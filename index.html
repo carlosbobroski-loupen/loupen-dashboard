@@ -158,6 +158,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <span style="font-size:12px;color:var(--muted);margin-left:auto" id="l-filter-count"></span>
   </div>
 
+  <!-- FILTRO GA4 DOMÍNIO (visível nas views de analytics) -->
+  <div class="global-filters" id="ga-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-world"></i>Domínio</span>
+    <select class="filter-sel" id="f-dominio" onchange="mudarDominio(this.value)">
+      <option value="all">Todos os domínios</option>
+      <option value="503864241">loupen.com.br</option>
+      <option value="541927286">pages.loupen.com.br</option>
+    </select>
+    <div style="font-size:11px;color:var(--muted);display:flex;gap:12px;margin-left:8px">
+      <span id="ga-prop-1" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block"></span>loupen.com.br</span>
+      <span id="ga-prop-2" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>pages.loupen.com.br</span>
+    </div>
+  </div>
+
   <!-- OVERVIEW -->
   <div class="view active" id="view-overview">
     <div class="kpi-grid">
@@ -291,7 +305,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ── CONFIG ──────────────────────────────────────────────────
-const PROP    = '503864241';
+const PROPS = [
+  { id: '503864241',  label: 'loupen.com.br' },
+  { id: '541927286',  label: 'pages.loupen.com.br' }
+];
+let activeProp = 'all'; // 'all' | '503864241' | '541927286'
 const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
 const META_TOKEN   = 'EAAnwZAoVKOWUBR2Yls6fEMqLfZAR3ZARj6akUoTPqIrMN5MyMBGJWo8MYIUghdA6e7oyVJ3r6ZCd2NUIcCKNmZCzZBjQyEZBrzSfCZCIHTUYwZB1sQGxC6w2ikfJROvR4MEbsyLGZAdVAI0XplZBjB7vyZBKRmJIftussxxdgiVC68mBzJK6ZCRBMVRLjbLgAZCHM8';
 const META_ACCOUNT = 'act_2412716725845249';
@@ -310,9 +328,11 @@ function showView(id){
   document.getElementById('view-'+id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
   document.getElementById('page-title').textContent=VIEWS[id]||id;
-  // Mostrar filtros globais apenas na view de leads
+  // Mostrar filtros por view
   const gf = document.getElementById('global-filters');
-  if (gf) gf.classList.toggle('visible', id==='leads');
+  const gaf = document.getElementById('ga-filters');
+  if (gf)  gf.classList.toggle('visible',  id==='leads');
+  if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -362,9 +382,40 @@ async function getToken(){
   const d=await r.json();if(!d.access_token)throw new Error('GA4 Auth: '+JSON.stringify(d));
   return d.access_token;
 }
-async function ga4q(token,body){
-  const r=await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${PROP}:runReport`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+async function ga4q(token, body, propId) {
+  const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propId}:runReport`, {
+    method:'POST',
+    headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
   return r.json();
+}
+
+async function ga4qAll(token, body) {
+  const props = activeProp === 'all' ? PROPS : PROPS.filter(p => p.id === activeProp);
+  const results = await Promise.all(props.map(p => ga4q(token, body, p.id)));
+  // Mesclar rows de todas as propriedades
+  if (results.length === 1) return results[0];
+  const merged = { rows: [] };
+  const map = {};
+  results.forEach((res, pi) => {
+    (res.rows || []).forEach(row => {
+      const key = row.dimensionValues.map(d => d.value).join('||');
+      if (!map[key]) {
+        map[key] = { dimensionValues: row.dimensionValues, metricValues: row.metricValues.map(m => ({ value: m.value })) };
+        merged.rows.push(map[key]);
+      } else {
+        // Somar métricas numéricas (exceto bounceRate que é média)
+        row.metricValues.forEach((m, i) => {
+          const cur = parseFloat(map[key].metricValues[i].value) || 0;
+          const add = parseFloat(m.value) || 0;
+          map[key].metricValues[i].value = String(cur + add);
+        });
+      }
+    });
+  });
+  // Recalcular bounceRate como média ponderada por sessões (índice 2 nos relatórios de canal)
+  return merged;
 }
 
 // ── META ADS ─────────────────────────────────────────────────
@@ -479,6 +530,11 @@ function normCanal(utm_source, conv_channel, conv_source) {
 // ── LEADS ────────────────────────────────────────────────────
 let _allLeads = [];
 
+function mudarDominio(val) {
+  activeProp = val;
+  loadGA4().catch(console.error);
+}
+
 function aplicarFiltros() {
   const fEvento = document.getElementById('f-evento')?.value || '';
   const fStage  = document.getElementById('f-stage')?.value || '';
@@ -589,10 +645,18 @@ async function loadGA4(){
   const token=await getToken();
   const dr=[{startDate:period().startDate,endDate:period().endDate}];
   const sc={scales:scOpts()};
+
+  // Atualizar label do filtro de domínio
+  const domSel = document.getElementById('f-dominio');
+  if (domSel) {
+    const lbl = activeProp === 'all' ? 'Todos os domínios' : PROPS.find(p=>p.id===activeProp)?.label || '';
+    // já populado no init
+  }
+
   const [r1,r2,r3]=await Promise.all([
-    ga4q(token,{dateRanges:dr,dimensions:[{name:'sessionDefaultChannelGroup'}],metrics:[{name:'sessions'},{name:'activeUsers'},{name:'bounceRate'},{name:'conversions'}]}),
-    ga4q(token,{dateRanges:dr,dimensions:[{name:'sessionCampaignName'},{name:'sessionSource'},{name:'sessionMedium'}],metrics:[{name:'sessions'},{name:'conversions'},{name:'bounceRate'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:15}),
-    ga4q(token,{dateRanges:dr,dimensions:[{name:'landingPagePlusQueryString'}],metrics:[{name:'sessions'},{name:'bounceRate'},{name:'conversions'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:10})
+    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'sessionDefaultChannelGroup'}],metrics:[{name:'sessions'},{name:'activeUsers'},{name:'bounceRate'},{name:'conversions'}]}),
+    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'sessionCampaignName'},{name:'sessionSource'},{name:'sessionMedium'}],metrics:[{name:'sessions'},{name:'conversions'},{name:'bounceRate'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:15}),
+    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'landingPagePlusQueryString'}],metrics:[{name:'sessions'},{name:'bounceRate'},{name:'conversions'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:10})
   ]);
   const rows1=r1.rows||[];
   let tS=0,tU=0,tC=0,bS=0;
