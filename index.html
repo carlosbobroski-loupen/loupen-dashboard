@@ -79,6 +79,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .view{display:none}
 .view.active{display:block}
 .empty{color:var(--muted);text-align:center;padding:24px;font-size:13px}
+.meta-tabs{display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 8px}
+.meta-tab{background:none;border:none;color:var(--muted);font-size:13px;font-family:var(--font);padding:12px 16px;cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;transition:all .15s}
+.meta-tab:hover{color:var(--text)}
+.meta-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.meta-tab i{font-size:15px}
 
 .filter-sel{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;outline:none;min-width:160px}
 .filter-clear{background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:4px}
@@ -453,337 +458,180 @@ async function ga4qAll(token, body) {
 }
 
 // ── META ADS ─────────────────────────────────────────────────
+function switchMetaTab(tab) {
+  document.querySelectorAll('.meta-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.meta-tab-content').forEach(c => c.style.display = 'none');
+  document.querySelector(`.meta-tab[onclick*="${tab}"]`).classList.add('active');
+  document.getElementById(`meta-tab-${tab}`).style.display = 'block';
+  const counts = { camps: _metaData.camps.length, adsets: _metaData.adsets.length, ads: _metaData.ads.length };
+  document.getElementById('m-tab-badge').textContent = counts[tab] + ' ' + (tab === 'camps' ? 'campanhas' : tab === 'adsets' ? 'conjuntos' : 'anúncios');
+}
+
+let _metaData = { camps: [], adsets: [], ads: [] };
+
 async function loadMeta(){
-  const p=period();
-  const since=p.startDate, until=p.endDate;
-  // Pedimos também 'actions' para extrair conversões (leads)
-  const fields='name,status,insights.fields(spend,impressions,clicks,ctr,cpc,reach,actions,cost_per_action_type)';
-  const url=`https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns?fields=${encodeURIComponent(fields)}&time_range={"since":"${since}","until":"${until}"}&access_token=${META_TOKEN}&limit=50`;
-  const r=await fetch(url);
-  const d=await r.json();
-  if(d.error)throw new Error('Meta API: '+d.error.message);
+  const p = period();
 
-  // Excluir campanhas indesejadas (Ebook não deve aparecer)
-  const EXCLUIR = ['[CON] [LP] Ebook'];
-  const camps=(d.data||[]).filter(c=>!EXCLUIR.some(ex=>c.name.includes(ex)));
+  // Construir time_range — suporta "hoje" também
+  const timeRange = `{"since":"${p.startDate}","until":"${p.endDate}"}`;
 
-  let totSpend=0,totImpr=0,totClicks=0,totReach=0,totConv=0;
-  const campRows=[];
-  camps.forEach(c=>{
-    const ins=(c.insights&&c.insights.data&&c.insights.data[0])||{};
-    const spend=parseFloat(ins.spend||0);
-    const impr=parseInt(ins.impressions||0);
-    const clicks=parseInt(ins.clicks||0);
-    const ctr=parseFloat(ins.ctr||0);
-    const cpc=parseFloat(ins.cpc||0);
-    const reach=parseInt(ins.reach||0);
+  // Campos espelhando o Gerenciador de Anúncios Meta
+  const insightFields = 'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,cost_per_action_type,cost_per_result,objective';
 
-    // Extrair conversões/leads de actions (pode ser "lead", "onsite_conversion.lead_grouped" ou "offsite_conversion.fb_pixel_lead")
-    let conv = 0;
+  // ── 1. CAMPANHAS ──
+  const campsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns`
+    + `?fields=name,status,effective_status,objective,insights.fields(${insightFields}){time_range}`
+    + `&time_range=${encodeURIComponent(timeRange)}`
+    + `&limit=50&access_token=${META_TOKEN}`;
+
+  // ── 2. CONJUNTOS DE ANÚNCIOS ──
+  const adsetsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/adsets`
+    + `?fields=name,status,effective_status,campaign_id,campaign{name},insights.fields(${insightFields}){time_range}`
+    + `&time_range=${encodeURIComponent(timeRange)}`
+    + `&limit=100&access_token=${META_TOKEN}`;
+
+  // ── 3. ANÚNCIOS ──
+  const adsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/ads`
+    + `?fields=name,status,effective_status,adset_id,adset{name},insights.fields(${insightFields}){time_range}`
+    + `&time_range=${encodeURIComponent(timeRange)}`
+    + `&limit=100&access_token=${META_TOKEN}`;
+
+  const [campsRes, adsetsRes, adsRes] = await Promise.all([
+    fetch(campsUrl).then(r=>r.json()),
+    fetch(adsetsUrl).then(r=>r.json()),
+    fetch(adsUrl).then(r=>r.json())
+  ]);
+
+  if (campsRes.error) throw new Error('Meta Campanhas: ' + campsRes.error.message);
+  if (adsetsRes.error) throw new Error('Meta Conjuntos: ' + adsetsRes.error.message);
+  if (adsRes.error) throw new Error('Meta Anúncios: ' + adsRes.error.message);
+
+  // Função para extrair insights e resultados (espelhando o Meta)
+  function parseInsights(item) {
+    const ins = item.insights?.data?.[0] || {};
+    const spend    = parseFloat(ins.spend || 0);
+    const impr     = parseInt(ins.impressions || 0);
+    const clicks   = parseInt(ins.clicks || 0);
+    const ctr      = parseFloat(ins.ctr || 0);
+    const cpc      = parseFloat(ins.cpc || 0);
+    const reach    = parseInt(ins.reach || 0);
+    const freq     = parseFloat(ins.frequency || 0);
+
+    // Resultados = leads ou cliques dependendo do objetivo
+    // Mesma lógica do Meta: busca "lead" em actions, fallback para "link_click"
     const actions = ins.actions || [];
-    actions.forEach(a=>{
-      if(a.action_type==='lead' || a.action_type==='onsite_conversion.lead_grouped' || a.action_type==='offsite_conversion.fb_pixel_lead') {
-        conv += parseInt(a.value)||0;
-      }
-    });
+    let results = 0;
+    let resultType = '—';
+    const leadAction = actions.find(a =>
+      a.action_type === 'lead' ||
+      a.action_type === 'onsite_conversion.lead_grouped' ||
+      a.action_type === 'offsite_conversion.fb_pixel_lead'
+    );
+    if (leadAction) {
+      results = parseInt(leadAction.value || 0);
+      resultType = 'Lead no site';
+    } else {
+      const clickAction = actions.find(a => a.action_type === 'link_click');
+      if (clickAction) { results = parseInt(clickAction.value || 0); resultType = 'Clique no link'; }
+    }
 
-    // CPL por campanha
-    const cpl = conv > 0 ? spend/conv : 0;
+    // Custo por resultado
+    const costPerResult = results > 0 ? spend / results : 0;
 
-    totSpend+=spend;totImpr+=impr;totClicks+=clicks;totReach+=reach;totConv+=conv;
-    campRows.push({name:c.name,status:c.status,spend,impr,clicks,ctr,cpc,reach,conv,cpl});
-  });
+    return { spend, impr, clicks, ctr, cpc, reach, freq, results, resultType, costPerResult };
+  }
 
-  // CPL geral
-  const cpl=totConv>0?(totSpend/totConv):0;
+  // Processar campanhas
+  const camps = (campsRes.data || []).map(c => ({
+    name: c.name, status: c.effective_status || c.status,
+    ...parseInsights(c)
+  }));
 
-  // KPIs Meta
-  document.getElementById('m-spend').textContent=brl(totSpend);
-  document.getElementById('m-impr').textContent=fmt(totImpr);
-  document.getElementById('m-clicks').textContent=fmt(totClicks);
-  document.getElementById('m-ctr').textContent=totClicks&&totImpr?(totClicks/totImpr*100).toFixed(2)+'%':'—';
-  document.getElementById('m-reach').textContent=fmt(totReach);
-  document.getElementById('m-cpl').textContent=cpl>0?brl(cpl):'—';
+  // Processar conjuntos
+  const adsets = (adsetsRes.data || []).map(a => ({
+    name: a.name, status: a.effective_status || a.status,
+    campaign: a.campaign?.name || '—',
+    ...parseInsights(a)
+  }));
 
-  // Overview KPIs
-  document.getElementById('ov-meta-spend').textContent=brl(totSpend);
-  document.getElementById('ov-meta-cpl').textContent=cpl>0?brl(cpl):'—';
-  // Atualizar KPIs Meta totais
-  const ovConv = document.getElementById('m-conv-total');
-  if(ovConv) ovConv.textContent = fmt(totConv);
+  // Processar anúncios
+  const ads = (adsRes.data || []).map(a => ({
+    name: a.name, status: a.effective_status || a.status,
+    adset: a.adset?.name || '—',
+    ...parseInsights(a)
+  }));
 
-  // Tabela campanhas
-  document.getElementById('m-camps-badge').textContent=campRows.length+' campanhas';
-  document.getElementById('m-camps-body').innerHTML=campRows.length?campRows.map(c=>`<tr>
+  _metaData = { camps, adsets, ads };
+
+  // ── KPIs TOTAIS (soma das campanhas) ──
+  const totSpend  = camps.reduce((s,c) => s+c.spend, 0);
+  const totImpr   = camps.reduce((s,c) => s+c.impr, 0);
+  const totClicks = camps.reduce((s,c) => s+c.clicks, 0);
+  const totReach  = camps.reduce((s,c) => s+c.reach, 0);
+  const totResults= camps.reduce((s,c) => s+c.results, 0);
+  const ctrGeral  = totImpr > 0 ? (totClicks/totImpr*100) : 0;
+  const cplGeral  = totResults > 0 ? totSpend/totResults : 0;
+
+  document.getElementById('m-spend').textContent  = brl(totSpend);
+  document.getElementById('m-impr').textContent   = fmt(totImpr);
+  document.getElementById('m-clicks').textContent = fmt(totClicks);
+  document.getElementById('m-ctr').textContent    = ctrGeral.toFixed(2)+'%';
+  document.getElementById('m-reach').textContent  = fmt(totReach);
+  document.getElementById('m-cpl').textContent    = cplGeral > 0 ? brl(cplGeral) : '—';
+  document.getElementById('ov-meta-spend').textContent = brl(totSpend);
+  document.getElementById('ov-meta-cpl').textContent   = cplGeral > 0 ? brl(cplGeral) : '—';
+
+  // ── TABELA CAMPANHAS ──
+  document.getElementById('m-camps-body').innerHTML = camps.length ? camps.map(c => `<tr>
     <td><div class="t-name">${c.name}</div></td>
     <td>${statusChip(c.status)}</td>
-    <td style="font-family:var(--mono)">${brl(c.spend)}</td>
-    <td>${fmt(c.impr)}</td>
+    <td style="font-weight:500">${c.results > 0 ? fmt(c.results) : '—'}<div class="t-sub">${c.resultType}</div></td>
+    <td>${fmt(c.reach)}</td>
+    <td>${c.freq > 0 ? c.freq.toFixed(2) : '—'}</td>
+    <td style="font-family:var(--mono)">${c.costPerResult > 0 ? brl(c.costPerResult) : '—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(c.spend)}</td>
     <td>${fmt(c.clicks)}</td>
     <td class="${c.ctr>2?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
-    <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
-    <td style="font-weight:500">${fmt(c.conv)}</td>
-    <td style="font-family:var(--mono);font-weight:500">${c.cpl>0?brl(c.cpl):'—'}</td>
-  </tr>`).join(''):`<tr><td colspan="9" class="empty">Nenhuma campanha com dados no período</td></tr>`;
+    <td style="font-family:var(--mono)">${c.cpc > 0 ? brl(c.cpc) : '—'}</td>
+  </tr>`).join('') : '<tr><td colspan="10" class="empty">Nenhuma campanha no período</td></tr>';
 
-  // Barras gasto
-  const spendRows=campRows.sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,22),v:c.spend,fmt:brl(c.spend)}));
-  mkBars(document.getElementById('m-spend-bars'),spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}],CORES[3]);
-  mkBars(document.getElementById('ov-meta-bars'),spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}],CORES[3]);
+  // ── TABELA CONJUNTOS ──
+  document.getElementById('m-adsets-body').innerHTML = adsets.length ? adsets.map(a => `<tr>
+    <td><div class="t-name">${a.name}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${a.campaign}</td>
+    <td>${statusChip(a.status)}</td>
+    <td style="font-weight:500">${a.results > 0 ? fmt(a.results) : '—'}<div class="t-sub">${a.resultType}</div></td>
+    <td>${fmt(a.reach)}</td>
+    <td style="font-family:var(--mono)">${a.costPerResult > 0 ? brl(a.costPerResult) : '—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(a.spend)}</td>
+    <td>${fmt(a.clicks)}</td>
+    <td class="${a.ctr>2?'rej-ok':a.ctr>1?'rej-warn':'rej-bad'}">${a.ctr.toFixed(2)}%</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhum conjunto no período</td></tr>';
 
-  // Donut cliques
-  const clickRows=campRows.sort((a,b)=>b.clicks-a.clicks).slice(0,6);
-  mkLeg(document.getElementById('m-click-leg'),clickRows.map(c=>c.name.slice(0,18)));
-  mkChart('c-meta-clicks','doughnut',clickRows.map(c=>c.name.slice(0,18)),[{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
-}
+  // ── TABELA ANÚNCIOS ──
+  document.getElementById('m-ads-body').innerHTML = ads.length ? ads.map(a => `<tr>
+    <td><div class="t-name">${a.name}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${a.adset}</td>
+    <td>${statusChip(a.status)}</td>
+    <td style="font-weight:500">${a.results > 0 ? fmt(a.results) : '—'}<div class="t-sub">${a.resultType}</div></td>
+    <td>${fmt(a.reach)}</td>
+    <td style="font-family:var(--mono)">${a.costPerResult > 0 ? brl(a.costPerResult) : '—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(a.spend)}</td>
+    <td>${fmt(a.clicks)}</td>
+    <td class="${a.ctr>2?'rej-ok':a.ctr>1?'rej-warn':'rej-bad'}">${a.ctr.toFixed(2)}%</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhum anúncio no período</td></tr>';
 
+  // Badge da tab ativa
+  document.getElementById('m-tab-badge').textContent = camps.length + ' campanhas';
 
-// ── NORMALIZAÇÃO DE DADOS ────────────────────────────────────
+  // ── GRÁFICOS ──
+  const spendRows = [...camps].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
+  mkBars(document.getElementById('m-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], CORES[3]);
 
-function normEvento(v) {
-  if (!v) return 'Não informado';
-  const s = v.toLowerCase();
-  if (s.includes('rescue') && s.includes('eco')) return 'Rescue Licença Eco';
-  if (s.includes('webinar') && s.includes('goto')) return 'Webinar GoTo — Jul/26';
-  if (s.includes('webinar')) return 'Webinar';
-  return v;
-}
-function normCargo(v) {
-  if (!v) return 'Não informado';
-  const s = v.toLowerCase().replace(/_/g, ' ').replace(/,/g, ' ').trim();
-  if (s.includes('ceo') || s.includes('founder') || s.includes('sócio') || s.includes('socio')) return 'CEO / Founder / Sócio';
-  if (s.includes('diretor')) return 'Diretor';
-  if (s.includes('gerente')) return 'Gerente';
-  if (s.includes('coordenador') || s.includes('supervisor')) return 'Coordenador / Supervisor';
-  if (s.includes('analista')) return 'Analista';
-  if (s.includes('outro')) return 'Outro';
-  return v.replace(/_/g, ' ').replace(/,_/g, ', ');
-}
-
-function normPorte(v) {
-  if (!v) return 'Não informado';
-  const s = v.replace(/_/g, ' ').toLowerCase().trim();
-  if (s.includes('1 a 19') || s.includes('1_a_19')) return '1 a 19 func.';
-  if (s.includes('20 a 99') || s.includes('20_a_99')) return '20 a 99 func.';
-  if (s.includes('100 a 249') || s.includes('100_a_249')) return '100 a 249 func.';
-  if (s.includes('250 a 499') || s.includes('250_a_499')) return '250 a 499 func.';
-  if (s.includes('500') || s.includes('999')) return '500+ func.';
-  if (s.includes('1000') || s.includes('1.000')) return '1.000+ func.';
-  return v.replace(/_/g, ' ');
-}
-
-function normCanal(utm_source, conv_channel, conv_source) {
-  const s = (utm_source || conv_channel || conv_source || '').toLowerCase().trim();
-  if (s.includes('meta') || s.includes('facebook') || s.includes('instagram')) return 'Meta ADS';
-  if (s.includes('google') || s.includes('googleads')) return 'Google ADS';
-  if (s === 'paid search' || s === 'cpc') return 'Google ADS';
-  if (s === 'organic' || s.includes('organic')) return 'Orgânico';
-  if (s === 'email' || s.includes('email')) return 'E-mail';
-  if (s === 'direct' || s === '(direct)' || s === '') return 'Direto';
-  return utm_source || conv_channel || conv_source || 'Direto';
-}
-
-// ── LEADS ────────────────────────────────────────────────────
-let _allLeads = [];
-
-function mudarDominio(val) {
-  activeProp = val;
-  loadGA4().catch(console.error);
-}
-
-function parseDataLead(v) {
-  // Tenta interpretar a data do lead em vários formatos
-  if (!v) return null;
-  const s = v.toString();
-  // Formato gviz: Date(2026,5,18,14,54,18) — meses 0-indexados
-  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
-  if (m) return new Date(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
-  // Formato dd/MM/yyyy
-  const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (m2) return new Date(parseInt(m2[3]), parseInt(m2[2])-1, parseInt(m2[1]));
-  // ISO
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
-}
-
-function aplicarFiltros() {
-  const fEvento = document.getElementById('f-evento')?.value || '';
-  const fStage  = document.getElementById('f-stage')?.value || '';
-  const p = period();
-  const dStart = new Date(p.startDate + 'T00:00:00');
-  const dEnd   = new Date(p.endDate   + 'T23:59:59');
-
-  let rows = _allLeads || [];
-
-  // Filtro de data (usa col 26 created_at, fallback col 0 data)
-  rows = rows.filter(r => {
-    const d = parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v);
-    if (!d) return true; // se não consegue parsear, mantém
-    return d >= dStart && d <= dEnd;
-  });
-
-  if (fEvento) {
-    rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
-  }
-  if (fStage === 'qualificado') {
-    rows = rows.filter(r => (r.c[24]?.v||'').toLowerCase().includes('qualificado'));
-  } else if (fStage === 'apenas_lead') {
-    rows = rows.filter(r => !(r.c[24]?.v||'').toLowerCase().includes('qualificado'));
-  }
-
-  renderLeads(rows);
-
-  // Atualizar KPIs da Visão Geral com os leads filtrados também
-  document.getElementById('ov-leads').textContent = fmt(rows.length);
-
-  const hasFilter = fEvento || fStage;
-  const cnt = document.getElementById('l-filter-count');
-  if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
-}
-
-function limparFiltros() {
-  const fe = document.getElementById('f-evento'); if(fe) fe.value='';
-  const fs = document.getElementById('f-stage');  if(fs) fs.value='';
-  renderLeads(_allLeads);
-  const cnt = document.getElementById('l-filter-count'); if(cnt) cnt.textContent='';
-}
-
-function renderLeads(rows) {
-  // KPIs
-  const lq = rows.filter(r=>(r.c[24]?.v||'').includes('Qualificado')).length;
-  document.getElementById('l-total').textContent = fmt(rows.length);
-  document.getElementById('l-lq').textContent    = fmt(lq);
-  document.getElementById('l-taxa').textContent  = rows.length ? Math.round(lq/rows.length*100)+'%' : '—';
-
-  // Barras canal
-  const byCan={};
-  rows.forEach(r=>{const v=normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v);byCan[v]=(byCan[v]||0)+1;});
-  const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
-  mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
-
-  // Barras cargo
-  const byCargo={};
-  rows.forEach(r=>{const v=normCargo(r.c[6]?.v);byCargo[v]=(byCargo[v]||0)+1;});
-  mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
-
-  // Barras porte
-  const byPorte={};
-  rows.forEach(r=>{const v=normPorte(r.c[7]?.v);byPorte[v]=(byPorte[v]||0)+1;});
-  const ordemPorte=['1 a 19 func.','20 a 99 func.','100 a 249 func.','250 a 499 func.','500+ func.','1.000+ func.','Não informado'];
-  const porteRows=Object.entries(byPorte).sort((a,b)=>(ordemPorte.indexOf(a[0])-ordemPorte.indexOf(b[0]))||b[1]-a[1]).map(([label,v])=>({label,v}));
-  mkBars(document.getElementById('l-porte'),porteRows,CORES[4]);
-
-  // Barras evento
-  const byEvento={};
-  rows.forEach(r=>{const v=normEvento(r.c[1]?.v);byEvento[v]=(byEvento[v]||0)+1;});
-  mkBars(document.getElementById('l-evento'),Object.entries(byEvento).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v})),CORES[3]);
-
-  // Tabela todos os leads
-  document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
-    const c=r.c||[];const bc=(c[24]?.v||'').includes('Qualificado')?'lq':'lead';
-    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${normCargo(c[6]?.v)}</td><td style="font-size:11px;color:var(--muted)">${normPorte(c[7]?.v)}</td><td>${pill(normCanal(c[15]?.v,c[14]?.v,c[10]?.v))}</td><td style="font-size:11px;color:var(--muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${normEvento(c[1]?.v)}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
-  }).join('');
-
-  // Google/Meta ADS bars
-  mkBars(document.getElementById('gads-bars'),canRows.filter(r=>r.label==='Google ADS').length?canRows.filter(r=>r.label==='Google ADS'):[{label:'Sem dados Google',v:0}],CORES[0]);
-  mkBars(document.getElementById('meta-bars'),canRows.filter(r=>r.label==='Meta ADS').length?canRows.filter(r=>r.label==='Meta ADS'):[{label:'Sem dados Meta',v:0}],CORES[3]);
-}
-
-async function loadLeads(){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
-  const r=await fetch(url);
-  const txt=await r.text();
-  const start=txt.indexOf('{');
-  const end=txt.lastIndexOf('}')+1;
-  const d=JSON.parse(txt.slice(start,end));
-  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
-
-  // 1. Guardar todos os leads para uso pelos filtros
-  _allLeads = rows;
-
-  // 2. Popular o select de eventos com valores únicos
-  const eventos = [...new Set(rows.map(r=>normEvento(r.c[1]?.v)).filter(Boolean))].sort();
-  const selEvento = document.getElementById('f-evento');
-  if (selEvento) {
-    const cur = selEvento.value;
-    selEvento.innerHTML = '<option value="">Todos os eventos</option>' +
-      eventos.map(e=>`<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');
-  }
-
-  // 3. KPIs da visão geral e badge
-  document.getElementById('ov-leads').textContent = fmt(rows.length);
-  document.getElementById('leads-badge').textContent = rows.length + ' leads';
-
-  // 4. Tabela "Leads recentes" da Visão Geral (sempre mostra TODOS, não filtra)
-  document.getElementById('ov-leads-body').innerHTML = rows.slice(-8).reverse().map(r=>{
-    const c = r.c || [];
-    const bc = (c[24]?.v||'').toLowerCase().includes('qualificado') ? 'lq' : 'lead';
-    return `<tr>
-      <td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td>
-      <td style="color:var(--muted);font-size:12px">${normCargo(c[6]?.v)}</td>
-      <td>${pill(normCanal(c[15]?.v, c[14]?.v, c[10]?.v))}</td>
-      <td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td>
-      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td>
-    </tr>`;
-  }).join('');
-
-  // 5. Renderizar view de leads (aplicando filtros se ativos)
-  aplicarFiltros();
-}
-
-// ── GA4 ──────────────────────────────────────────────────────
-async function loadGA4(){
-  const token=await getToken();
-  const dr=[{startDate:period().startDate,endDate:period().endDate}];
-  const sc={scales:scOpts()};
-
-  // Atualizar label do filtro de domínio
-  const domSel = document.getElementById('f-dominio');
-  if (domSel) {
-    const lbl = activeProp === 'all' ? 'Todos os domínios' : PROPS.find(p=>p.id===activeProp)?.label || '';
-    // já populado no init
-  }
-
-  const [r1,r2,r3]=await Promise.all([
-    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'sessionDefaultChannelGroup'}],metrics:[{name:'sessions'},{name:'activeUsers'},{name:'bounceRate'},{name:'conversions'}]}),
-    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'sessionCampaignName'},{name:'sessionSource'},{name:'sessionMedium'}],metrics:[{name:'sessions'},{name:'conversions'},{name:'bounceRate'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:15}),
-    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'landingPagePlusQueryString'}],metrics:[{name:'sessions'},{name:'bounceRate'},{name:'conversions'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:10})
-  ]);
-  const rows1=r1.rows||[];
-  let tS=0,tU=0,tC=0,bS=0;
-  rows1.forEach(r=>{tS+=parseInt(r.metricValues[0].value)||0;tU+=parseInt(r.metricValues[1].value)||0;bS+=parseFloat(r.metricValues[2].value)||0;tC+=parseInt(r.metricValues[3].value)||0;});
-  const ab=rows1.length?(bS/rows1.length*100).toFixed(1)+'%':'—';
-  ['ov-sess','ga-sess'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tS);});
-  ['ga-users'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tU);});
-  ['ga-conv'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tC);});
-  ['ov-bounce','ga-bounce'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=ab;});
-  const labs=rows1.map(r=>r.dimensionValues[0].value);
-  const dS=rows1.map(r=>parseInt(r.metricValues[0].value)||0);
-  const dC=rows1.map(r=>parseInt(r.metricValues[3].value)||0);
-  mkLeg(document.getElementById('ov-leg1'),labs);
-  mkLeg(document.getElementById('ga-leg'),labs);
-  const barDs=[{label:'Sessões',data:dS,backgroundColor:CORES.slice(0,labs.length),borderWidth:0,borderRadius:4}];
-  mkChart('c-canal','bar',labs,barDs,sc);
-  mkChart('c-ga-canal','bar',labs,barDs,sc);
-  document.getElementById('ga-body').innerHTML=rows1.map((r,i)=>`<tr>
-    <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CORES[i%CORES.length]};margin-right:8px;vertical-align:middle"></span>${r.dimensionValues[0].value}</td>
-    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[1].value)}</td><td>${fmt(r.metricValues[3].value)}</td>
-    <td class="${rcl(r.metricValues[2].value)}">${pct(r.metricValues[2].value)}</td>
-  </tr>`).join('');
-  const rows2=r2.rows||[];
-  document.getElementById('utm-body').innerHTML=rows2.length?rows2.map(r=>`<tr>
-    <td><div class="t-name">${r.dimensionValues[0].value||'(sem nome)'}</div></td>
-    <td style="font-size:11px;color:var(--muted)">${r.dimensionValues[1].value} / ${r.dimensionValues[2].value}</td>
-    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[1].value)}</td>
-    <td class="${rcl(r.metricValues[2].value)}">${pct(r.metricValues[2].value)}</td>
-  </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhuma campanha UTM no período</td></tr>`;
-  const rows3=r3.rows||[];
-  document.getElementById('lp-body').innerHTML=rows3.length?rows3.map(r=>{
-    const u=r.dimensionValues[0].value;
-    return`<tr><td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${u}">${u.length>60?'…'+u.slice(-58):u}</td>
-    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[2].value)}</td>
-    <td class="${rcl(r.metricValues[1].value)}">${pct(r.metricValues[1].value)}</td></tr>`;
-  }).join(''):`<tr><td colspan="4" class="empty">Sem dados no período</td></tr>`;
+  const resultRows = [...camps].sort((a,b)=>b.results-a.results).slice(0,6);
+  mkLeg(document.getElementById('m-click-leg'), resultRows.map(c=>c.name.slice(0,18)));
+  mkChart('c-meta-clicks','doughnut', resultRows.map(c=>c.name.slice(0,18)),
+    [{data:resultRows.map(c=>c.results||c.clicks),backgroundColor:CORES.slice(0,resultRows.length),borderWidth:0}],{cutout:'62%'});
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
