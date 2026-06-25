@@ -83,6 +83,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .filter-sel{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;outline:none;min-width:160px}
 .filter-clear{background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:4px}
 .filter-clear:hover{border-color:var(--red);color:var(--red)}
+.date-range-wrap{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 12px}
+.date-input{background:none;border:none;color:var(--text);font-size:12px;font-family:var(--font);cursor:pointer;outline:none;width:110px}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:pointer}
+.date-presets{display:flex;gap:4px;margin-left:4px;border-left:1px solid var(--border);padding-left:8px}
+.preset-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:5px;font-size:11px;font-family:var(--font);cursor:pointer;transition:all .15s}
+.preset-btn:hover,.preset-btn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+.global-filters{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:20px}
+.global-filters.visible{display:flex}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
 .meta-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:6px;background:var(--purple-dim);color:var(--purple);font-weight:500}
 .status-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:5px;font-weight:500}
@@ -119,14 +127,35 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <div class="topbar">
     <div class="page-title" id="page-title">Visão geral</div>
     <div class="topbar-right">
-      <select class="period-select" id="period" onchange="carregarTudo()">
-        <option value="7">Últimos 7 dias</option>
-        <option value="30" selected>Últimos 30 dias</option>
-        <option value="60">Últimos 60 dias</option>
-        <option value="90">Últimos 90 dias</option>
-      </select>
+      <div class="date-range-wrap">
+        <i class="ti ti-calendar" style="color:var(--muted);font-size:15px"></i>
+        <input type="date" class="date-input" id="date-start" onchange="carregarTudo()">
+        <span style="color:var(--muted);font-size:12px">até</span>
+        <input type="date" class="date-input" id="date-end" onchange="carregarTudo()">
+        <div class="date-presets">
+          <button class="preset-btn active" onclick="setPreset(7,this)">7d</button>
+          <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+          <button class="preset-btn" onclick="setPreset(60,this)">60d</button>
+          <button class="preset-btn" onclick="setPreset(90,this)">90d</button>
+        </div>
+      </div>
       <button class="btn-refresh" onclick="carregarTudo()"><i class="ti ti-refresh"></i>Atualizar</button>
     </div>
+  </div>
+
+  <!-- FILTROS GLOBAIS -->
+  <div class="global-filters" id="global-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="f-evento" onchange="aplicarFiltros()">
+      <option value="">Todos os eventos</option>
+    </select>
+    <select class="filter-sel" id="f-stage" onchange="aplicarFiltros()">
+      <option value="">Todos os estágios</option>
+      <option value="qualificado">Lead Qualificado</option>
+      <option value="apenas_lead">Lead (não qualificado)</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltros()"><i class="ti ti-x"></i>Limpar</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="l-filter-count"></span>
   </div>
 
   <!-- OVERVIEW -->
@@ -161,24 +190,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="kpi blue"><div class="kpi-label">Total de leads</div><div class="kpi-value" id="l-total">—</div></div>
       <div class="kpi green"><div class="kpi-label">Qualificados</div><div class="kpi-value" id="l-lq">—</div></div>
       <div class="kpi amber"><div class="kpi-label">Taxa qualif.</div><div class="kpi-value" id="l-taxa">—</div></div>
-      <div class="kpi purple"><div class="kpi-label">Conversões</div><div class="kpi-value" id="l-camps">—</div></div>
-    </div>
-
-    <!-- FILTROS -->
-    <div class="card" style="padding:14px 20px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
-        <select class="filter-sel" id="f-evento" onchange="aplicarFiltros()">
-          <option value="">Todos os eventos</option>
-        </select>
-        <select class="filter-sel" id="f-stage" onchange="aplicarFiltros()">
-          <option value="">Todos os estágios</option>
-          <option value="Lead Qualificado">Lead Qualificado</option>
-          <option value="Lead">Lead</option>
-        </select>
-        <button class="filter-clear" onclick="limparFiltros()"><i class="ti ti-x"></i> Limpar</button>
-        <span style="font-size:12px;color:var(--muted);margin-left:auto" id="l-filter-count"></span>
-      </div>
+      <div class="kpi purple"><div class="kpi-label">Eventos</div><div class="kpi-value" id="l-camps">—</div></div>
     </div>
 
     <div class="two-col">
@@ -298,6 +310,9 @@ function showView(id){
   document.getElementById('view-'+id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
   document.getElementById('page-title').textContent=VIEWS[id]||id;
+  // Mostrar filtros globais apenas na view de leads
+  const gf = document.getElementById('global-filters');
+  if (gf) gf.classList.toggle('visible', id==='leads');
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -311,7 +326,25 @@ function statusChip(s){const l=(s||'').toUpperCase();if(l==='ACTIVE')return`<spa
 function mkChart(id,type,labels,datasets,extra={}){if(CC[id])CC[id].destroy();const c=document.getElementById(id);if(!c)return;CC[id]=new Chart(c,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},...extra}});}
 function mkLeg(el,labels){if(!el)return;el.innerHTML=labels.map((l,i)=>`<div class="leg"><div class="leg-dot" style="background:${CORES[i%CORES.length]}"></div>${l}</div>`).join('');}
 function mkBars(el,rows,color){if(!el)return;const max=Math.max(...rows.map(r=>r.v),1);const tot=rows.reduce((a,r)=>a+r.v,0);el.innerHTML=rows.map(r=>`<div class="bar-row"><div class="bar-label">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.v/max*100)}%;background:${color}"></div></div><div class="bar-val">${r.fmt?r.fmt:fmt(r.v)}</div></div>`).join('');}
-function period(){const d=parseInt(document.getElementById('period').value)||30;const h=new Date();const f=x=>x.toISOString().slice(0,10);return{days:d,startDate:f(new Date(h-d*86400000)),endDate:f(h),startUnix:Math.floor((h-d*86400000)/1000),endUnix:Math.floor(h/1000)};}
+function setPreset(days, btn) {
+  const h = new Date();
+  const f = x => x.toISOString().slice(0,10);
+  document.getElementById('date-end').value = f(h);
+  document.getElementById('date-start').value = f(new Date(h - days*86400000));
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  carregarTudo();
+}
+function period(){
+  const s = document.getElementById('date-start')?.value;
+  const e = document.getElementById('date-end')?.value;
+  const h = new Date();
+  const f = x => x.toISOString().slice(0,10);
+  const startDate = s || f(new Date(h - 30*86400000));
+  const endDate   = e || f(h);
+  const days = Math.round((new Date(endDate)-new Date(startDate))/86400000);
+  return{days,startDate,endDate,startUnix:Math.floor(new Date(startDate)/1000),endUnix:Math.floor(new Date(endDate)/1000)};
+}
 function scOpts(){return{x:{grid:{display:false},ticks:{color:'#7a7f8a',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#7a7f8a',font:{size:11}}}};}
 
 // ── GA4 AUTH ─────────────────────────────────────────────────
@@ -450,11 +483,21 @@ function aplicarFiltros() {
   const fEvento = document.getElementById('f-evento')?.value || '';
   const fStage  = document.getElementById('f-stage')?.value || '';
   let rows = _allLeads;
-  if (fEvento) rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
-  if (fStage)  rows = rows.filter(r => (r.c[24]?.v||'').includes(fStage === 'Lead Qualificado' ? 'Qualificado' : fStage) && !(fStage === 'Lead' && (r.c[24]?.v||'').includes('Qualificado')));
+
+  if (fEvento) {
+    rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
+  }
+  if (fStage === 'qualificado') {
+    rows = rows.filter(r => (r.c[24]?.v||'').toLowerCase().includes('qualificado'));
+  } else if (fStage === 'apenas_lead') {
+    rows = rows.filter(r => !(r.c[24]?.v||'').toLowerCase().includes('qualificado'));
+  }
+
   renderLeads(rows);
+
+  const hasFilter = fEvento || fStage;
   const cnt = document.getElementById('l-filter-count');
-  if (cnt) cnt.textContent = (fEvento||fStage) ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
+  if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
 }
 
 function limparFiltros() {
@@ -589,7 +632,17 @@ async function loadGA4(){
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
+async function initDates(){
+  const h = new Date();
+  const f = x => x.toISOString().slice(0,10);
+  const ds = document.getElementById('date-start');
+  const de = document.getElementById('date-end');
+  if (ds && !ds.value) ds.value = f(new Date(h - 30*86400000));
+  if (de && !de.value) de.value = f(h);
+}
+
 async function carregarTudo(){
+  await initDates();
   const pulse=document.getElementById('pulse');
   const stxt=document.getElementById('stxt');
   pulse.style.background='var(--amber)';
