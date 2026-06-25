@@ -268,7 +268,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas</div><div class="section-badge" id="m-camps-badge">—</div></div>
-      <table class="tbl"><thead><tr><th>Campanha</th><th>Status</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th></tr></thead><tbody id="m-camps-body"></tbody></table>
+      <table class="tbl"><thead><tr><th>Campanha</th><th>Status</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Conversões</th><th>CPL</th></tr></thead><tbody id="m-camps-body"></tbody></table>
     </div>
     <div class="two-col">
       <div class="card">
@@ -422,14 +422,18 @@ async function ga4qAll(token, body) {
 async function loadMeta(){
   const p=period();
   const since=p.startDate, until=p.endDate;
-  const fields='name,status,insights.fields(spend,impressions,clicks,ctr,cpc,reach,cost_per_result)';
-  const url=`https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns?fields=${encodeURIComponent(fields)}&time_range={"since":"${since}","until":"${until}"}&access_token=${META_TOKEN}&limit=20`;
+  // Pedimos também 'actions' para extrair conversões (leads)
+  const fields='name,status,insights.fields(spend,impressions,clicks,ctr,cpc,reach,actions,cost_per_action_type)';
+  const url=`https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns?fields=${encodeURIComponent(fields)}&time_range={"since":"${since}","until":"${until}"}&access_token=${META_TOKEN}&limit=50`;
   const r=await fetch(url);
   const d=await r.json();
   if(d.error)throw new Error('Meta API: '+d.error.message);
-  const camps=d.data||[];
 
-  let totSpend=0,totImpr=0,totClicks=0,totReach=0;
+  // Excluir campanhas indesejadas (Ebook não deve aparecer)
+  const EXCLUIR = ['[CON] [LP] Ebook'];
+  const camps=(d.data||[]).filter(c=>!EXCLUIR.some(ex=>c.name.includes(ex)));
+
+  let totSpend=0,totImpr=0,totClicks=0,totReach=0,totConv=0;
   const campRows=[];
   camps.forEach(c=>{
     const ins=(c.insights&&c.insights.data&&c.insights.data[0])||{};
@@ -439,12 +443,25 @@ async function loadMeta(){
     const ctr=parseFloat(ins.ctr||0);
     const cpc=parseFloat(ins.cpc||0);
     const reach=parseInt(ins.reach||0);
-    totSpend+=spend;totImpr+=impr;totClicks+=clicks;totReach+=reach;
-    campRows.push({name:c.name,status:c.status,spend,impr,clicks,ctr,cpc,reach});
+
+    // Extrair conversões/leads de actions (pode ser "lead", "onsite_conversion.lead_grouped" ou "offsite_conversion.fb_pixel_lead")
+    let conv = 0;
+    const actions = ins.actions || [];
+    actions.forEach(a=>{
+      if(a.action_type==='lead' || a.action_type==='onsite_conversion.lead_grouped' || a.action_type==='offsite_conversion.fb_pixel_lead') {
+        conv += parseInt(a.value)||0;
+      }
+    });
+
+    // CPL por campanha
+    const cpl = conv > 0 ? spend/conv : 0;
+
+    totSpend+=spend;totImpr+=impr;totClicks+=clicks;totReach+=reach;totConv+=conv;
+    campRows.push({name:c.name,status:c.status,spend,impr,clicks,ctr,cpc,reach,conv,cpl});
   });
 
-  const leads=parseInt(document.getElementById('ov-leads').textContent.replace(/\D/g,''))||1;
-  const cpl=totSpend>0?(totSpend/leads):0;
+  // CPL geral
+  const cpl=totConv>0?(totSpend/totConv):0;
 
   // KPIs Meta
   document.getElementById('m-spend').textContent=brl(totSpend);
@@ -457,6 +474,9 @@ async function loadMeta(){
   // Overview KPIs
   document.getElementById('ov-meta-spend').textContent=brl(totSpend);
   document.getElementById('ov-meta-cpl').textContent=cpl>0?brl(cpl):'—';
+  // Atualizar KPIs Meta totais
+  const ovConv = document.getElementById('m-conv-total');
+  if(ovConv) ovConv.textContent = fmt(totConv);
 
   // Tabela campanhas
   document.getElementById('m-camps-badge').textContent=campRows.length+' campanhas';
@@ -468,7 +488,9 @@ async function loadMeta(){
     <td>${fmt(c.clicks)}</td>
     <td class="${c.ctr>2?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
     <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
-  </tr>`).join(''):`<tr><td colspan="7" class="empty">Nenhuma campanha com dados no período</td></tr>`;
+    <td style="font-weight:500">${fmt(c.conv)}</td>
+    <td style="font-family:var(--mono);font-weight:500">${c.cpl>0?brl(c.cpl):'—'}</td>
+  </tr>`).join(''):`<tr><td colspan="9" class="empty">Nenhuma campanha com dados no período</td></tr>`;
 
   // Barras gasto
   const spendRows=campRows.sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,22),v:c.spend,fmt:brl(c.spend)}));
@@ -535,10 +557,36 @@ function mudarDominio(val) {
   loadGA4().catch(console.error);
 }
 
+function parseDataLead(v) {
+  // Tenta interpretar a data do lead em vários formatos
+  if (!v) return null;
+  const s = v.toString();
+  // Formato gviz: Date(2026,5,18,14,54,18) — meses 0-indexados
+  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
+  // Formato dd/MM/yyyy
+  const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m2) return new Date(parseInt(m2[3]), parseInt(m2[2])-1, parseInt(m2[1]));
+  // ISO
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
 function aplicarFiltros() {
   const fEvento = document.getElementById('f-evento')?.value || '';
   const fStage  = document.getElementById('f-stage')?.value || '';
-  let rows = _allLeads;
+  const p = period();
+  const dStart = new Date(p.startDate + 'T00:00:00');
+  const dEnd   = new Date(p.endDate   + 'T23:59:59');
+
+  let rows = _allLeads || [];
+
+  // Filtro de data (usa col 26 created_at, fallback col 0 data)
+  rows = rows.filter(r => {
+    const d = parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v);
+    if (!d) return true; // se não consegue parsear, mantém
+    return d >= dStart && d <= dEnd;
+  });
 
   if (fEvento) {
     rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
@@ -550,6 +598,9 @@ function aplicarFiltros() {
   }
 
   renderLeads(rows);
+
+  // Atualizar KPIs da Visão Geral com os leads filtrados também
+  document.getElementById('ov-leads').textContent = fmt(rows.length);
 
   const hasFilter = fEvento || fStage;
   const cnt = document.getElementById('l-filter-count');
