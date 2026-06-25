@@ -521,6 +521,230 @@ async function ga4qAll(token, body) {
 }
 
 // ── META ADS ─────────────────────────────────────────────────
+let _allLeads = [];
+
+// ── NORMALIZAÇÃO DE DADOS ────────────────────────────────────
+function normCargo(v) {
+  if (!v) return 'Não informado';
+  const s = v.toLowerCase().replace(/_/g, ' ').replace(/,/g, ' ').trim();
+  if (s.includes('ceo') || s.includes('founder') || s.includes('sócio') || s.includes('socio')) return 'CEO / Founder / Sócio';
+  if (s.includes('diretor')) return 'Diretor';
+  if (s.includes('gerente')) return 'Gerente';
+  if (s.includes('coordenador') || s.includes('supervisor')) return 'Coordenador / Supervisor';
+  if (s.includes('analista')) return 'Analista';
+  if (s.includes('outro')) return 'Outro';
+  return v.replace(/_/g, ' ').replace(/,_/g, ', ');
+}
+
+function normPorte(v) {
+  if (!v) return 'Não informado';
+  const s = v.replace(/_/g, ' ').toLowerCase().trim();
+  if (s.includes('1 a 19') || s.includes('1_a_19')) return '1 a 19 func.';
+  if (s.includes('20 a 99') || s.includes('20_a_99')) return '20 a 99 func.';
+  if (s.includes('100 a 249') || s.includes('100_a_249')) return '100 a 249 func.';
+  if (s.includes('250 a 499') || s.includes('250_a_499')) return '250 a 499 func.';
+  if (s.includes('500') || s.includes('999')) return '500+ func.';
+  if (s.includes('1000') || s.includes('1.000')) return '1.000+ func.';
+  return v.replace(/_/g, ' ');
+}
+
+function normCanal(utm_source, conv_channel, conv_source) {
+  const s = (utm_source || conv_channel || conv_source || '').toLowerCase().trim();
+  if (s.includes('meta') || s.includes('facebook') || s.includes('instagram')) return 'Meta ADS';
+  if (s.includes('google') || s.includes('googleads')) return 'Google ADS';
+  if (s === 'paid search' || s === 'cpc') return 'Google ADS';
+  if (s === 'organic' || s.includes('organic')) return 'Orgânico';
+  if (s === 'email' || s.includes('email')) return 'E-mail';
+  if (s === 'direct' || s === '(direct)' || s === '') return 'Direto';
+  return utm_source || conv_channel || conv_source || 'Direto';
+}
+
+function normEvento(v) {
+  if (!v) return 'Não informado';
+  const s = v.toLowerCase();
+  if (s.includes('rescue') && s.includes('eco')) return 'Rescue Licença Eco';
+  if (s.includes('webinar') && s.includes('goto')) return 'Webinar GoTo — Jul/26';
+  if (s.includes('webinar')) return 'Webinar';
+  return v;
+}
+
+function parseDataLead(v) {
+  if (!v) return null;
+  const s = v.toString();
+  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
+  const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m2) return new Date(parseInt(m2[3]), parseInt(m2[2])-1, parseInt(m2[1]));
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function mudarDominio(val) {
+  activeProp = val;
+  loadGA4().catch(console.error);
+}
+
+function aplicarFiltros() {
+  const fEvento = document.getElementById('f-evento')?.value || '';
+  const fStage  = document.getElementById('f-stage')?.value || '';
+  const p = period();
+  const dStart = new Date(p.startDate + 'T00:00:00');
+  const dEnd   = new Date(p.endDate   + 'T23:59:59');
+
+  let rows = _allLeads || [];
+
+  rows = rows.filter(r => {
+    const d = parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v);
+    if (!d) return true;
+    return d >= dStart && d <= dEnd;
+  });
+
+  if (fEvento) {
+    rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
+  }
+  if (fStage === 'qualificado') {
+    rows = rows.filter(r => (r.c[24]?.v||'').toLowerCase().includes('qualificado'));
+  } else if (fStage === 'apenas_lead') {
+    rows = rows.filter(r => !(r.c[24]?.v||'').toLowerCase().includes('qualificado'));
+  }
+
+  renderLeads(rows);
+  document.getElementById('ov-leads').textContent = fmt(rows.length);
+
+  const hasFilter = fEvento || fStage;
+  const cnt = document.getElementById('l-filter-count');
+  if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
+}
+
+function limparFiltros() {
+  const fe = document.getElementById('f-evento'); if(fe) fe.value='';
+  const fs = document.getElementById('f-stage');  if(fs) fs.value='';
+  aplicarFiltros();
+  const cnt = document.getElementById('l-filter-count'); if(cnt) cnt.textContent='';
+}
+
+function renderLeads(rows) {
+  const lq = rows.filter(r=>(r.c[24]?.v||'').toLowerCase().includes('qualificado')).length;
+  document.getElementById('l-total').textContent = fmt(rows.length);
+  document.getElementById('l-lq').textContent    = fmt(lq);
+  document.getElementById('l-taxa').textContent  = rows.length ? Math.round(lq/rows.length*100)+'%' : '—';
+
+  const byCan={};
+  rows.forEach(r=>{const v=normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v);byCan[v]=(byCan[v]||0)+1;});
+  const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
+
+  const byCargo={};
+  rows.forEach(r=>{const v=normCargo(r.c[6]?.v);byCargo[v]=(byCargo[v]||0)+1;});
+  mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
+
+  const byPorte={};
+  rows.forEach(r=>{const v=normPorte(r.c[7]?.v);byPorte[v]=(byPorte[v]||0)+1;});
+  const ordemPorte=['1 a 19 func.','20 a 99 func.','100 a 249 func.','250 a 499 func.','500+ func.','1.000+ func.','Não informado'];
+  const porteRows=Object.entries(byPorte).sort((a,b)=>(ordemPorte.indexOf(a[0])-ordemPorte.indexOf(b[0]))||b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('l-porte'),porteRows,CORES[4]);
+
+  const byEvento={};
+  rows.forEach(r=>{const v=normEvento(r.c[1]?.v);byEvento[v]=(byEvento[v]||0)+1;});
+  mkBars(document.getElementById('l-evento'),Object.entries(byEvento).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v})),CORES[3]);
+
+  document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
+    const c=r.c||[];const bc=(c[24]?.v||'').toLowerCase().includes('qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${normCargo(c[6]?.v)}</td><td style="font-size:11px;color:var(--muted)">${normPorte(c[7]?.v)}</td><td>${pill(normCanal(c[15]?.v,c[14]?.v,c[10]?.v))}</td><td style="font-size:11px;color:var(--muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${normEvento(c[1]?.v)}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+  }).join('');
+}
+
+async function loadLeads(){
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
+  const r=await fetch(url);
+  const txt=await r.text();
+  const start=txt.indexOf('{');
+  const end=txt.lastIndexOf('}')+1;
+  const d=JSON.parse(txt.slice(start,end));
+  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
+
+  _allLeads = rows;
+
+  const eventos = [...new Set(rows.map(r=>normEvento(r.c[1]?.v)).filter(Boolean))].sort();
+  const selEvento = document.getElementById('f-evento');
+  if (selEvento) {
+    const cur = selEvento.value;
+    selEvento.innerHTML = '<option value="">Todos os eventos</option>' +
+      eventos.map(e=>`<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');
+  }
+
+  document.getElementById('ov-leads').textContent = fmt(rows.length);
+  document.getElementById('leads-badge').textContent = rows.length + ' leads';
+  document.getElementById('l-camps').textContent = eventos.length;
+
+  document.getElementById('ov-leads-body').innerHTML = rows.slice(-8).reverse().map(r=>{
+    const c = r.c || [];
+    const bc = (c[24]?.v||'').toLowerCase().includes('qualificado') ? 'lq' : 'lead';
+    return `<tr>
+      <td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td>
+      <td style="color:var(--muted);font-size:12px">${normCargo(c[6]?.v)}</td>
+      <td>${pill(normCanal(c[15]?.v, c[14]?.v, c[10]?.v))}</td>
+      <td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td>
+      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td>
+    </tr>`;
+  }).join('');
+
+  aplicarFiltros();
+}
+
+async function loadGA4(){
+  const token=await getToken();
+  const dr=[{startDate:period().startDate,endDate:period().endDate}];
+  const sc={scales:scOpts()};
+
+  const [r1,r2,r3]=await Promise.all([
+    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'sessionDefaultChannelGroup'}],metrics:[{name:'sessions'},{name:'activeUsers'},{name:'bounceRate'},{name:'conversions'}]}),
+    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'sessionCampaignName'},{name:'sessionSource'},{name:'sessionMedium'}],metrics:[{name:'sessions'},{name:'conversions'},{name:'bounceRate'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:15}),
+    ga4qAll(token,{dateRanges:dr,dimensions:[{name:'landingPagePlusQueryString'}],metrics:[{name:'sessions'},{name:'bounceRate'},{name:'conversions'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:10})
+  ]);
+
+  const rows1=r1.rows||[];
+  let tS=0,tU=0,tC=0,bS=0;
+  rows1.forEach(r=>{tS+=parseInt(r.metricValues[0].value)||0;tU+=parseInt(r.metricValues[1].value)||0;bS+=parseFloat(r.metricValues[2].value)||0;tC+=parseInt(r.metricValues[3].value)||0;});
+  const ab=rows1.length?(bS/rows1.length*100).toFixed(1)+'%':'—';
+
+  ['ov-sess','ga-sess'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tS);});
+  ['ga-users'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tU);});
+  ['ga-conv'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tC);});
+  ['ov-bounce','ga-bounce'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=ab;});
+
+  const labs=rows1.map(r=>r.dimensionValues[0].value);
+  const dS=rows1.map(r=>parseInt(r.metricValues[0].value)||0);
+  const dC=rows1.map(r=>parseInt(r.metricValues[3].value)||0);
+  mkLeg(document.getElementById('ov-leg1'),labs);
+  mkLeg(document.getElementById('ga-leg'),labs);
+  const barDs=[{label:'Sessões',data:dS,backgroundColor:CORES.slice(0,labs.length),borderWidth:0,borderRadius:4}];
+  mkChart('c-canal','bar',labs,barDs,sc);
+  mkChart('c-ga-canal','bar',labs,barDs,sc);
+
+  document.getElementById('ga-body').innerHTML=rows1.map((r,i)=>`<tr>
+    <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CORES[i%CORES.length]};margin-right:8px;vertical-align:middle"></span>${r.dimensionValues[0].value}</td>
+    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[1].value)}</td><td>${fmt(r.metricValues[3].value)}</td>
+    <td class="${rcl(r.metricValues[2].value)}">${pct(r.metricValues[2].value)}</td>
+  </tr>`).join('');
+
+  const rows2=r2.rows||[];
+  document.getElementById('utm-body').innerHTML=rows2.length?rows2.map(r=>`<tr>
+    <td><div class="t-name">${r.dimensionValues[0].value||'(sem nome)'}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${r.dimensionValues[1].value} / ${r.dimensionValues[2].value}</td>
+    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[1].value)}</td>
+    <td class="${rcl(r.metricValues[2].value)}">${pct(r.metricValues[2].value)}</td>
+  </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhuma campanha UTM no período</td></tr>`;
+
+  const rows3=r3.rows||[];
+  document.getElementById('lp-body').innerHTML=rows3.length?rows3.map(r=>{
+    const u=r.dimensionValues[0].value;
+    return`<tr><td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${u}">${u.length>60?'…'+u.slice(-58):u}</td>
+    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[2].value)}</td>
+    <td class="${rcl(r.metricValues[1].value)}">${pct(r.metricValues[1].value)}</td></tr>`;
+  }).join(''):`<tr><td colspan="4" class="empty">Sem dados no período</td></tr>`;
+}
+
 function switchMetaTab(tab) {
   document.querySelectorAll('.meta-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.meta-tab-content').forEach(c => c.style.display = 'none');
