@@ -79,6 +79,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .view{display:none}
 .view.active{display:block}
 .empty{color:var(--muted);text-align:center;padding:24px;font-size:13px}
+
+.filter-sel{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;outline:none;min-width:160px}
+.filter-clear{background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:4px}
+.filter-clear:hover{border-color:var(--red);color:var(--red)}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
 .meta-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:6px;background:var(--purple-dim);color:var(--purple);font-weight:500}
 .status-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:5px;font-weight:500}
@@ -157,15 +161,37 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="kpi blue"><div class="kpi-label">Total de leads</div><div class="kpi-value" id="l-total">—</div></div>
       <div class="kpi green"><div class="kpi-label">Qualificados</div><div class="kpi-value" id="l-lq">—</div></div>
       <div class="kpi amber"><div class="kpi-label">Taxa qualif.</div><div class="kpi-value" id="l-taxa">—</div></div>
-      <div class="kpi purple"><div class="kpi-label">Campanhas</div><div class="kpi-value" id="l-camps">—</div></div>
+      <div class="kpi purple"><div class="kpi-label">Conversões</div><div class="kpi-value" id="l-camps">—</div></div>
     </div>
+
+    <!-- FILTROS -->
+    <div class="card" style="padding:14px 20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+        <select class="filter-sel" id="f-evento" onchange="aplicarFiltros()">
+          <option value="">Todos os eventos</option>
+        </select>
+        <select class="filter-sel" id="f-stage" onchange="aplicarFiltros()">
+          <option value="">Todos os estágios</option>
+          <option value="Lead Qualificado">Lead Qualificado</option>
+          <option value="Lead">Lead</option>
+        </select>
+        <button class="filter-clear" onclick="limparFiltros()"><i class="ti ti-x"></i> Limpar</button>
+        <span style="font-size:12px;color:var(--muted);margin-left:auto" id="l-filter-count"></span>
+      </div>
+    </div>
+
     <div class="two-col">
       <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Por canal</div></div><div id="l-canal"></div></div>
       <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-briefcase"></i>Por cargo</div></div><div id="l-cargo"></div></div>
     </div>
+    <div class="two-col">
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-building"></i>Por tamanho de empresa</div></div><div id="l-porte"></div></div>
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por evento de conversão</div></div><div id="l-evento"></div></div>
+    </div>
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads</div></div>
-      <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Porte</th><th>Canal</th><th>Campanha</th><th>Status</th><th>Data</th></tr></thead><tbody id="l-all"></tbody></table>
+      <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Porte</th><th>Canal</th><th>Evento</th><th>Status</th><th>Data</th></tr></thead><tbody id="l-all"></tbody></table>
     </div>
   </div>
 
@@ -373,6 +399,15 @@ async function loadMeta(){
 
 
 // ── NORMALIZAÇÃO DE DADOS ────────────────────────────────────
+
+function normEvento(v) {
+  if (!v) return 'Não informado';
+  const s = v.toLowerCase();
+  if (s.includes('rescue') && s.includes('eco')) return 'Rescue Licença Eco';
+  if (s.includes('webinar') && s.includes('goto')) return 'Webinar GoTo — Jul/26';
+  if (s.includes('webinar')) return 'Webinar';
+  return v;
+}
 function normCargo(v) {
   if (!v) return 'Não informado';
   const s = v.toLowerCase().replace(/_/g, ' ').replace(/,/g, ' ').trim();
@@ -409,6 +444,67 @@ function normCanal(utm_source, conv_channel, conv_source) {
 }
 
 // ── LEADS ────────────────────────────────────────────────────
+let _allLeads = [];
+
+function aplicarFiltros() {
+  const fEvento = document.getElementById('f-evento')?.value || '';
+  const fStage  = document.getElementById('f-stage')?.value || '';
+  let rows = _allLeads;
+  if (fEvento) rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
+  if (fStage)  rows = rows.filter(r => (r.c[24]?.v||'').includes(fStage === 'Lead Qualificado' ? 'Qualificado' : fStage) && !(fStage === 'Lead' && (r.c[24]?.v||'').includes('Qualificado')));
+  renderLeads(rows);
+  const cnt = document.getElementById('l-filter-count');
+  if (cnt) cnt.textContent = (fEvento||fStage) ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
+}
+
+function limparFiltros() {
+  const fe = document.getElementById('f-evento'); if(fe) fe.value='';
+  const fs = document.getElementById('f-stage');  if(fs) fs.value='';
+  renderLeads(_allLeads);
+  const cnt = document.getElementById('l-filter-count'); if(cnt) cnt.textContent='';
+}
+
+function renderLeads(rows) {
+  // KPIs
+  const lq = rows.filter(r=>(r.c[24]?.v||'').includes('Qualificado')).length;
+  document.getElementById('l-total').textContent = fmt(rows.length);
+  document.getElementById('l-lq').textContent    = fmt(lq);
+  document.getElementById('l-taxa').textContent  = rows.length ? Math.round(lq/rows.length*100)+'%' : '—';
+
+  // Barras canal
+  const byCan={};
+  rows.forEach(r=>{const v=normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v);byCan[v]=(byCan[v]||0)+1;});
+  const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
+
+  // Barras cargo
+  const byCargo={};
+  rows.forEach(r=>{const v=normCargo(r.c[6]?.v);byCargo[v]=(byCargo[v]||0)+1;});
+  mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
+
+  // Barras porte
+  const byPorte={};
+  rows.forEach(r=>{const v=normPorte(r.c[7]?.v);byPorte[v]=(byPorte[v]||0)+1;});
+  const ordemPorte=['1 a 19 func.','20 a 99 func.','100 a 249 func.','250 a 499 func.','500+ func.','1.000+ func.','Não informado'];
+  const porteRows=Object.entries(byPorte).sort((a,b)=>(ordemPorte.indexOf(a[0])-ordemPorte.indexOf(b[0]))||b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('l-porte'),porteRows,CORES[4]);
+
+  // Barras evento
+  const byEvento={};
+  rows.forEach(r=>{const v=normEvento(r.c[1]?.v);byEvento[v]=(byEvento[v]||0)+1;});
+  mkBars(document.getElementById('l-evento'),Object.entries(byEvento).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v})),CORES[3]);
+
+  // Tabela todos os leads
+  document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
+    const c=r.c||[];const bc=(c[24]?.v||'').includes('Qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${normCargo(c[6]?.v)}</td><td style="font-size:11px;color:var(--muted)">${normPorte(c[7]?.v)}</td><td>${pill(normCanal(c[15]?.v,c[14]?.v,c[10]?.v))}</td><td style="font-size:11px;color:var(--muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${normEvento(c[1]?.v)}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+  }).join('');
+
+  // Google/Meta ADS bars
+  mkBars(document.getElementById('gads-bars'),canRows.filter(r=>r.label==='Google ADS').length?canRows.filter(r=>r.label==='Google ADS'):[{label:'Sem dados Google',v:0}],CORES[0]);
+  mkBars(document.getElementById('meta-bars'),canRows.filter(r=>r.label==='Meta ADS').length?canRows.filter(r=>r.label==='Meta ADS'):[{label:'Sem dados Meta',v:0}],CORES[3]);
+}
+
 async function loadLeads(){
   const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
   const r=await fetch(url);
@@ -416,7 +512,7 @@ async function loadLeads(){
   const start=txt.indexOf('{');
   const end=txt.lastIndexOf('}')+1;
   const d=JSON.parse(txt.slice(start,end));
-  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v); // cols: [0]data [2]email [3]nome [5]empresa [6]cargo [7]porte [8]campanha [10]source [14]channel [24]stage [26]created_at
+  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v); // cols: [0]data [1]evento [2]email [3]nome [5]empresa [6]cargo [7]porte [10]source [14]channel [15]utm_source [24]stage
 
   const lq=rows.filter(r=>(r.c[24]?.v||'').includes('Qualificado')).length;
   const camps=[...new Set(rows.map(r=>r.c[8]?.v||r.c[13]?.v).filter(Boolean))].length;
