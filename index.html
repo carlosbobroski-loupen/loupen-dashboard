@@ -373,9 +373,12 @@ async function loadMeta(){
 
 // ── LEADS ────────────────────────────────────────────────────
 async function loadLeads(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes&headers=1`);
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
+  const r=await fetch(url);
   const txt=await r.text();
-  const d=JSON.parse(txt.slice(txt.indexOf('{')));
+  const start=txt.indexOf('{');
+  const end=txt.lastIndexOf('}')+1;
+  const d=JSON.parse(txt.slice(start,end));
   const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v); // cols: [0]data [2]email [3]nome [5]empresa [6]cargo [7]porte [8]campanha [10]source [14]channel [24]stage [26]created_at
 
   const lq=rows.filter(r=>r.c[24]?.v?.includes('Qualificado')).length;
