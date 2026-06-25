@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loupen — Marketing Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{--bg:#0d0f12;--surface:#141619;--surface2:#1c1f24;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f0;--muted:#7a7f8a;--dim:#3d424d;--blue:#3b82f6;--blue-dim:rgba(59,130,246,0.12);--green:#22c55e;--green-dim:rgba(34,197,94,0.12);--amber:#f59e0b;--amber-dim:rgba(245,158,11,0.12);--red:#ef4444;--red-dim:rgba(239,68,68,0.12);--purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);--font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;min-height:100vh}
+.shell{display:flex;min-height:100vh}
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;overflow-y:auto}
+.main{margin-left:220px;flex:1;padding:28px 32px;max-width:1300px}
+.logo{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
+.logo-name{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.nav{padding:12px 10px;flex:1}
+.nav-label{font-size:10px;font-weight:500;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:0 10px;margin:16px 0 6px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;color:var(--muted);font-size:13px;cursor:pointer;transition:all .15s;margin-bottom:1px;border:none;background:none;width:100%;text-align:left;font-family:var(--font)}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--blue-dim);color:var(--blue)}
+.nav-item i{font-size:16px}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+.last-update{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-.3px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.period-select{background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:13px;font-family:var(--font);cursor:pointer;outline:none}
+.btn-refresh{background:var(--blue);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:var(--font);transition:opacity .15s}
+.btn-refresh:hover{opacity:.85}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi-grid-6{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.blue::before{background:var(--blue)}.kpi.green::before{background:var(--green)}.kpi.amber::before{background:var(--amber)}.kpi.purple::before{background:var(--purple)}.kpi.red::before{background:var(--red)}
+.kpi-label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.kpi-value{font-size:24px;font-weight:600;font-family:var(--mono);letter-spacing:-1px;line-height:1}
+.kpi-footer{font-size:11px;color:var(--muted);margin-top:6px}
+.section-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.section-title i{font-size:16px;color:var(--muted)}
+.section-badge{font-size:10px;background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:10px;font-weight:500}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.chart-wrap{position:relative;width:100%}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 0 10px;border-bottom:1px solid var(--border)}
+.tbl th:not(:first-child){text-align:right}
+.tbl td{padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.tbl td:not(:first-child){text-align:right}
+.tbl tr:last-child td{border-bottom:none}
+.t-name{font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px}
+.badge.lead{background:var(--blue-dim);color:var(--blue)}
+.badge.lq{background:var(--green-dim);color:var(--green)}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px}
+.bar-row:last-child{margin-bottom:0}
+.bar-label{width:130px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.bar-track{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+.bar-val{width:55px;text-align:right;font-family:var(--mono);font-size:12px;flex-shrink:0}
+.rej-ok{color:var(--green)}.rej-warn{color:var(--amber)}.rej-bad{color:var(--red)}
+.sp{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;font-weight:500;font-family:var(--mono)}
+.sp-g{background:var(--blue-dim);color:var(--blue)}
+.sp-m{background:var(--purple-dim);color:var(--purple)}
+.sp-d{background:var(--surface2);color:var(--muted)}
+.sp-o{background:var(--amber-dim);color:var(--amber)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.view{display:none}
+.view.active{display:block}
+.empty{color:var(--muted);text-align:center;padding:24px;font-size:13px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+.meta-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:6px;background:var(--purple-dim);color:var(--purple);font-weight:500}
+.status-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:5px;font-weight:500}
+.chip-active{background:var(--green-dim);color:var(--green)}
+.chip-paused{background:var(--amber-dim);color:var(--amber)}
+.chip-other{background:var(--surface2);color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-name">Loupen</div>
+    <div class="logo-sub">Marketing Dashboard</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-label">Geral</div>
+    <button class="nav-item active" onclick="showView('overview')"><i class="ti ti-layout-dashboard"></i>Visão geral</button>
+    <div class="nav-label">Fontes</div>
+    <button class="nav-item" onclick="showView('leads')"><i class="ti ti-users"></i>Leads RD Station</button>
+    <button class="nav-item" onclick="showView('ga4')"><i class="ti ti-chart-line"></i>Google Analytics</button>
+    <button class="nav-item" onclick="showView('utm')"><i class="ti ti-link"></i>Campanhas UTM</button>
+    <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
+    <div class="nav-label">Anúncios</div>
+    <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
+    <button class="nav-item" onclick="showView('gads')"><i class="ti ti-brand-google"></i>Google ADS</button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="last-update"><div class="pulse" id="pulse"></div><span id="stxt">Carregando...</span></div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="page-title" id="page-title">Visão geral</div>
+    <div class="topbar-right">
+      <select class="period-select" id="period" onchange="carregarTudo()">
+        <option value="7">Últimos 7 dias</option>
+        <option value="30" selected>Últimos 30 dias</option>
+        <option value="60">Últimos 60 dias</option>
+        <option value="90">Últimos 90 dias</option>
+      </select>
+      <button class="btn-refresh" onclick="carregarTudo()"><i class="ti ti-refresh"></i>Atualizar</button>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="view active" id="view-overview">
+    <div class="kpi-grid">
+      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ov-leads">—</div><div class="kpi-footer">RD Station</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-eye"></i>Sessões</div><div class="kpi-value" id="ov-sess">—</div><div class="kpi-footer">GA4</div></div>
+      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-brand-meta"></i>Gasto Meta</div><div class="kpi-value" id="ov-meta-spend">—</div><div class="kpi-footer">Meta ADS</div></div>
+      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-target"></i>CPL Meta</div><div class="kpi-value" id="ov-meta-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
+      <div class="kpi red"><div class="kpi-label"><i class="ti ti-bounce-right"></i>Rejeição</div><div class="kpi-value" id="ov-bounce">—</div><div class="kpi-footer">GA4 média</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Sessões por canal</div></div>
+        <div class="legend" id="ov-leg1"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-canal" role="img" aria-label="Sessões por canal"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-brand-meta"></i>Gasto Meta por campanha</div></div>
+        <div id="ov-meta-bars" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-users"></i>Leads recentes</div><div class="section-badge" id="leads-badge">—</div></div>
+      <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Canal</th><th>Status</th><th>Data</th></tr></thead><tbody id="ov-leads-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- LEADS -->
+  <div class="view" id="view-leads">
+    <div class="kpi-grid-4">
+      <div class="kpi blue"><div class="kpi-label">Total de leads</div><div class="kpi-value" id="l-total">—</div></div>
+      <div class="kpi green"><div class="kpi-label">Qualificados</div><div class="kpi-value" id="l-lq">—</div></div>
+      <div class="kpi amber"><div class="kpi-label">Taxa qualif.</div><div class="kpi-value" id="l-taxa">—</div></div>
+      <div class="kpi purple"><div class="kpi-label">Campanhas</div><div class="kpi-value" id="l-camps">—</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Por canal</div></div><div id="l-canal"></div></div>
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-briefcase"></i>Por cargo</div></div><div id="l-cargo"></div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads</div></div>
+      <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Porte</th><th>Canal</th><th>Campanha</th><th>Status</th><th>Data</th></tr></thead><tbody id="l-all"></tbody></table>
+    </div>
+  </div>
+
+  <!-- GA4 -->
+  <div class="view" id="view-ga4">
+    <div class="kpi-grid-4">
+      <div class="kpi green"><div class="kpi-label">Sessões</div><div class="kpi-value" id="ga-sess">—</div></div>
+      <div class="kpi blue"><div class="kpi-label">Usuários ativos</div><div class="kpi-value" id="ga-users">—</div></div>
+      <div class="kpi amber"><div class="kpi-label">Conversões</div><div class="kpi-value" id="ga-conv">—</div></div>
+      <div class="kpi red"><div class="kpi-label">Rejeição média</div><div class="kpi-value" id="ga-bounce">—</div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Sessões por canal</div></div>
+      <div class="legend" id="ga-leg"></div>
+      <div class="chart-wrap" style="height:240px"><canvas id="c-ga-canal" role="img" aria-label="Sessões por canal GA4"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-table"></i>Detalhamento por canal</div></div>
+      <table class="tbl"><thead><tr><th>Canal</th><th>Sessões</th><th>Usuários</th><th>Conversões</th><th>Rejeição</th></tr></thead><tbody id="ga-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- UTM -->
+  <div class="view" id="view-utm">
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-link"></i>Campanhas UTM</div></div>
+      <table class="tbl"><thead><tr><th>Campanha</th><th>Source / Medium</th><th>Sessões</th><th>Conversões</th><th>Rejeição</th></tr></thead><tbody id="utm-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- LP -->
+  <div class="view" id="view-lp">
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-browser"></i>Landing Pages</div></div>
+      <table class="tbl"><thead><tr><th>Página</th><th>Sessões</th><th>Conversões</th><th>Rejeição</th></tr></thead><tbody id="lp-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- META ADS -->
+  <div class="view" id="view-meta">
+    <div class="kpi-grid-6">
+      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="m-spend">—</div><div class="kpi-footer">No período</div></div>
+      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="m-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label"><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas</div><div class="section-badge" id="m-camps-badge">—</div></div>
+      <table class="tbl"><thead><tr><th>Campanha</th><th>Status</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th></tr></thead><tbody id="m-camps-body"></tbody></table>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Gasto por campanha</div></div>
+        <div id="m-spend-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Cliques por campanha</div></div>
+        <div class="legend" id="m-click-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-meta-clicks" role="img" aria-label="Cliques por campanha Meta"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOOGLE ADS -->
+  <div class="view" id="view-gads">
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:4px 0">
+        <i class="ti ti-info-circle" style="font-size:20px;color:var(--amber);flex-shrink:0;margin-top:1px"></i>
+        <div>
+          <div style="font-weight:600;margin-bottom:4px">Google ADS</div>
+          <div style="color:var(--muted);font-size:13px;line-height:1.6">Para conectar dados de gastos e CPL do Google ADS é necessário configurar a Google Ads API com um token de desenvolvedor. Peça aqui no chat e configuro.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-brand-google"></i>Leads via Paid Search (GA4)</div></div>
+      <div id="gads-bars"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+const PROP    = '503864241';
+const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
+const META_TOKEN   = 'EAAnwZAoVKOWUBR2Yls6fEMqLfZAR3ZARj6akUoTPqIrMN5MyMBGJWo8MYIUghdA6e7oyVJ3r6ZCd2NUIcCKNmZCzZBjQyEZBrzSfCZCIHTUYwZB1sQGxC6w2ikfJROvR4MEbsyLGZAdVAI0XplZBjB7vyZBKRmJIftussxxdgiVC68mBzJK6ZCRBMVRLjbLgAZCHM8';
+const META_ACCOUNT = 'act_2412716725845249';
+const SA = {
+  email:'dashboard-marketing@n8n-credenciais-496419.iam.gserviceaccount.com',
+  key:`-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCbXZ4uuBP4G0NX\nHuVoyN4CC8BQwJhwMtRzpsARyHM4UQnIFggiPb5W42vz2pVmiNT1D3+mygRSLyDe\nM/LS1DhSKlXE0hNxm5cCtNoKRVdczpSbDYy1BB7Ywfcidji7zXKqC0/RXxnYur5R\nKX3SDDNZ2nfYXvhjK7xyAqvLyqfftdVmXvaw+QYMZp7mHRIcT1gOUYObK8BJIslf\n6hWK1NjnLaTx5eAFK5mJiT1nxG9jj8NILgCbGV5JNjgSE59Vhvz4UatiYzHyscDG\nIYXDTKROuko97wWwk8NloEEZB9/WNgNLd4EI54nEPBAxge4tpLrNzgNfQFZLTzLx\nv0fqDW1DAgMBAAECggEAB8QqQBObi+9w8k3tEcvYrSmBN4gpFpKz5AQV3c2zVMFY\nR9QyG+QSO62qm8n1Zea5Hnbj3qaCiMkqT3ExVjCdkB3lo60Mo8UvS0dXDuRgdZct\n/oIy4mmOUS+A9wwJ0fl3HeDq4IBsflT3Zn84duN9PaSaEQrOR8bL6LcRd2Jt+dS9\nHv8LiBqIcf1gzM80WUNb05l5McWLoVs5PEhf+96vM8hx+l/JRNcPSWQOihpXXQD8\nprT2f1flOnrGrb9adAsxdF7ZM3gf/oGtN/kIgffmZ4bhTljYy+cSyo7xC5ZQVyHc\nrw3tyTf2MuGmelIG1eRJ2k7am74qWgE66VjehuV14QKBgQDOPJr5U1FnJ9xwwe2g\nhsEDpBbAjHhv/JxR3ve8Vj5Q/NTu+xWgmnSOFbCcTir6fdS4EY272txnUpZ9oc/A\nEICCTYoxJ4sp6DOiEoTzPqGbW4sURbfzj0+EKYpMmGdQVW9/526IspJWTTZ9rDiN\nqpEnVzYWs0Gv2nIlqSPNgBwNjwKBgQDA2qu5Sm0gQiuQbpQAtSYoHEvkP9+XBukJ\n0/dUL2DXHfL8YtO2xaYn3JxOuUHSGKc435qMTpYBF8G1ZXqOrAv9C6d4zGabrxb9\nwJBYJPzmnIAaXfJe9xQ2WuU5Ylt8oqyVctWkUiH76q/R+daSN9BkX7hcXwpdSOLr\nUvCCPx7zDQKBgQCbCX5rHhJc3N9fuLmdao/g39LmzvKfJSSSe257G85e7aJZQVHB\n2TrzsSSCbFTs1/k4oqGM7fuwhKpzKVhXB1DEI+xWBWcditx94zQk9BljBA9qnvqp\nUzuwm9XGvO81ufRHD8DNbIiL7iGfmf8tqGLUU0BrEji4LRyQaTVr//mWywKBgQC5\nLH38sRDtC3wm93YW49kaZGkeZZI7wn/aVvPBmqhihTg9zGq6sTckSTiwgkNIBzHx\ncwpDNGXl8LingyPVgC8Wrq0EWUcgr1LlHZO7fvByQczjBFfnhVicBFTa760mlFAg\nQ54NZGuLJsHhXQIBbaQj7KDp2Lvr7EMub3nNpewCtQKBgF5+x0qwNqN/p/0vPY8A\n8ZQS5Mo89SyfhSoWbzbwbwqRL+6eul1sZ8Q58UDcqZUj4XnKu0c9t6M/ImQgLHcK\n9qt+sQs3AuRZ9S7ncs5z8JTqBpveIBuAtFA/ENDRJTmYzHmVaMq08zgidLkQTRGg\n+VFP+Re72X5l//AXdLbWYgOB\n-----END PRIVATE KEY-----\n`
+};
+const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',gads:'Google ADS'};
+let CC={};
+
+// ── NAV ─────────────────────────────────────────────────────
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
+  document.getElementById('page-title').textContent=VIEWS[id]||id;
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+const fmt  = n=>Number(n).toLocaleString('pt-BR');
+const fmtR = n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct  = v=>(parseFloat(v)*100).toFixed(1)+'%';
+const rcl  = v=>{const n=parseFloat(v)*100;return n<40?'rej-ok':n<65?'rej-warn':'rej-bad';};
+const brl  = v=>'R$\u00a0'+fmtR(parseFloat(v)||0);
+function pill(s){const l=(s||'').toLowerCase();if(l.includes('google')||l==='paid search')return`<span class="sp sp-g">Google</span>`;if(l.includes('meta')||l.includes('facebook'))return`<span class="sp sp-m">Meta</span>`;if(l==='(direct)'||l==='direct')return`<span class="sp sp-d">Direct</span>`;return`<span class="sp sp-o">${s||'—'}</span>`;}
+function statusChip(s){const l=(s||'').toUpperCase();if(l==='ACTIVE')return`<span class="status-chip chip-active">Ativo</span>`;if(l==='PAUSED')return`<span class="status-chip chip-paused">Pausado</span>`;return`<span class="status-chip chip-other">${s}</span>`;}
+function mkChart(id,type,labels,datasets,extra={}){if(CC[id])CC[id].destroy();const c=document.getElementById(id);if(!c)return;CC[id]=new Chart(c,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},...extra}});}
+function mkLeg(el,labels){if(!el)return;el.innerHTML=labels.map((l,i)=>`<div class="leg"><div class="leg-dot" style="background:${CORES[i%CORES.length]}"></div>${l}</div>`).join('');}
+function mkBars(el,rows,color){if(!el)return;const max=Math.max(...rows.map(r=>r.v),1);const tot=rows.reduce((a,r)=>a+r.v,0);el.innerHTML=rows.map(r=>`<div class="bar-row"><div class="bar-label">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.v/max*100)}%;background:${color}"></div></div><div class="bar-val">${r.fmt?r.fmt:fmt(r.v)}</div></div>`).join('');}
+function period(){const d=parseInt(document.getElementById('period').value)||30;const h=new Date();const f=x=>x.toISOString().slice(0,10);return{days:d,startDate:f(new Date(h-d*86400000)),endDate:f(h),startUnix:Math.floor((h-d*86400000)/1000),endUnix:Math.floor(h/1000)};}
+function scOpts(){return{x:{grid:{display:false},ticks:{color:'#7a7f8a',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#7a7f8a',font:{size:11}}}};}
+
+// ── GA4 AUTH ─────────────────────────────────────────────────
+async function getToken(){
+  const now=Math.floor(Date.now()/1000);
+  const enc=s=>btoa(JSON.stringify(s)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const h=enc({alg:'RS256',typ:'JWT'}),cl=enc({iss:SA.email,scope:'https://www.googleapis.com/auth/analytics.readonly',aud:'https://oauth2.googleapis.com/token',exp:now+3600,iat:now});
+  const ts=h+'.'+cl;
+  const kd=SA.key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,'');
+  const kb=Uint8Array.from(atob(kd),c=>c.charCodeAt(0));
+  const ck=await crypto.subtle.importKey('pkcs8',kb.buffer,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
+  const sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',ck,new TextEncoder().encode(ts));
+  const jwt=ts+'.'+btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`});
+  const d=await r.json();if(!d.access_token)throw new Error('GA4 Auth: '+JSON.stringify(d));
+  return d.access_token;
+}
+async function ga4q(token,body){
+  const r=await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${PROP}:runReport`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+
+// ── META ADS ─────────────────────────────────────────────────
+async function loadMeta(){
+  const p=period();
+  const since=p.startDate, until=p.endDate;
+  const fields='name,status,insights.fields(spend,impressions,clicks,ctr,cpc,reach,cost_per_result)';
+  const url=`https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns?fields=${encodeURIComponent(fields)}&time_range={"since":"${since}","until":"${until}"}&access_token=${META_TOKEN}&limit=20`;
+  const r=await fetch(url);
+  const d=await r.json();
+  if(d.error)throw new Error('Meta API: '+d.error.message);
+  const camps=d.data||[];
+
+  let totSpend=0,totImpr=0,totClicks=0,totReach=0;
+  const campRows=[];
+  camps.forEach(c=>{
+    const ins=(c.insights&&c.insights.data&&c.insights.data[0])||{};
+    const spend=parseFloat(ins.spend||0);
+    const impr=parseInt(ins.impressions||0);
+    const clicks=parseInt(ins.clicks||0);
+    const ctr=parseFloat(ins.ctr||0);
+    const cpc=parseFloat(ins.cpc||0);
+    const reach=parseInt(ins.reach||0);
+    totSpend+=spend;totImpr+=impr;totClicks+=clicks;totReach+=reach;
+    campRows.push({name:c.name,status:c.status,spend,impr,clicks,ctr,cpc,reach});
+  });
+
+  const leads=parseInt(document.getElementById('ov-leads').textContent.replace(/\D/g,''))||1;
+  const cpl=totSpend>0?(totSpend/leads):0;
+
+  // KPIs Meta
+  document.getElementById('m-spend').textContent=brl(totSpend);
+  document.getElementById('m-impr').textContent=fmt(totImpr);
+  document.getElementById('m-clicks').textContent=fmt(totClicks);
+  document.getElementById('m-ctr').textContent=totClicks&&totImpr?(totClicks/totImpr*100).toFixed(2)+'%':'—';
+  document.getElementById('m-reach').textContent=fmt(totReach);
+  document.getElementById('m-cpl').textContent=cpl>0?brl(cpl):'—';
+
+  // Overview KPIs
+  document.getElementById('ov-meta-spend').textContent=brl(totSpend);
+  document.getElementById('ov-meta-cpl').textContent=cpl>0?brl(cpl):'—';
+
+  // Tabela campanhas
+  document.getElementById('m-camps-badge').textContent=campRows.length+' campanhas';
+  document.getElementById('m-camps-body').innerHTML=campRows.length?campRows.map(c=>`<tr>
+    <td><div class="t-name">${c.name}</div></td>
+    <td>${statusChip(c.status)}</td>
+    <td style="font-family:var(--mono)">${brl(c.spend)}</td>
+    <td>${fmt(c.impr)}</td>
+    <td>${fmt(c.clicks)}</td>
+    <td class="${c.ctr>2?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
+    <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
+  </tr>`).join(''):`<tr><td colspan="7" class="empty">Nenhuma campanha com dados no período</td></tr>`;
+
+  // Barras gasto
+  const spendRows=campRows.sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,22),v:c.spend,fmt:brl(c.spend)}));
+  mkBars(document.getElementById('m-spend-bars'),spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}],CORES[3]);
+  mkBars(document.getElementById('ov-meta-bars'),spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}],CORES[3]);
+
+  // Donut cliques
+  const clickRows=campRows.sort((a,b)=>b.clicks-a.clicks).slice(0,6);
+  mkLeg(document.getElementById('m-click-leg'),clickRows.map(c=>c.name.slice(0,18)));
+  mkChart('c-meta-clicks','doughnut',clickRows.map(c=>c.name.slice(0,18)),[{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
+}
+
+// ── LEADS ────────────────────────────────────────────────────
+async function loadLeads(){
+  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`);
+  const txt=await r.text();
+  const d=JSON.parse(txt.slice(txt.indexOf('{')));
+  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
+
+  const lq=rows.filter(r=>r.c[23]?.v?.includes('Qualificado')).length;
+  const camps=[...new Set(rows.map(r=>r.c[8]?.v).filter(Boolean))].length;
+  document.getElementById('ov-leads').textContent=fmt(rows.length);
+  document.getElementById('l-total').textContent=fmt(rows.length);
+  document.getElementById('l-lq').textContent=fmt(lq);
+  document.getElementById('l-taxa').textContent=rows.length?Math.round(lq/rows.length*100)+'%':'—';
+  document.getElementById('l-camps').textContent=camps;
+  document.getElementById('leads-badge').textContent=rows.length+' leads';
+
+  document.getElementById('ov-leads-body').innerHTML=rows.slice(-8).reverse().map(r=>{
+    const c=r.c||[];const bc=c[23]?.v?.includes('Qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="color:var(--muted);font-size:12px">${c[6]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td><span class="badge ${bc}">${c[23]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+  }).join('');
+
+  document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
+    const c=r.c||[];const bc=c[23]?.v?.includes('Qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${c[6]?.v||'—'}</td><td style="font-size:11px;color:var(--muted)">${c[7]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c[8]?.v||'—'}</td><td><span class="badge ${bc}">${c[23]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+  }).join('');
+
+  const byCan={};rows.forEach(r=>{const v=r.c[14]?.v||r.c[9]?.v||'Direct';byCan[v]=(byCan[v]||0)+1;});
+  const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
+  const byCargo={};rows.forEach(r=>{const v=r.c[6]?.v||'N/A';byCargo[v]=(byCargo[v]||0)+1;});
+  mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
+  mkBars(document.getElementById('gads-bars'),canRows.filter(r=>{const l=r.label.toLowerCase();return l.includes('google')||l==='paid search';}).length?canRows.filter(r=>{const l=r.label.toLowerCase();return l.includes('google')||l==='paid search';}):[{label:'Sem dados Google',v:0}],CORES[0]);
+}
+
+// ── GA4 ──────────────────────────────────────────────────────
+async function loadGA4(){
+  const token=await getToken();
+  const dr=[{startDate:period().startDate,endDate:period().endDate}];
+  const sc={scales:scOpts()};
+  const [r1,r2,r3]=await Promise.all([
+    ga4q(token,{dateRanges:dr,dimensions:[{name:'sessionDefaultChannelGroup'}],metrics:[{name:'sessions'},{name:'activeUsers'},{name:'bounceRate'},{name:'conversions'}]}),
+    ga4q(token,{dateRanges:dr,dimensions:[{name:'sessionCampaignName'},{name:'sessionSource'},{name:'sessionMedium'}],metrics:[{name:'sessions'},{name:'conversions'},{name:'bounceRate'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:15}),
+    ga4q(token,{dateRanges:dr,dimensions:[{name:'landingPagePlusQueryString'}],metrics:[{name:'sessions'},{name:'bounceRate'},{name:'conversions'}],orderBys:[{metric:{metricName:'sessions'},desc:true}],limit:10})
+  ]);
+  const rows1=r1.rows||[];
+  let tS=0,tU=0,tC=0,bS=0;
+  rows1.forEach(r=>{tS+=parseInt(r.metricValues[0].value)||0;tU+=parseInt(r.metricValues[1].value)||0;bS+=parseFloat(r.metricValues[2].value)||0;tC+=parseInt(r.metricValues[3].value)||0;});
+  const ab=rows1.length?(bS/rows1.length*100).toFixed(1)+'%':'—';
+  ['ov-sess','ga-sess'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tS);});
+  ['ga-users'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tU);});
+  ['ga-conv'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmt(tC);});
+  ['ov-bounce','ga-bounce'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=ab;});
+  const labs=rows1.map(r=>r.dimensionValues[0].value);
+  const dS=rows1.map(r=>parseInt(r.metricValues[0].value)||0);
+  const dC=rows1.map(r=>parseInt(r.metricValues[3].value)||0);
+  mkLeg(document.getElementById('ov-leg1'),labs);
+  mkLeg(document.getElementById('ga-leg'),labs);
+  const barDs=[{label:'Sessões',data:dS,backgroundColor:CORES.slice(0,labs.length),borderWidth:0,borderRadius:4}];
+  mkChart('c-canal','bar',labs,barDs,sc);
+  mkChart('c-ga-canal','bar',labs,barDs,sc);
+  document.getElementById('ga-body').innerHTML=rows1.map((r,i)=>`<tr>
+    <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CORES[i%CORES.length]};margin-right:8px;vertical-align:middle"></span>${r.dimensionValues[0].value}</td>
+    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[1].value)}</td><td>${fmt(r.metricValues[3].value)}</td>
+    <td class="${rcl(r.metricValues[2].value)}">${pct(r.metricValues[2].value)}</td>
+  </tr>`).join('');
+  const rows2=r2.rows||[];
+  document.getElementById('utm-body').innerHTML=rows2.length?rows2.map(r=>`<tr>
+    <td><div class="t-name">${r.dimensionValues[0].value||'(sem nome)'}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${r.dimensionValues[1].value} / ${r.dimensionValues[2].value}</td>
+    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[1].value)}</td>
+    <td class="${rcl(r.metricValues[2].value)}">${pct(r.metricValues[2].value)}</td>
+  </tr>`).join(''):`<tr><td colspan="5" class="empty">Nenhuma campanha UTM no período</td></tr>`;
+  const rows3=r3.rows||[];
+  document.getElementById('lp-body').innerHTML=rows3.length?rows3.map(r=>{
+    const u=r.dimensionValues[0].value;
+    return`<tr><td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${u}">${u.length>60?'…'+u.slice(-58):u}</td>
+    <td>${fmt(r.metricValues[0].value)}</td><td>${fmt(r.metricValues[2].value)}</td>
+    <td class="${rcl(r.metricValues[1].value)}">${pct(r.metricValues[1].value)}</td></tr>`;
+  }).join(''):`<tr><td colspan="4" class="empty">Sem dados no período</td></tr>`;
+}
+
+// ── MAIN ─────────────────────────────────────────────────────
+async function carregarTudo(){
+  const pulse=document.getElementById('pulse');
+  const stxt=document.getElementById('stxt');
+  pulse.style.background='var(--amber)';
+  stxt.textContent='Atualizando...';
+  const results=await Promise.allSettled([loadLeads(),loadGA4(),loadMeta()]);
+  const errors=results.filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Erro desconhecido');
+  if(errors.length){
+    pulse.style.background='var(--red)';
+    stxt.textContent='Parcial — '+errors[0];
+    console.error('Erros:',errors);
+  } else {
+    pulse.style.background='var(--green)';
+    stxt.textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+carregarTudo();
+setInterval(carregarTudo,5*60*1000);
+</script>
+</body>
+</html>
