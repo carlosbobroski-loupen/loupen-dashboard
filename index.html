@@ -373,13 +373,13 @@ async function loadMeta(){
 
 // ── LEADS ────────────────────────────────────────────────────
 async function loadLeads(){
-  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`);
+  const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes&headers=1`);
   const txt=await r.text();
   const d=JSON.parse(txt.slice(txt.indexOf('{')));
-  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
+  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v); // cols: [0]data [2]email [3]nome [5]empresa [6]cargo [7]porte [8]campanha [10]source [14]channel [24]stage [26]created_at
 
-  const lq=rows.filter(r=>r.c[23]?.v?.includes('Qualificado')).length;
-  const camps=[...new Set(rows.map(r=>r.c[8]?.v).filter(Boolean))].length;
+  const lq=rows.filter(r=>r.c[24]?.v?.includes('Qualificado')).length;
+  const camps=[...new Set(rows.map(r=>r.c[8]?.v||r.c[13]?.v).filter(Boolean))].length;
   document.getElementById('ov-leads').textContent=fmt(rows.length);
   document.getElementById('l-total').textContent=fmt(rows.length);
   document.getElementById('l-lq').textContent=fmt(lq);
@@ -388,19 +388,19 @@ async function loadLeads(){
   document.getElementById('leads-badge').textContent=rows.length+' leads';
 
   document.getElementById('ov-leads-body').innerHTML=rows.slice(-8).reverse().map(r=>{
-    const c=r.c||[];const bc=c[23]?.v?.includes('Qualificado')?'lq':'lead';
-    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="color:var(--muted);font-size:12px">${c[6]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td><span class="badge ${bc}">${c[23]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+    const c=r.c||[];const bc=c[24]?.v?.includes('Qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="color:var(--muted);font-size:12px">${c[6]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
   }).join('');
 
   document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
-    const c=r.c||[];const bc=c[23]?.v?.includes('Qualificado')?'lq':'lead';
-    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${c[6]?.v||'—'}</td><td style="font-size:11px;color:var(--muted)">${c[7]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c[8]?.v||'—'}</td><td><span class="badge ${bc}">${c[23]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+    const c=r.c||[];const bc=c[24]?.v?.includes('Qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${c[6]?.v||'—'}</td><td style="font-size:11px;color:var(--muted)">${c[7]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c[8]?.v||'—'}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
   }).join('');
 
-  const byCan={};rows.forEach(r=>{const v=r.c[14]?.v||r.c[9]?.v||'Direct';byCan[v]=(byCan[v]||0)+1;});
+  const byCan={};rows.forEach(r=>{const v=r.c[14]?.v||r.c[10]?.v||'Direct';byCan[v]=(byCan[v]||0)+1;});
   const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
   mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
-  const byCargo={};rows.forEach(r=>{const v=r.c[6]?.v||'N/A';byCargo[v]=(byCargo[v]||0)+1;});
+  const byCargo={};rows.forEach(r=>{const v=(r.c[6]?.v||'N/A').replace(/,_/g,', ').replace(/_/g,' ');byCargo[v]=(byCargo[v]||0)+1;});
   mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
   mkBars(document.getElementById('gads-bars'),canRows.filter(r=>{const l=r.label.toLowerCase();return l.includes('google')||l==='paid search';}).length?canRows.filter(r=>{const l=r.label.toLowerCase();return l.includes('google')||l==='paid search';}):[{label:'Sem dados Google',v:0}],CORES[0]);
 }
