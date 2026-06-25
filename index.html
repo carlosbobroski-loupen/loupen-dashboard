@@ -611,33 +611,39 @@ async function loadLeads(){
   const start=txt.indexOf('{');
   const end=txt.lastIndexOf('}')+1;
   const d=JSON.parse(txt.slice(start,end));
-  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v); // cols: [0]data [1]evento [2]email [3]nome [5]empresa [6]cargo [7]porte [10]source [14]channel [15]utm_source [24]stage
+  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
 
-  const lq=rows.filter(r=>(r.c[24]?.v||'').includes('Qualificado')).length;
-  const camps=[...new Set(rows.map(r=>r.c[8]?.v||r.c[13]?.v).filter(Boolean))].length;
-  document.getElementById('ov-leads').textContent=fmt(rows.length);
-  document.getElementById('l-total').textContent=fmt(rows.length);
-  document.getElementById('l-lq').textContent=fmt(lq);
-  document.getElementById('l-taxa').textContent=rows.length?Math.round(lq/rows.length*100)+'%':'—';
-  document.getElementById('l-camps').textContent=camps;
-  document.getElementById('leads-badge').textContent=rows.length+' leads';
+  // 1. Guardar todos os leads para uso pelos filtros
+  _allLeads = rows;
 
-  document.getElementById('ov-leads-body').innerHTML=rows.slice(-8).reverse().map(r=>{
-    const c=r.c||[];const bc=c[24]?.v?.includes('Qualificado')?'lq':'lead';
-    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="color:var(--muted);font-size:12px">${c[6]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
+  // 2. Popular o select de eventos com valores únicos
+  const eventos = [...new Set(rows.map(r=>normEvento(r.c[1]?.v)).filter(Boolean))].sort();
+  const selEvento = document.getElementById('f-evento');
+  if (selEvento) {
+    const cur = selEvento.value;
+    selEvento.innerHTML = '<option value="">Todos os eventos</option>' +
+      eventos.map(e=>`<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');
+  }
+
+  // 3. KPIs da visão geral e badge
+  document.getElementById('ov-leads').textContent = fmt(rows.length);
+  document.getElementById('leads-badge').textContent = rows.length + ' leads';
+
+  // 4. Tabela "Leads recentes" da Visão Geral (sempre mostra TODOS, não filtra)
+  document.getElementById('ov-leads-body').innerHTML = rows.slice(-8).reverse().map(r=>{
+    const c = r.c || [];
+    const bc = (c[24]?.v||'').toLowerCase().includes('qualificado') ? 'lq' : 'lead';
+    return `<tr>
+      <td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td>
+      <td style="color:var(--muted);font-size:12px">${normCargo(c[6]?.v)}</td>
+      <td>${pill(normCanal(c[15]?.v, c[14]?.v, c[10]?.v))}</td>
+      <td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td>
+      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td>
+    </tr>`;
   }).join('');
 
-  document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
-    const c=r.c||[];const bc=c[24]?.v?.includes('Qualificado')?'lq':'lead';
-    return`<tr><td><div class="t-name">${c[3]?.v||'—'}</div><div class="t-sub">${c[5]?.v||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${c[6]?.v||'—'}</td><td style="font-size:11px;color:var(--muted)">${c[7]?.v||'—'}</td><td>${pill(c[14]?.v||c[9]?.v)}</td><td style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c[8]?.v||'—'}</td><td><span class="badge ${bc}">${c[24]?.v||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[0]?.v||'').toString().slice(0,10)}</td></tr>`;
-  }).join('');
-
-  const byCan={};rows.forEach(r=>{const v=normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v);byCan[v]=(byCan[v]||0)+1;});
-  const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
-  mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
-  const byCargo={};rows.forEach(r=>{const v=normCargo(r.c[6]?.v);byCargo[v]=(byCargo[v]||0)+1;});
-  mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
-  mkBars(document.getElementById('gads-bars'),canRows.filter(r=>r.label==='Google ADS').length?canRows.filter(r=>r.label==='Google ADS'):[{label:'Sem dados Google',v:0}],CORES[0]);
+  // 5. Renderizar view de leads (aplicando filtros se ativos)
+  aplicarFiltros();
 }
 
 // ── GA4 ──────────────────────────────────────────────────────
