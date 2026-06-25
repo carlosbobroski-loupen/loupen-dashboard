@@ -116,6 +116,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
     <div class="nav-label">Anúncios</div>
     <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
+    <button class="nav-item" onclick="showView('linkedin')"><i class="ti ti-brand-linkedin"></i>LinkedIn ADS</button>
     <button class="nav-item" onclick="showView('gads')"><i class="ti ti-brand-google"></i>Google ADS</button>
   </nav>
   <div class="sidebar-footer">
@@ -174,12 +175,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- OVERVIEW -->
   <div class="view active" id="view-overview">
-    <div class="kpi-grid">
+    <div class="kpi-grid" style="grid-template-columns:repeat(6,1fr)">
       <div class="kpi blue"><div class="kpi-label"><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ov-leads">—</div><div class="kpi-footer">RD Station</div></div>
       <div class="kpi green"><div class="kpi-label"><i class="ti ti-eye"></i>Sessões</div><div class="kpi-value" id="ov-sess">—</div><div class="kpi-footer">GA4</div></div>
       <div class="kpi purple"><div class="kpi-label"><i class="ti ti-brand-meta"></i>Gasto Meta</div><div class="kpi-value" id="ov-meta-spend">—</div><div class="kpi-footer">Meta ADS</div></div>
       <div class="kpi amber"><div class="kpi-label"><i class="ti ti-target"></i>CPL Meta</div><div class="kpi-value" id="ov-meta-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
       <div class="kpi red"><div class="kpi-label"><i class="ti ti-bounce-right"></i>Rejeição</div><div class="kpi-value" id="ov-bounce">—</div><div class="kpi-footer">GA4 média</div></div>
+      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-brand-linkedin"></i>Gasto LinkedIn</div><div class="kpi-value" id="ov-li-spend">—</div><div class="kpi-footer">LinkedIn ADS</div></div>
     </div>
     <div class="two-col">
       <div class="card">
@@ -283,6 +285,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
   </div>
 
+  <!-- LINKEDIN ADS -->
+  <div class="view" id="view-linkedin">
+    <div class="kpi-grid-6">
+      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="li-spend">—</div><div class="kpi-footer">No período</div></div>
+      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="li-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="li-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="li-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label"><i class="ti ti-users"></i>Conversões</div><div class="kpi-value" id="li-conv">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="li-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas</div><div class="section-badge" id="li-camps-badge">—</div></div>
+      <table class="tbl">
+        <thead><tr><th>Campanha</th><th>Status</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Conversões</th><th>CPL</th></tr></thead>
+        <tbody id="li-camps-body"></tbody>
+      </table>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Gasto por campanha</div></div>
+        <div id="li-spend-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Cliques por campanha</div></div>
+        <div class="legend" id="li-click-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-li-clicks" role="img" aria-label="Cliques por campanha LinkedIn"></canvas></div>
+      </div>
+    </div>
+  </div>
+
   <!-- GOOGLE ADS -->
   <div class="view" id="view-gads">
     <div class="card">
@@ -313,12 +345,14 @@ let activeProp = 'all'; // 'all' | '503864241' | '541927286'
 const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
 const META_TOKEN   = 'EAAnwZAoVKOWUBR2Yls6fEMqLfZAR3ZARj6akUoTPqIrMN5MyMBGJWo8MYIUghdA6e7oyVJ3r6ZCd2NUIcCKNmZCzZBjQyEZBrzSfCZCIHTUYwZB1sQGxC6w2ikfJROvR4MEbsyLGZAdVAI0XplZBjB7vyZBKRmJIftussxxdgiVC68mBzJK6ZCRBMVRLjbLgAZCHM8';
 const META_ACCOUNT = 'act_2412716725845249';
+const LI_TOKEN   = 'AQWarP9mUgJ-opMlrqqrL-woJoQLtlN6BwJ8u48WeDH5mhkqAn7pjrqz8OEHHIMe5-Mff0GQnQgAmppFR2po7kL105VXYvFXSCgrvL0kFD9uYGrYo5OZPnBhXJRkn8ITdVlhz3re9p3N3cPRfVqS-Z5gHPnKqcSQLHBy3XFCEvDeihgSzG0DdGcze8zToLGDB9LBOldgMBHyLYDPJ7Pw1cgx59EJL-6ObpY3OPFfvZPt71-AHdmON7QewPEKHhetdmIRJTRD_XP6ZVio-WKcVD8M-thgSt9Y3VwT41ZdD4cLLSdouiuYbncgf3sUMqA70z-C-fWnYsqsA-KstmXyCmVjPSRWOKw';
+const LI_ACCOUNT  = '533600351';
 const SA = {
   email:'dashboard-marketing@n8n-credenciais-496419.iam.gserviceaccount.com',
   key:`-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCbXZ4uuBP4G0NX\nHuVoyN4CC8BQwJhwMtRzpsARyHM4UQnIFggiPb5W42vz2pVmiNT1D3+mygRSLyDe\nM/LS1DhSKlXE0hNxm5cCtNoKRVdczpSbDYy1BB7Ywfcidji7zXKqC0/RXxnYur5R\nKX3SDDNZ2nfYXvhjK7xyAqvLyqfftdVmXvaw+QYMZp7mHRIcT1gOUYObK8BJIslf\n6hWK1NjnLaTx5eAFK5mJiT1nxG9jj8NILgCbGV5JNjgSE59Vhvz4UatiYzHyscDG\nIYXDTKROuko97wWwk8NloEEZB9/WNgNLd4EI54nEPBAxge4tpLrNzgNfQFZLTzLx\nv0fqDW1DAgMBAAECggEAB8QqQBObi+9w8k3tEcvYrSmBN4gpFpKz5AQV3c2zVMFY\nR9QyG+QSO62qm8n1Zea5Hnbj3qaCiMkqT3ExVjCdkB3lo60Mo8UvS0dXDuRgdZct\n/oIy4mmOUS+A9wwJ0fl3HeDq4IBsflT3Zn84duN9PaSaEQrOR8bL6LcRd2Jt+dS9\nHv8LiBqIcf1gzM80WUNb05l5McWLoVs5PEhf+96vM8hx+l/JRNcPSWQOihpXXQD8\nprT2f1flOnrGrb9adAsxdF7ZM3gf/oGtN/kIgffmZ4bhTljYy+cSyo7xC5ZQVyHc\nrw3tyTf2MuGmelIG1eRJ2k7am74qWgE66VjehuV14QKBgQDOPJr5U1FnJ9xwwe2g\nhsEDpBbAjHhv/JxR3ve8Vj5Q/NTu+xWgmnSOFbCcTir6fdS4EY272txnUpZ9oc/A\nEICCTYoxJ4sp6DOiEoTzPqGbW4sURbfzj0+EKYpMmGdQVW9/526IspJWTTZ9rDiN\nqpEnVzYWs0Gv2nIlqSPNgBwNjwKBgQDA2qu5Sm0gQiuQbpQAtSYoHEvkP9+XBukJ\n0/dUL2DXHfL8YtO2xaYn3JxOuUHSGKc435qMTpYBF8G1ZXqOrAv9C6d4zGabrxb9\nwJBYJPzmnIAaXfJe9xQ2WuU5Ylt8oqyVctWkUiH76q/R+daSN9BkX7hcXwpdSOLr\nUvCCPx7zDQKBgQCbCX5rHhJc3N9fuLmdao/g39LmzvKfJSSSe257G85e7aJZQVHB\n2TrzsSSCbFTs1/k4oqGM7fuwhKpzKVhXB1DEI+xWBWcditx94zQk9BljBA9qnvqp\nUzuwm9XGvO81ufRHD8DNbIiL7iGfmf8tqGLUU0BrEji4LRyQaTVr//mWywKBgQC5\nLH38sRDtC3wm93YW49kaZGkeZZI7wn/aVvPBmqhihTg9zGq6sTckSTiwgkNIBzHx\ncwpDNGXl8LingyPVgC8Wrq0EWUcgr1LlHZO7fvByQczjBFfnhVicBFTa760mlFAg\nQ54NZGuLJsHhXQIBbaQj7KDp2Lvr7EMub3nNpewCtQKBgF5+x0qwNqN/p/0vPY8A\n8ZQS5Mo89SyfhSoWbzbwbwqRL+6eul1sZ8Q58UDcqZUj4XnKu0c9t6M/ImQgLHcK\n9qt+sQs3AuRZ9S7ncs5z8JTqBpveIBuAtFA/ENDRJTmYzHmVaMq08zgidLkQTRGg\n+VFP+Re72X5l//AXdLbWYgOB\n-----END PRIVATE KEY-----\n`
 };
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',gads:'Google ADS'};
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
 // ── NAV ─────────────────────────────────────────────────────
@@ -753,6 +787,94 @@ async function loadGA4(){
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
+async function loadLinkedIn(){
+  const p = period();
+  const since = p.startDate.replace(/-/g,'');
+  const until = p.endDate.replace(/-/g,'');
+
+  // Buscar campanhas
+  const campsUrl = `https://api.linkedin.com/v2/adCampaignsV2?q=search&search.account.values[0]=urn:li:sponsoredAccount:${LI_ACCOUNT}&search.status.values[0]=ACTIVE&search.status.values[1]=PAUSED&fields=id,name,status,costType`;
+  const campsResp = await fetch(campsUrl, {headers:{Authorization:`Bearer ${LI_TOKEN}`,'LinkedIn-Version':'202401'}});
+  const campsData = await campsResp.json();
+  if (campsData.serviceErrorCode) throw new Error('LinkedIn camps: '+campsData.message);
+
+  const camps = campsData.elements || [];
+
+  // Buscar analytics de todas as campanhas
+  const campIds = camps.map(c=>c.id);
+  if (!campIds.length) {
+    document.getElementById('li-camps-badge').textContent = '0 campanhas';
+    document.getElementById('li-camps-body').innerHTML = '<tr><td colspan="9" class="empty">Nenhuma campanha ativa no período</td></tr>';
+    return;
+  }
+
+  // Analytics por campanha
+  const analyticsUrl = `https://api.linkedin.com/v2/adAnalyticsV2?q=analytics&pivot=CAMPAIGN&dateRange.start.day=${p.startDate.split('-')[2]}&dateRange.start.month=${p.startDate.split('-')[1]}&dateRange.start.year=${p.startDate.split('-')[0]}&dateRange.end.day=${p.endDate.split('-')[2]}&dateRange.end.month=${p.endDate.split('-')[1]}&dateRange.end.year=${p.endDate.split('-')[0]}&timeGranularity=ALL&accounts[0]=urn:li:sponsoredAccount:${LI_ACCOUNT}&fields=pivotValue,costInLocalCurrency,impressions,clicks,externalWebsiteConversions`;
+  const analyticsResp = await fetch(analyticsUrl, {headers:{Authorization:`Bearer ${LI_TOKEN}`,'LinkedIn-Version':'202401'}});
+  const analyticsData = await analyticsResp.json();
+  if (analyticsData.serviceErrorCode) throw new Error('LinkedIn analytics: '+analyticsData.message);
+
+  const analytics = analyticsData.elements || [];
+
+  // Mapear analytics por campanha ID
+  const analyticsMap = {};
+  analytics.forEach(a => {
+    const id = a.pivotValue?.replace('urn:li:sponsoredCampaign:','');
+    if (id) analyticsMap[id] = a;
+  });
+
+  // Combinar campanhas + analytics
+  let totSpend=0, totImpr=0, totClicks=0, totConv=0;
+  const campRows = [];
+  camps.forEach(c => {
+    const a = analyticsMap[c.id] || {};
+    const spend   = parseFloat(a.costInLocalCurrency || 0);
+    const impr    = parseInt(a.impressions || 0);
+    const clicks  = parseInt(a.clicks || 0);
+    const conv    = parseInt(a.externalWebsiteConversions || 0);
+    const ctr     = impr > 0 ? (clicks/impr*100) : 0;
+    const cpc     = clicks > 0 ? spend/clicks : 0;
+    const cpl     = conv > 0 ? spend/conv : 0;
+    totSpend+=spend; totImpr+=impr; totClicks+=clicks; totConv+=conv;
+    campRows.push({name:c.name, status:c.status, spend, impr, clicks, ctr, cpc, conv, cpl});
+  });
+
+  const cplGeral = totConv > 0 ? totSpend/totConv : 0;
+  const ctrGeral = totImpr > 0 ? (totClicks/totImpr*100) : 0;
+
+  // KPIs
+  document.getElementById('li-spend').textContent  = brl(totSpend);
+  document.getElementById('li-impr').textContent   = fmt(totImpr);
+  document.getElementById('li-clicks').textContent = fmt(totClicks);
+  document.getElementById('li-ctr').textContent    = ctrGeral.toFixed(2)+'%';
+  document.getElementById('li-conv').textContent   = fmt(totConv);
+  document.getElementById('li-cpl').textContent    = cplGeral > 0 ? brl(cplGeral) : '—';
+  const ovLiSpend = document.getElementById('ov-li-spend'); if(ovLiSpend) ovLiSpend.textContent = brl(totSpend);
+
+  // Tabela campanhas
+  document.getElementById('li-camps-badge').textContent = campRows.length + ' campanhas';
+  document.getElementById('li-camps-body').innerHTML = campRows.length ? campRows.map(c=>`<tr>
+    <td><div class="t-name">${c.name}</div></td>
+    <td>${statusChip(c.status)}</td>
+    <td style="font-family:var(--mono)">${brl(c.spend)}</td>
+    <td>${fmt(c.impr)}</td>
+    <td>${fmt(c.clicks)}</td>
+    <td class="${c.ctr>2?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
+    <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
+    <td style="font-weight:500">${fmt(c.conv)}</td>
+    <td style="font-family:var(--mono);font-weight:500">${c.cpl>0?brl(c.cpl):'—'}</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Sem dados no período</td></tr>';
+
+  // Barras gasto
+  const spendRows = campRows.sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
+  mkBars(document.getElementById('li-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], '#0A66C2');
+
+  // Donut cliques
+  const clickRows = [...campRows].sort((a,b)=>b.clicks-a.clicks).slice(0,6);
+  mkLeg(document.getElementById('li-click-leg'), clickRows.map(c=>c.name.slice(0,20)));
+  mkChart('c-li-clicks','doughnut', clickRows.map(c=>c.name.slice(0,20)), [{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
+}
+
 async function initDates(){
   const h = new Date();
   const f = x => x.toISOString().slice(0,10);
@@ -768,7 +890,7 @@ async function carregarTudo(){
   const stxt=document.getElementById('stxt');
   pulse.style.background='var(--amber)';
   stxt.textContent='Atualizando...';
-  const results=await Promise.allSettled([loadLeads(),loadGA4(),loadMeta()]);
+  const results=await Promise.allSettled([loadLeads(),loadGA4(),loadMeta(),loadLinkedIn()]);
   const errors=results.filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Erro desconhecido');
   if(errors.length){
     pulse.style.background='var(--red)';
