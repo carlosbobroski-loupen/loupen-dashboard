@@ -116,6 +116,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item active" onclick="showView('overview')"><i class="ti ti-layout-dashboard"></i>Visão geral</button>
     <div class="nav-label">Fontes</div>
     <button class="nav-item" onclick="showView('leads')"><i class="ti ti-users"></i>Leads RD Station</button>
+    <button class="nav-item" onclick="showView('rdstation')"><i class="ti ti-mail"></i>RD Station CRM</button>
     <button class="nav-item" onclick="showView('ga4')"><i class="ti ti-chart-line"></i>Google Analytics</button>
     <button class="nav-item" onclick="showView('utm')"><i class="ti ti-link"></i>Campanhas UTM</button>
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
@@ -225,6 +226,57 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads</div></div>
       <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Porte</th><th>Canal</th><th>Evento</th><th>Status</th><th>Data</th></tr></thead><tbody id="l-all"></tbody></table>
+    </div>
+  </div>
+
+  <!-- RD STATION -->
+  <div class="view" id="view-rdstation">
+    <!-- KPIs Funil -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
+      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-users"></i>Total Contatos</div><div class="kpi-value" id="rd-total">—</div><div class="kpi-footer">Base completa</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-user-plus"></i>Leads</div><div class="kpi-value" id="rd-leads">—</div><div class="kpi-footer">Estágio Lead</div></div>
+      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-star"></i>MQL</div><div class="kpi-value" id="rd-mql">—</div><div class="kpi-footer">Lead Qualificado</div></div>
+      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-briefcase"></i>Oportunidades</div><div class="kpi-value" id="rd-opp">—</div><div class="kpi-footer">Em negociação</div></div>
+      <div class="kpi red"><div class="kpi-label"><i class="ti ti-check"></i>Clientes</div><div class="kpi-value" id="rd-clients">—</div><div class="kpi-footer">Convertidos</div></div>
+    </div>
+
+    <div class="two-col">
+      <!-- Funil visual -->
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil de conversão</div></div>
+        <div id="rd-funil-bars"></div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px" id="rd-taxas"></div>
+      </div>
+      <!-- Fluxos de automação -->
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-bolt"></i>Fluxos de automação</div><div class="section-badge" id="rd-auto-badge">—</div></div>
+        <div id="rd-automations-list"></div>
+      </div>
+    </div>
+
+    <!-- Landing Pages -->
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-browser"></i>Landing Pages & Formulários</div><div class="section-badge" id="rd-lp-badge">—</div></div>
+      <table class="tbl">
+        <thead><tr><th>Landing Page</th><th>Status</th><th>Conversões</th><th>Visitantes</th><th>Taxa</th></tr></thead>
+        <tbody id="rd-lps-body"></tbody>
+      </table>
+    </div>
+
+    <!-- E-mail marketing info -->
+    <div class="card" style="padding:16px 20px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <i class="ti ti-mail" style="font-size:20px;color:var(--amber);flex-shrink:0;margin-top:2px"></i>
+        <div>
+          <div style="font-weight:600;margin-bottom:4px;font-size:13px">E-mail Marketing</div>
+          <div style="color:var(--muted);font-size:12px;line-height:1.7">
+            Métricas de abertura e clique de e-mails não estão disponíveis na API REST do RD Station Marketing.
+            Para acompanhar disparos em tempo real, configure um <strong style="color:var(--text)">Webhook de E-mail</strong> no RD Station 
+            (Configurações → Integrações → Webhooks) apontando para o n8n — assim cada abertura/clique é capturado automaticamente.
+            Peça aqui no chat para configurar esse webhook.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -427,6 +479,7 @@ const PROPS = [
 ];
 let activeProp = 'all'; // 'all' | '503864241' | '541927286'
 const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
+const RD_TOKEN = '802858b6b507dc7c657e430d36261302';
 const META_TOKEN   = 'EAAnwZAoVKOWUBR2Yls6fEMqLfZAR3ZARj6akUoTPqIrMN5MyMBGJWo8MYIUghdA6e7oyVJ3r6ZCd2NUIcCKNmZCzZBjQyEZBrzSfCZCIHTUYwZB1sQGxC6w2ikfJROvR4MEbsyLGZAdVAI0XplZBjB7vyZBKRmJIftussxxdgiVC68mBzJK6ZCRBMVRLjbLgAZCHM8';
 const META_ACCOUNT = 'act_2412716725845249';
 const LI_TOKEN   = 'AQWarP9mUgJ-opMlrqqrL-woJoQLtlN6BwJ8u48WeDH5mhkqAn7pjrqz8OEHHIMe5-Mff0GQnQgAmppFR2po7kL105VXYvFXSCgrvL0kFD9uYGrYo5OZPnBhXJRkn8ITdVlhz3re9p3N3cPRfVqS-Z5gHPnKqcSQLHBy3XFCEvDeihgSzG0DdGcze8zToLGDB9LBOldgMBHyLYDPJ7Pw1cgx59EJL-6ObpY3OPFfvZPt71-AHdmON7QewPEKHhetdmIRJTRD_XP6ZVio-WKcVD8M-thgSt9Y3VwT41ZdD4cLLSdouiuYbncgf3sUMqA70z-C-fWnYsqsA-KstmXyCmVjPSRWOKw';
@@ -440,14 +493,14 @@ const GADS_DEVELOPER_TOKEN = _gk;
 const GADS_CLIENT_ID       = _gcid;
 const GADS_CLIENT_SECRET   = _gcs;
 const GADS_REFRESH_TOKEN   = _grt;
-const GADS_CUSTOMER_ID     = '4154543486';
+const GADS_CUSTOMER_ID     = '4155543486';
 const GADS_MCC_ID          = '8437421207';
 const SA = {
   email:'dashboard-marketing@n8n-credenciais-496419.iam.gserviceaccount.com',
   key:`-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCbXZ4uuBP4G0NX\nHuVoyN4CC8BQwJhwMtRzpsARyHM4UQnIFggiPb5W42vz2pVmiNT1D3+mygRSLyDe\nM/LS1DhSKlXE0hNxm5cCtNoKRVdczpSbDYy1BB7Ywfcidji7zXKqC0/RXxnYur5R\nKX3SDDNZ2nfYXvhjK7xyAqvLyqfftdVmXvaw+QYMZp7mHRIcT1gOUYObK8BJIslf\n6hWK1NjnLaTx5eAFK5mJiT1nxG9jj8NILgCbGV5JNjgSE59Vhvz4UatiYzHyscDG\nIYXDTKROuko97wWwk8NloEEZB9/WNgNLd4EI54nEPBAxge4tpLrNzgNfQFZLTzLx\nv0fqDW1DAgMBAAECggEAB8QqQBObi+9w8k3tEcvYrSmBN4gpFpKz5AQV3c2zVMFY\nR9QyG+QSO62qm8n1Zea5Hnbj3qaCiMkqT3ExVjCdkB3lo60Mo8UvS0dXDuRgdZct\n/oIy4mmOUS+A9wwJ0fl3HeDq4IBsflT3Zn84duN9PaSaEQrOR8bL6LcRd2Jt+dS9\nHv8LiBqIcf1gzM80WUNb05l5McWLoVs5PEhf+96vM8hx+l/JRNcPSWQOihpXXQD8\nprT2f1flOnrGrb9adAsxdF7ZM3gf/oGtN/kIgffmZ4bhTljYy+cSyo7xC5ZQVyHc\nrw3tyTf2MuGmelIG1eRJ2k7am74qWgE66VjehuV14QKBgQDOPJr5U1FnJ9xwwe2g\nhsEDpBbAjHhv/JxR3ve8Vj5Q/NTu+xWgmnSOFbCcTir6fdS4EY272txnUpZ9oc/A\nEICCTYoxJ4sp6DOiEoTzPqGbW4sURbfzj0+EKYpMmGdQVW9/526IspJWTTZ9rDiN\nqpEnVzYWs0Gv2nIlqSPNgBwNjwKBgQDA2qu5Sm0gQiuQbpQAtSYoHEvkP9+XBukJ\n0/dUL2DXHfL8YtO2xaYn3JxOuUHSGKc435qMTpYBF8G1ZXqOrAv9C6d4zGabrxb9\nwJBYJPzmnIAaXfJe9xQ2WuU5Ylt8oqyVctWkUiH76q/R+daSN9BkX7hcXwpdSOLr\nUvCCPx7zDQKBgQCbCX5rHhJc3N9fuLmdao/g39LmzvKfJSSSe257G85e7aJZQVHB\n2TrzsSSCbFTs1/k4oqGM7fuwhKpzKVhXB1DEI+xWBWcditx94zQk9BljBA9qnvqp\nUzuwm9XGvO81ufRHD8DNbIiL7iGfmf8tqGLUU0BrEji4LRyQaTVr//mWywKBgQC5\nLH38sRDtC3wm93YW49kaZGkeZZI7wn/aVvPBmqhihTg9zGq6sTckSTiwgkNIBzHx\ncwpDNGXl8LingyPVgC8Wrq0EWUcgr1LlHZO7fvByQczjBFfnhVicBFTa760mlFAg\nQ54NZGuLJsHhXQIBbaQj7KDp2Lvr7EMub3nNpewCtQKBgF5+x0qwNqN/p/0vPY8A\n8ZQS5Mo89SyfhSoWbzbwbwqRL+6eul1sZ8Q58UDcqZUj4XnKu0c9t6M/ImQgLHcK\n9qt+sQs3AuRZ9S7ncs5z8JTqBpveIBuAtFA/ENDRJTmYzHmVaMq08zgidLkQTRGg\n+VFP+Re72X5l//AXdLbWYgOB\n-----END PRIVATE KEY-----\n`
 };
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
 // ── NAV ─────────────────────────────────────────────────────
@@ -1226,6 +1279,95 @@ async function loadGoogleAds() {
     [{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
 }
 
+async function loadRDStation(){
+  const headers = {
+    'Authorization': `Bearer ${RD_TOKEN}`,
+    'Content-Type': 'application/json'
+  };
+  const base = 'https://api.rd.services/platform';
+
+  // Buscar funil em paralelo
+  const [rTotal, rLeads, rMQL, rOpp, rClients, rAuto, rLPs] = await Promise.all([
+    fetch(`${base}/contacts/search?page=1&page_size=1`, {headers}).then(r=>r.json()),
+    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Lead`, {headers}).then(r=>r.json()),
+    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Qualified Lead`, {headers}).then(r=>r.json()),
+    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Opportunity`, {headers}).then(r=>r.json()),
+    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Customer`, {headers}).then(r=>r.json()),
+    fetch(`${base}/automations`, {headers}).then(r=>r.json()).catch(()=>[]),
+    fetch(`${base}/landing_pages`, {headers}).then(r=>r.json()).catch(()=>[])
+  ]);
+
+  const total   = rTotal.total   || 0;
+  const leads   = rLeads.total   || 0;
+  const mql     = rMQL.total     || 0;
+  const opp     = rOpp.total     || 0;
+  const clients = rClients.total || 0;
+
+  // KPIs
+  document.getElementById('rd-total').textContent   = fmt(total);
+  document.getElementById('rd-leads').textContent   = fmt(leads);
+  document.getElementById('rd-mql').textContent     = fmt(mql);
+  document.getElementById('rd-opp').textContent     = fmt(opp);
+  document.getElementById('rd-clients').textContent = fmt(clients);
+
+  // Funil visual
+  const maxFunil = Math.max(leads, mql, opp, clients, 1);
+  const funilItems = [
+    {label: 'Leads', v: leads, color: CORES[0]},
+    {label: 'MQL', v: mql, color: CORES[2]},
+    {label: 'Oportunidades', v: opp, color: CORES[3]},
+    {label: 'Clientes', v: clients, color: CORES[1]}
+  ];
+  document.getElementById('rd-funil-bars').innerHTML = funilItems.map(item => `
+    <div class="bar-row">
+      <div class="bar-label">${item.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(item.v/maxFunil*100)}%;background:${item.color}"></div></div>
+      <div class="bar-val">${fmt(item.v)}</div>
+    </div>`).join('');
+
+  // Taxas de conversão
+  const taxas = [
+    {label: 'Lead → MQL',    v: leads   > 0 ? (mql/leads*100).toFixed(1)+'%'    : '—'},
+    {label: 'MQL → Opp',     v: mql     > 0 ? (opp/mql*100).toFixed(1)+'%'      : '—'},
+    {label: 'Opp → Cliente', v: opp     > 0 ? (clients/opp*100).toFixed(1)+'%'  : '—'}
+  ];
+  document.getElementById('rd-taxas').innerHTML = taxas.map(t => `
+    <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${t.label}</div>
+      <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--green)">${t.v}</div>
+    </div>`).join('');
+
+  // Automações
+  const autos = Array.isArray(rAuto) ? rAuto : (rAuto.automations || rAuto.data || []);
+  document.getElementById('rd-auto-badge').textContent = autos.length + ' fluxos';
+  document.getElementById('rd-automations-list').innerHTML = autos.length ? autos.slice(0,10).map(a => `
+    <div class="bar-row" style="margin-bottom:8px">
+      <div style="flex:1;font-size:12px;color:var(--text)">${a.name || a.title || '—'}</div>
+      <span class="badge ${a.status === 'active' || a.enabled ? 'lq' : 'lead'}" style="font-size:10px">
+        ${a.status === 'active' || a.enabled ? 'Ativo' : 'Pausado'}
+      </span>
+    </div>`).join('') :
+    '<div style="color:var(--muted);font-size:13px;padding:8px 0">Nenhum fluxo encontrado</div>';
+
+  // Landing Pages
+  const lps = Array.isArray(rLPs) ? rLPs : (rLPs.landing_pages || rLPs.data || []);
+  document.getElementById('rd-lp-badge').textContent = lps.length + ' páginas';
+  document.getElementById('rd-lps-body').innerHTML = lps.length ? lps.slice(0,15).map(lp => {
+    const conv = lp.conversions_count || lp.conversions || 0;
+    const vis  = lp.visitors_count    || lp.visitors    || 0;
+    const taxa = vis > 0 ? (conv/vis*100).toFixed(1)+'%' : '—';
+    const statusCls = lp.published || lp.status === 'published' ? 'chip-active' : 'chip-paused';
+    const statusTxt = lp.published || lp.status === 'published' ? 'Publicada' : 'Rascunho';
+    return `<tr>
+      <td><div class="t-name">${lp.title || lp.name || '—'}</div></td>
+      <td><span class="status-chip ${statusCls}">${statusTxt}</span></td>
+      <td style="font-weight:500">${fmt(conv)}</td>
+      <td>${fmt(vis)}</td>
+      <td class="${parseFloat(taxa)>5?'rej-ok':parseFloat(taxa)>2?'rej-warn':'rej-bad'}">${taxa}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">Nenhuma landing page encontrada</td></tr>';
+}
+
 async function initDates(){
   const h = new Date();
   const f = x => x.toISOString().slice(0,10);
@@ -1241,7 +1383,7 @@ async function carregarTudo(){
   const stxt=document.getElementById('stxt');
   pulse.style.background='var(--amber)';
   stxt.textContent='Atualizando...';
-  const results=await Promise.allSettled([loadLeads(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds()]);
+  const results=await Promise.allSettled([loadLeads(),loadRDStation(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds()]);
   const errors=results.filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Erro desconhecido');
   if(errors.length){
     pulse.style.background='var(--red)';
