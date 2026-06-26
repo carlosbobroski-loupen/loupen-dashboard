@@ -763,24 +763,21 @@ async function loadMeta(){
   const timeRange = `{"since":"${p.startDate}","until":"${p.endDate}"}`;
 
   // Campos espelhando o Gerenciador de Anúncios Meta
-  const insightFields = 'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,cost_per_action_type,cost_per_result,objective';
+  const insightFields = 'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,cost_per_action_type,cost_per_result';
 
   // ── 1. CAMPANHAS ──
   const campsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns`
-    + `?fields=name,status,effective_status,objective,insights.fields(${insightFields}){time_range}`
-    + `&time_range=${encodeURIComponent(timeRange)}`
+    + `?fields=name,status,effective_status,objective,insights.time_range(${encodeURIComponent(timeRange)}).fields(${insightFields})`
     + `&limit=50&access_token=${META_TOKEN}`;
 
   // ── 2. CONJUNTOS DE ANÚNCIOS ──
   const adsetsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/adsets`
-    + `?fields=name,status,effective_status,campaign_id,campaign{name},insights.fields(${insightFields}){time_range}`
-    + `&time_range=${encodeURIComponent(timeRange)}`
+    + `?fields=name,status,effective_status,campaign_id,campaign{name},insights.time_range(${encodeURIComponent(timeRange)}).fields(${insightFields})`
     + `&limit=100&access_token=${META_TOKEN}`;
 
   // ── 3. ANÚNCIOS ──
   const adsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/ads`
-    + `?fields=name,status,effective_status,adset_id,adset{name},insights.fields(${insightFields}){time_range}`
-    + `&time_range=${encodeURIComponent(timeRange)}`
+    + `?fields=name,status,effective_status,adset_id,adset{name},insights.time_range(${encodeURIComponent(timeRange)}).fields(${insightFields})`
     + `&limit=100&access_token=${META_TOKEN}`;
 
   const [campsRes, adsetsRes, adsRes] = await Promise.all([
