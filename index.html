@@ -271,21 +271,48 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="kpi green"><div class="kpi-label"><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
       <div class="kpi amber"><div class="kpi-label"><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
       <div class="kpi red"><div class="kpi-label"><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
+      <div class="kpi green"><div class="kpi-label"><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer">Custo por resultado</div></div>
     </div>
-    <div class="card">
-      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas</div><div class="section-badge" id="m-camps-badge">—</div></div>
-      <table class="tbl"><thead><tr><th>Campanha</th><th>Status</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Conversões</th><th>CPL</th></tr></thead><tbody id="m-camps-body"></tbody></table>
+
+    <div class="card" style="padding:0">
+      <div class="meta-tabs">
+        <button class="meta-tab active" onclick="switchMetaTab('camps')"><i class="ti ti-speakerphone"></i>Campanhas</button>
+        <button class="meta-tab" onclick="switchMetaTab('adsets')"><i class="ti ti-layout-grid"></i>Conjuntos de anúncios</button>
+        <button class="meta-tab" onclick="switchMetaTab('ads')"><i class="ti ti-photo"></i>Anúncios</button>
+        <span style="margin-left:auto;padding:10px 16px;font-size:12px;color:var(--muted)" id="m-tab-badge">—</span>
+      </div>
+
+      <div id="meta-tab-camps" class="meta-tab-content" style="padding:0 20px 20px;overflow-x:auto">
+        <table class="tbl" style="min-width:1100px">
+          <thead><tr><th>Campanha</th><th>Veiculação</th><th>Resultados</th><th>Alcance</th><th>Freq.</th><th>Custo/Result.</th><th>Gasto</th><th>Cliques</th><th>CTR</th><th>CPC</th></tr></thead>
+          <tbody id="m-camps-body"></tbody>
+        </table>
+      </div>
+
+      <div id="meta-tab-adsets" class="meta-tab-content" style="display:none;padding:0 20px 20px;overflow-x:auto">
+        <table class="tbl" style="min-width:1100px">
+          <thead><tr><th>Conjunto</th><th>Campanha</th><th>Veiculação</th><th>Resultados</th><th>Alcance</th><th>Custo/Result.</th><th>Gasto</th><th>Cliques</th><th>CTR</th></tr></thead>
+          <tbody id="m-adsets-body"></tbody>
+        </table>
+      </div>
+
+      <div id="meta-tab-ads" class="meta-tab-content" style="display:none;padding:0 20px 20px;overflow-x:auto">
+        <table class="tbl" style="min-width:1100px">
+          <thead><tr><th>Anúncio</th><th>Conjunto</th><th>Veiculação</th><th>Resultados</th><th>Alcance</th><th>Custo/Result.</th><th>Gasto</th><th>Cliques</th><th>CTR</th></tr></thead>
+          <tbody id="m-ads-body"></tbody>
+        </table>
+      </div>
     </div>
+
     <div class="two-col">
       <div class="card">
         <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Gasto por campanha</div></div>
         <div id="m-spend-bars"></div>
       </div>
       <div class="card">
-        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Cliques por campanha</div></div>
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Resultados por campanha</div></div>
         <div class="legend" id="m-click-leg"></div>
-        <div class="chart-wrap" style="height:200px"><canvas id="c-meta-clicks" role="img" aria-label="Cliques por campanha Meta"></canvas></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-meta-clicks" role="img" aria-label="Resultados por campanha Meta"></canvas></div>
       </div>
     </div>
   </div>
