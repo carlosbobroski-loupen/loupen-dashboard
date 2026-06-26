@@ -1280,28 +1280,43 @@ async function loadGoogleAds() {
 }
 
 async function loadRDStation(){
-  const headers = {
-    'Authorization': `Bearer ${RD_TOKEN}`,
-    'Content-Type': 'application/json'
-  };
-  const base = 'https://api.rd.services/platform';
+  // Lê do cache do Google Sheets (atualizado hourly pelo n8n)
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=RD_Funil`;
+  const r = await fetch(url);
+  const txt = await r.text();
+  const start = txt.indexOf('{');
+  const end   = txt.lastIndexOf('}') + 1;
+  const d = JSON.parse(txt.slice(start, end));
+  const rows = (d.table?.rows || []).filter(r => r.c && r.c[1]?.v);
 
-  // Buscar funil em paralelo
-  const [rTotal, rLeads, rMQL, rOpp, rClients, rAuto, rLPs] = await Promise.all([
-    fetch(`${base}/contacts/search?page=1&page_size=1`, {headers}).then(r=>r.json()),
-    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Lead`, {headers}).then(r=>r.json()),
-    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Qualified Lead`, {headers}).then(r=>r.json()),
-    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Opportunity`, {headers}).then(r=>r.json()),
-    fetch(`${base}/contacts/search?page=1&page_size=1&query[lifecycle_stage]=Customer`, {headers}).then(r=>r.json()),
-    fetch(`${base}/automations`, {headers}).then(r=>r.json()).catch(()=>[]),
-    fetch(`${base}/landing_pages`, {headers}).then(r=>r.json()).catch(()=>[])
-  ]);
+  if (!rows.length) {
+    // Aba ainda não existe ou está vazia — mostrar mensagem
+    ['rd-total','rd-leads','rd-mql','rd-opp','rd-clients'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+    document.getElementById('rd-funil-bars').innerHTML =
+      '<div style="color:var(--muted);font-size:13px;padding:12px 0">Configure o workflow n8n para popular os dados do RD Station.<br>Importe o arquivo <strong style="color:var(--text)">rdstation_cache.json</strong> no seu n8n e execute.</div>';
+    document.getElementById('rd-automations-list').innerHTML =
+      '<div style="color:var(--muted);font-size:13px">Aguardando dados do n8n...</div>';
+    document.getElementById('rd-lps-body').innerHTML =
+      '<tr><td colspan="5" class="empty">Aguardando dados do n8n...</td></tr>';
+    return;
+  }
 
-  const total   = rTotal.total   || 0;
-  const leads   = rLeads.total   || 0;
-  const mql     = rMQL.total     || 0;
-  const opp     = rOpp.total     || 0;
-  const clients = rClients.total || 0;
+  // Mapear dados do Sheets: [0]=atualizadoEm [1]=metrica [2]=valor [3]=etapa
+  const dataMap = {};
+  rows.forEach(r => {
+    const etapa = r.c[3]?.v || '';
+    const valor = r.c[2]?.v || 0;
+    dataMap[etapa] = valor;
+  });
+
+  const total   = parseInt(dataMap['total']    || 0);
+  const leads   = parseInt(dataMap['lead']     || 0);
+  const mql     = parseInt(dataMap['mql']      || 0);
+  const opp     = parseInt(dataMap['opportunity'] || 0);
+  const clients = parseInt(dataMap['customer'] || 0);
 
   // KPIs
   document.getElementById('rd-total').textContent   = fmt(total);
@@ -1313,10 +1328,10 @@ async function loadRDStation(){
   // Funil visual
   const maxFunil = Math.max(leads, mql, opp, clients, 1);
   const funilItems = [
-    {label: 'Leads', v: leads, color: CORES[0]},
-    {label: 'MQL', v: mql, color: CORES[2]},
-    {label: 'Oportunidades', v: opp, color: CORES[3]},
-    {label: 'Clientes', v: clients, color: CORES[1]}
+    {label: 'Leads',         v: leads,   color: CORES[0]},
+    {label: 'MQL',           v: mql,     color: CORES[2]},
+    {label: 'Oportunidades', v: opp,     color: CORES[3]},
+    {label: 'Clientes',      v: clients, color: CORES[1]}
   ];
   document.getElementById('rd-funil-bars').innerHTML = funilItems.map(item => `
     <div class="bar-row">
@@ -1327,9 +1342,9 @@ async function loadRDStation(){
 
   // Taxas de conversão
   const taxas = [
-    {label: 'Lead → MQL',    v: leads   > 0 ? (mql/leads*100).toFixed(1)+'%'    : '—'},
-    {label: 'MQL → Opp',     v: mql     > 0 ? (opp/mql*100).toFixed(1)+'%'      : '—'},
-    {label: 'Opp → Cliente', v: opp     > 0 ? (clients/opp*100).toFixed(1)+'%'  : '—'}
+    {label: 'Lead → MQL',    v: leads > 0 ? (mql/leads*100).toFixed(1)+'%'    : '—'},
+    {label: 'MQL → Opp',     v: mql   > 0 ? (opp/mql*100).toFixed(1)+'%'      : '—'},
+    {label: 'Opp → Cliente', v: opp   > 0 ? (clients/opp*100).toFixed(1)+'%'  : '—'}
   ];
   document.getElementById('rd-taxas').innerHTML = taxas.map(t => `
     <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center">
@@ -1337,35 +1352,20 @@ async function loadRDStation(){
       <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--green)">${t.v}</div>
     </div>`).join('');
 
-  // Automações
-  const autos = Array.isArray(rAuto) ? rAuto : (rAuto.automations || rAuto.data || []);
-  document.getElementById('rd-auto-badge').textContent = autos.length + ' fluxos';
-  document.getElementById('rd-automations-list').innerHTML = autos.length ? autos.slice(0,10).map(a => `
-    <div class="bar-row" style="margin-bottom:8px">
-      <div style="flex:1;font-size:12px;color:var(--text)">${a.name || a.title || '—'}</div>
-      <span class="badge ${a.status === 'active' || a.enabled ? 'lq' : 'lead'}" style="font-size:10px">
-        ${a.status === 'active' || a.enabled ? 'Ativo' : 'Pausado'}
-      </span>
-    </div>`).join('') :
-    '<div style="color:var(--muted);font-size:13px;padding:8px 0">Nenhum fluxo encontrado</div>';
+  // Automações e LPs — aguardam abas próprias no Sheets
+  document.getElementById('rd-auto-badge').textContent = '—';
+  document.getElementById('rd-automations-list').innerHTML =
+    '<div style="color:var(--muted);font-size:12px;line-height:1.7">Automações serão exibidas aqui após configurar a aba <strong style="color:var(--text)">RD_Automacoes</strong> no n8n.</div>';
+  document.getElementById('rd-lp-badge').textContent = '—';
+  document.getElementById('rd-lps-body').innerHTML =
+    '<tr><td colspan="5" class="empty">LPs serão exibidas após configurar a aba RD_LandingPages no n8n.</td></tr>';
 
-  // Landing Pages
-  const lps = Array.isArray(rLPs) ? rLPs : (rLPs.landing_pages || rLPs.data || []);
-  document.getElementById('rd-lp-badge').textContent = lps.length + ' páginas';
-  document.getElementById('rd-lps-body').innerHTML = lps.length ? lps.slice(0,15).map(lp => {
-    const conv = lp.conversions_count || lp.conversions || 0;
-    const vis  = lp.visitors_count    || lp.visitors    || 0;
-    const taxa = vis > 0 ? (conv/vis*100).toFixed(1)+'%' : '—';
-    const statusCls = lp.published || lp.status === 'published' ? 'chip-active' : 'chip-paused';
-    const statusTxt = lp.published || lp.status === 'published' ? 'Publicada' : 'Rascunho';
-    return `<tr>
-      <td><div class="t-name">${lp.title || lp.name || '—'}</div></td>
-      <td><span class="status-chip ${statusCls}">${statusTxt}</span></td>
-      <td style="font-weight:500">${fmt(conv)}</td>
-      <td>${fmt(vis)}</td>
-      <td class="${parseFloat(taxa)>5?'rej-ok':parseFloat(taxa)>2?'rej-warn':'rej-bad'}">${taxa}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="5" class="empty">Nenhuma landing page encontrada</td></tr>';
+  // Atualizar última atualização
+  const ultimaAtt = rows[0]?.c[0]?.v;
+  if (ultimaAtt) {
+    const stxt = document.getElementById('stxt');
+    if (stxt) stxt.textContent = 'RD: ' + ultimaAtt.toString().slice(0,19);
+  }
 }
 
 async function initDates(){
