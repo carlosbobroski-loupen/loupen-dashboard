@@ -480,10 +480,9 @@ const PROPS = [
 let activeProp = 'all'; // 'all' | '503864241' | '541927286'
 const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
 // SECRETS REMOVED 2026-07-02: these were exposed publicly in this client-side file.
-// LinkedIn Ads and Google Ads data are now fetched through a secure n8n backend
+// LinkedIn Ads, Google Ads and Meta Ads data are now fetched through a secure n8n backend
 // (credentials live in n8n, never in this static page). See ADS_API_URL below.
 const RD_TOKEN = '';
-const META_TOKEN = '';
 const META_ACCOUNT = 'act_2412716725845249';
 const LI_ACCOUNT  = '533600351';
 const GADS_CUSTOMER_ID     = '4155543486';
@@ -828,93 +827,11 @@ function switchMetaTab(tab) {
 let _metaData = { camps: [], adsets: [], ads: [] };
 
 async function loadMeta(){
-  const p = period();
-
-  // Construir time_range — suporta "hoje" também
-  const timeRange = `{"since":"${p.startDate}","until":"${p.endDate}"}`;
-
-  // Campos espelhando o Gerenciador de Anúncios Meta
-  const insightFields = 'spend,impressions,clicks,ctr,cpc,reach,frequency,actions,cost_per_action_type,cost_per_result';
-
-  // ── 1. CAMPANHAS ──
-  const campsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/campaigns`
-    + `?fields=name,status,effective_status,objective,insights.time_range(${encodeURIComponent(timeRange)}).fields(${insightFields})`
-    + `&limit=50&access_token=${META_TOKEN}`;
-
-  // ── 2. CONJUNTOS DE ANÚNCIOS ──
-  const adsetsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/adsets`
-    + `?fields=name,status,effective_status,campaign_id,campaign{name},insights.time_range(${encodeURIComponent(timeRange)}).fields(${insightFields})`
-    + `&limit=100&access_token=${META_TOKEN}`;
-
-  // ── 3. ANÚNCIOS ──
-  const adsUrl = `https://graph.facebook.com/v19.0/${META_ACCOUNT}/ads`
-    + `?fields=name,status,effective_status,adset_id,adset{name},insights.time_range(${encodeURIComponent(timeRange)}).fields(${insightFields})`
-    + `&limit=100&access_token=${META_TOKEN}`;
-
-  const [campsRes, adsetsRes, adsRes] = await Promise.all([
-    fetch(campsUrl).then(r=>r.json()),
-    fetch(adsetsUrl).then(r=>r.json()),
-    fetch(adsUrl).then(r=>r.json())
-  ]);
-
-  if (campsRes.error) throw new Error('Meta Campanhas: ' + campsRes.error.message);
-  if (adsetsRes.error) throw new Error('Meta Conjuntos: ' + adsetsRes.error.message);
-  if (adsRes.error) throw new Error('Meta Anúncios: ' + adsRes.error.message);
-
-  // Função para extrair insights e resultados (espelhando o Meta)
-  function parseInsights(item) {
-    const ins = item.insights?.data?.[0] || {};
-    const spend    = parseFloat(ins.spend || 0);
-    const impr     = parseInt(ins.impressions || 0);
-    const clicks   = parseInt(ins.clicks || 0);
-    const ctr      = parseFloat(ins.ctr || 0);
-    const cpc      = parseFloat(ins.cpc || 0);
-    const reach    = parseInt(ins.reach || 0);
-    const freq     = parseFloat(ins.frequency || 0);
-
-    // Resultados = leads ou cliques dependendo do objetivo
-    // Mesma lógica do Meta: busca "lead" em actions, fallback para "link_click"
-    const actions = ins.actions || [];
-    let results = 0;
-    let resultType = '—';
-    const leadAction = actions.find(a =>
-      a.action_type === 'lead' ||
-      a.action_type === 'onsite_conversion.lead_grouped' ||
-      a.action_type === 'offsite_conversion.fb_pixel_lead'
-    );
-    if (leadAction) {
-      results = parseInt(leadAction.value || 0);
-      resultType = 'Lead no site';
-    } else {
-      const clickAction = actions.find(a => a.action_type === 'link_click');
-      if (clickAction) { results = parseInt(clickAction.value || 0); resultType = 'Clique no link'; }
-    }
-
-    // Custo por resultado
-    const costPerResult = results > 0 ? spend / results : 0;
-
-    return { spend, impr, clicks, ctr, cpc, reach, freq, results, resultType, costPerResult };
-  }
-
-  // Processar campanhas
-  const camps = (campsRes.data || []).map(c => ({
-    name: c.name, status: c.effective_status || c.status,
-    ...parseInsights(c)
-  }));
-
-  // Processar conjuntos
-  const adsets = (adsetsRes.data || []).map(a => ({
-    name: a.name, status: a.effective_status || a.status,
-    campaign: a.campaign?.name || '—',
-    ...parseInsights(a)
-  }));
-
-  // Processar anúncios
-  const ads = (adsRes.data || []).map(a => ({
-    name: a.name, status: a.effective_status || a.status,
-    adset: a.adset?.name || '—',
-    ...parseInsights(a)
-  }));
+  const d = await fetchAdsData();
+  const m = d.metaAds || {};
+  const camps  = (m.campaigns || []).map(c => ({ ...c, resultType: c.resultType || '—' }));
+  const adsets = (m.adsets || []).map(a => ({ ...a, resultType: a.resultType || '—' }));
+  const ads    = (m.ads || []).map(a => ({ ...a, resultType: a.resultType || '—' }));
 
   _metaData = { camps, adsets, ads };
 
