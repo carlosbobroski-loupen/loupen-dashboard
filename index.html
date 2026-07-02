@@ -479,26 +479,16 @@ const PROPS = [
 ];
 let activeProp = 'all'; // 'all' | '503864241' | '541927286'
 const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
-const RD_TOKEN = '802858b6b507dc7c657e430d36261302';
-const META_TOKEN   = 'EAAnwZAoVKOWUBR2Yls6fEMqLfZAR3ZARj6akUoTPqIrMN5MyMBGJWo8MYIUghdA6e7oyVJ3r6ZCd2NUIcCKNmZCzZBjQyEZBrzSfCZCIHTUYwZB1sQGxC6w2ikfJROvR4MEbsyLGZAdVAI0XplZBjB7vyZBKRmJIftussxxdgiVC68mBzJK6ZCRBMVRLjbLgAZCHM8';
+// SECRETS REMOVED 2026-07-02: these were exposed publicly in this client-side file.
+// LinkedIn Ads and Google Ads data are now fetched through a secure n8n backend
+// (credentials live in n8n, never in this static page). See ADS_API_URL below.
+const RD_TOKEN = '';
+const META_TOKEN = '';
 const META_ACCOUNT = 'act_2412716725845249';
-const LI_TOKEN   = 'AQWarP9mUgJ-opMlrqqrL-woJoQLtlN6BwJ8u48WeDH5mhkqAn7pjrqz8OEHHIMe5-Mff0GQnQgAmppFR2po7kL105VXYvFXSCgrvL0kFD9uYGrYo5OZPnBhXJRkn8ITdVlhz3re9p3N3cPRfVqS-Z5gHPnKqcSQLHBy3XFCEvDeihgSzG0DdGcze8zToLGDB9LBOldgMBHyLYDPJ7Pw1cgx59EJL-6ObpY3OPFfvZPt71-AHdmON7QewPEKHhetdmIRJTRD_XP6ZVio-WKcVD8M-thgSt9Y3VwT41ZdD4cLLSdouiuYbncgf3sUMqA70z-C-fWnYsqsA-KstmXyCmVjPSRWOKw';
 const LI_ACCOUNT  = '533600351';
-// Google Ads config (segmentado para evitar falso-positivo no scanner)
-const _gk = ['lyp','H1ek4zoq','KpKzH7u','SdpA'].join('');
-const _gcid = ['531707499855-n84j3746d51ffabpdn7r96vc77fle5b0','.apps.googleusercontent.com'].join('');
-const _gcs = ['GOCSPX-','P81riygGf5AqMxamFlHb','WNbkwejK'].join('');
-const _grt = ['1//0hahmbU3WtsGSCgYIARAAGBESNwF-L9IreRCnJj3X519i','vuDuVUcbjqL7qGNnudNObf1gJZ2ME0AQHKlYnTSBo2Zgv','GFeKIXAS7w'].join('');
-const GADS_DEVELOPER_TOKEN = _gk;
-const GADS_CLIENT_ID       = _gcid;
-const GADS_CLIENT_SECRET   = _gcs;
-const GADS_REFRESH_TOKEN   = _grt;
 const GADS_CUSTOMER_ID     = '4155543486';
 const GADS_MCC_ID          = '8437421207';
-const SA = {
-  email:'dashboard-marketing@n8n-credenciais-496419.iam.gserviceaccount.com',
-  key:`-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCbXZ4uuBP4G0NX\nHuVoyN4CC8BQwJhwMtRzpsARyHM4UQnIFggiPb5W42vz2pVmiNT1D3+mygRSLyDe\nM/LS1DhSKlXE0hNxm5cCtNoKRVdczpSbDYy1BB7Ywfcidji7zXKqC0/RXxnYur5R\nKX3SDDNZ2nfYXvhjK7xyAqvLyqfftdVmXvaw+QYMZp7mHRIcT1gOUYObK8BJIslf\n6hWK1NjnLaTx5eAFK5mJiT1nxG9jj8NILgCbGV5JNjgSE59Vhvz4UatiYzHyscDG\nIYXDTKROuko97wWwk8NloEEZB9/WNgNLd4EI54nEPBAxge4tpLrNzgNfQFZLTzLx\nv0fqDW1DAgMBAAECggEAB8QqQBObi+9w8k3tEcvYrSmBN4gpFpKz5AQV3c2zVMFY\nR9QyG+QSO62qm8n1Zea5Hnbj3qaCiMkqT3ExVjCdkB3lo60Mo8UvS0dXDuRgdZct\n/oIy4mmOUS+A9wwJ0fl3HeDq4IBsflT3Zn84duN9PaSaEQrOR8bL6LcRd2Jt+dS9\nHv8LiBqIcf1gzM80WUNb05l5McWLoVs5PEhf+96vM8hx+l/JRNcPSWQOihpXXQD8\nprT2f1flOnrGrb9adAsxdF7ZM3gf/oGtN/kIgffmZ4bhTljYy+cSyo7xC5ZQVyHc\nrw3tyTf2MuGmelIG1eRJ2k7am74qWgE66VjehuV14QKBgQDOPJr5U1FnJ9xwwe2g\nhsEDpBbAjHhv/JxR3ve8Vj5Q/NTu+xWgmnSOFbCcTir6fdS4EY272txnUpZ9oc/A\nEICCTYoxJ4sp6DOiEoTzPqGbW4sURbfzj0+EKYpMmGdQVW9/526IspJWTTZ9rDiN\nqpEnVzYWs0Gv2nIlqSPNgBwNjwKBgQDA2qu5Sm0gQiuQbpQAtSYoHEvkP9+XBukJ\n0/dUL2DXHfL8YtO2xaYn3JxOuUHSGKc435qMTpYBF8G1ZXqOrAv9C6d4zGabrxb9\nwJBYJPzmnIAaXfJe9xQ2WuU5Ylt8oqyVctWkUiH76q/R+daSN9BkX7hcXwpdSOLr\nUvCCPx7zDQKBgQCbCX5rHhJc3N9fuLmdao/g39LmzvKfJSSSe257G85e7aJZQVHB\n2TrzsSSCbFTs1/k4oqGM7fuwhKpzKVhXB1DEI+xWBWcditx94zQk9BljBA9qnvqp\nUzuwm9XGvO81ufRHD8DNbIiL7iGfmf8tqGLUU0BrEji4LRyQaTVr//mWywKBgQC5\nLH38sRDtC3wm93YW49kaZGkeZZI7wn/aVvPBmqhihTg9zGq6sTckSTiwgkNIBzHx\ncwpDNGXl8LingyPVgC8Wrq0EWUcgr1LlHZO7fvByQczjBFfnhVicBFTa760mlFAg\nQ54NZGuLJsHhXQIBbaQj7KDp2Lvr7EMub3nNpewCtQKBgF5+x0qwNqN/p/0vPY8A\n8ZQS5Mo89SyfhSoWbzbwbwqRL+6eul1sZ8Q58UDcqZUj4XnKu0c9t6M/ImQgLHcK\n9qt+sQs3AuRZ9S7ncs5z8JTqBpveIBuAtFA/ENDRJTmYzHmVaMq08zgidLkQTRGg\n+VFP+Re72X5l//AXdLbWYgOB\n-----END PRIVATE KEY-----\n`
-};
+const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff8e85ea49e64';
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
 const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
@@ -999,71 +989,34 @@ async function loadMeta(){
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
-async function loadLinkedIn(){
+// Busca dados agregados de LinkedIn Ads + Google Ads via webhook do n8n.
+// O n8n guarda as credenciais e faz as chamadas às APIs; esta página nunca vê tokens.
+let _adsCache = null, _adsCacheKey = '';
+async function fetchAdsData(){
   const p = period();
-  const since = p.startDate.replace(/-/g,'');
-  const until = p.endDate.replace(/-/g,'');
+  const key = p.startDate + '_' + p.endDate;
+  if (_adsCache && _adsCacheKey === key) return _adsCache;
+  const r = await fetch(`${ADS_API_URL}?start=${p.startDate}&end=${p.endDate}`);
+  if (!r.ok) throw new Error('Ads API: HTTP ' + r.status);
+  const d = await r.json();
+  _adsCache = d; _adsCacheKey = key;
+  return d;
+}
 
-  // Buscar campanhas
-  const campsUrl = `https://api.linkedin.com/v2/adCampaignsV2?q=search&search.account.values[0]=urn:li:sponsoredAccount:${LI_ACCOUNT}&search.status.values[0]=ACTIVE&search.status.values[1]=PAUSED&fields=id,name,status,costType`;
-  const campsResp = await fetch(campsUrl, {headers:{Authorization:`Bearer ${LI_TOKEN}`,'LinkedIn-Version':'202401'}});
-  const campsData = await campsResp.json();
-  if (campsData.serviceErrorCode) throw new Error('LinkedIn camps: '+campsData.message);
+async function loadLinkedIn(){
+  const d = await fetchAdsData();
+  const li = d.linkedIn || {};
+  const campRows = li.campaigns || [];
+  const t = li.totals || {};
 
-  const camps = campsData.elements || [];
+  document.getElementById('li-spend').textContent  = brl(t.spend||0);
+  document.getElementById('li-impr').textContent   = fmt(t.impr||0);
+  document.getElementById('li-clicks').textContent = fmt(t.clicks||0);
+  document.getElementById('li-ctr').textContent    = (t.ctr||0).toFixed(2)+'%';
+  document.getElementById('li-conv').textContent   = fmt(t.conv||0);
+  document.getElementById('li-cpl').textContent    = t.cpl>0 ? brl(t.cpl) : '—';
+  const ovLiSpend = document.getElementById('ov-li-spend'); if(ovLiSpend) ovLiSpend.textContent = brl(t.spend||0);
 
-  // Buscar analytics de todas as campanhas
-  const campIds = camps.map(c=>c.id);
-  if (!campIds.length) {
-    document.getElementById('li-camps-badge').textContent = '0 campanhas';
-    document.getElementById('li-camps-body').innerHTML = '<tr><td colspan="9" class="empty">Nenhuma campanha ativa no período</td></tr>';
-    return;
-  }
-
-  // Analytics por campanha
-  const analyticsUrl = `https://api.linkedin.com/v2/adAnalyticsV2?q=analytics&pivot=CAMPAIGN&dateRange.start.day=${p.startDate.split('-')[2]}&dateRange.start.month=${p.startDate.split('-')[1]}&dateRange.start.year=${p.startDate.split('-')[0]}&dateRange.end.day=${p.endDate.split('-')[2]}&dateRange.end.month=${p.endDate.split('-')[1]}&dateRange.end.year=${p.endDate.split('-')[0]}&timeGranularity=ALL&accounts[0]=urn:li:sponsoredAccount:${LI_ACCOUNT}&fields=pivotValue,costInLocalCurrency,impressions,clicks,externalWebsiteConversions`;
-  const analyticsResp = await fetch(analyticsUrl, {headers:{Authorization:`Bearer ${LI_TOKEN}`,'LinkedIn-Version':'202401'}});
-  const analyticsData = await analyticsResp.json();
-  if (analyticsData.serviceErrorCode) throw new Error('LinkedIn analytics: '+analyticsData.message);
-
-  const analytics = analyticsData.elements || [];
-
-  // Mapear analytics por campanha ID
-  const analyticsMap = {};
-  analytics.forEach(a => {
-    const id = a.pivotValue?.replace('urn:li:sponsoredCampaign:','');
-    if (id) analyticsMap[id] = a;
-  });
-
-  // Combinar campanhas + analytics
-  let totSpend=0, totImpr=0, totClicks=0, totConv=0;
-  const campRows = [];
-  camps.forEach(c => {
-    const a = analyticsMap[c.id] || {};
-    const spend   = parseFloat(a.costInLocalCurrency || 0);
-    const impr    = parseInt(a.impressions || 0);
-    const clicks  = parseInt(a.clicks || 0);
-    const conv    = parseInt(a.externalWebsiteConversions || 0);
-    const ctr     = impr > 0 ? (clicks/impr*100) : 0;
-    const cpc     = clicks > 0 ? spend/clicks : 0;
-    const cpl     = conv > 0 ? spend/conv : 0;
-    totSpend+=spend; totImpr+=impr; totClicks+=clicks; totConv+=conv;
-    campRows.push({name:c.name, status:c.status, spend, impr, clicks, ctr, cpc, conv, cpl});
-  });
-
-  const cplGeral = totConv > 0 ? totSpend/totConv : 0;
-  const ctrGeral = totImpr > 0 ? (totClicks/totImpr*100) : 0;
-
-  // KPIs
-  document.getElementById('li-spend').textContent  = brl(totSpend);
-  document.getElementById('li-impr').textContent   = fmt(totImpr);
-  document.getElementById('li-clicks').textContent = fmt(totClicks);
-  document.getElementById('li-ctr').textContent    = ctrGeral.toFixed(2)+'%';
-  document.getElementById('li-conv').textContent   = fmt(totConv);
-  document.getElementById('li-cpl').textContent    = cplGeral > 0 ? brl(cplGeral) : '—';
-  const ovLiSpend = document.getElementById('ov-li-spend'); if(ovLiSpend) ovLiSpend.textContent = brl(totSpend);
-
-  // Tabela campanhas
   document.getElementById('li-camps-badge').textContent = campRows.length + ' campanhas';
   document.getElementById('li-camps-body').innerHTML = campRows.length ? campRows.map(c=>`<tr>
     <td><div class="t-name">${c.name}</div></td>
@@ -1077,11 +1030,9 @@ async function loadLinkedIn(){
     <td style="font-family:var(--mono);font-weight:500">${c.cpl>0?brl(c.cpl):'—'}</td>
   </tr>`).join('') : '<tr><td colspan="9" class="empty">Sem dados no período</td></tr>';
 
-  // Barras gasto
-  const spendRows = campRows.sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
+  const spendRows = [...campRows].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
   mkBars(document.getElementById('li-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], '#0A66C2');
 
-  // Donut cliques
   const clickRows = [...campRows].sort((a,b)=>b.clicks-a.clicks).slice(0,6);
   mkLeg(document.getElementById('li-click-leg'), clickRows.map(c=>c.name.slice(0,20)));
   mkChart('c-li-clicks','doughnut', clickRows.map(c=>c.name.slice(0,20)), [{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
@@ -1094,93 +1045,25 @@ function switchGadsTab(tab) {
   document.getElementById(`gads-tab-${tab}`).style.display = 'block';
 }
 
-async function getGadsToken() {
-  const r = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: `client_id=${encodeURIComponent(GADS_CLIENT_ID)}&client_secret=${encodeURIComponent(GADS_CLIENT_SECRET)}&refresh_token=${encodeURIComponent(GADS_REFRESH_TOKEN)}&grant_type=refresh_token`
-  });
-  const d = await r.json();
-  if (!d.access_token) throw new Error('Google Ads auth falhou: ' + JSON.stringify(d));
-  return d.access_token;
-}
-
-async function gadsQuery(token, query) {
-  const r = await fetch(`https://googleads.googleapis.com/v17/customers/${GADS_CUSTOMER_ID}/googleAds:searchStream`, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'developer-token': GADS_DEVELOPER_TOKEN,
-      'login-customer-id': GADS_MCC_ID,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ query })
-  });
-  const text = await r.text();
-  // searchStream retorna array de objetos JSON
-  const lines = text.trim().split('\n').filter(Boolean);
-  const rows = [];
-  lines.forEach(line => {
-    try {
-      const obj = JSON.parse(line);
-      if (obj.results) rows.push(...obj.results);
-    } catch(e) {}
-  });
-  return rows;
-}
-
 async function loadGoogleAds() {
-  const token = await getGadsToken();
-  const p = period();
-  const dateFilter = `segments.date BETWEEN '${p.startDate}' AND '${p.endDate}'`;
+  const d = await fetchAdsData();
+  const ga = d.googleAds || {};
+  const camps = ga.campaigns || [];
+  const t = ga.totals || {};
 
-  const brl2 = v => 'R$ ' + (parseFloat(v)/1000000).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-  const pct2 = v => (parseFloat(v)*100).toFixed(2) + '%';
-  const rcl2 = v => { const n=parseFloat(v)*100; return n<3?'rej-ok':n<1?'rej-warn':'rej-bad'; };
+  document.getElementById('ga-spend').textContent   = brl(t.spend||0);
+  document.getElementById('ga-impr').textContent    = fmt(t.impr||0);
+  document.getElementById('ga-clicks').textContent  = fmt(t.clicks||0);
+  document.getElementById('ga-ctr').textContent     = (t.ctr||0).toFixed(2)+'%';
+  document.getElementById('ga-conv-ads').textContent= fmt(Math.round(t.conv||0));
+  document.getElementById('ga-cpa').textContent     = t.cpa>0 ? brl(t.cpa) : '—';
 
-  // ── CAMPANHAS ──
-  const campsRows = await gadsQuery(token, `
-    SELECT campaign.name, campaign.status, metrics.impressions, metrics.clicks,
-           metrics.ctr, metrics.average_cpc, metrics.cost_micros,
-           metrics.conversions, metrics.cost_per_conversion
-    FROM campaign
-    WHERE ${dateFilter}
-    ORDER BY metrics.cost_micros DESC`);
-
-  const camps = campsRows.map(r => ({
-    name: r.campaign.name,
-    status: r.campaign.status,
-    impr: parseInt(r.metrics.impressions || 0),
-    clicks: parseInt(r.metrics.clicks || 0),
-    ctr: parseFloat(r.metrics.ctr || 0),
-    cpc: parseFloat(r.metrics.averageCpc || 0),
-    spend: parseFloat(r.metrics.costMicros || 0) / 1000000,
-    conv: parseFloat(r.metrics.conversions || 0),
-    cpa: parseFloat(r.metrics.costPerConversion || 0) / 1000000
-  }));
-
-  // KPIs
-  const totSpend  = camps.reduce((s,c)=>s+c.spend, 0);
-  const totImpr   = camps.reduce((s,c)=>s+c.impr, 0);
-  const totClicks = camps.reduce((s,c)=>s+c.clicks, 0);
-  const totConv   = camps.reduce((s,c)=>s+c.conv, 0);
-  const ctrGeral  = totImpr > 0 ? (totClicks/totImpr*100) : 0;
-  const cpaGeral  = totConv > 0 ? totSpend/totConv : 0;
-
-  document.getElementById('ga-spend').textContent   = brl(totSpend);
-  document.getElementById('ga-impr').textContent    = fmt(totImpr);
-  document.getElementById('ga-clicks').textContent  = fmt(totClicks);
-  document.getElementById('ga-ctr').textContent     = ctrGeral.toFixed(2)+'%';
-  document.getElementById('ga-conv-ads').textContent= fmt(Math.round(totConv));
-  document.getElementById('ga-cpa').textContent     = cpaGeral > 0 ? brl(cpaGeral) : '—';
-
-  // Tabela campanhas
   document.getElementById('ga-camps-body').innerHTML = camps.length ? camps.map(c=>`<tr>
     <td><div class="t-name">${c.name}</div></td>
     <td>${statusChip(c.status==='ENABLED'?'ACTIVE':c.status)}</td>
     <td>${fmt(c.impr)}</td>
     <td>${fmt(c.clicks)}</td>
-    <td class="${c.ctr*100>3?'rej-ok':c.ctr*100>1?'rej-warn':'rej-bad'}">${(c.ctr*100).toFixed(2)}%</td>
+    <td class="${c.ctr>3?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
     <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
     <td style="font-family:var(--mono);font-weight:500">${brl(c.spend)}</td>
     <td style="font-weight:500">${fmt(Math.round(c.conv))}</td>
@@ -1189,87 +1072,48 @@ async function loadGoogleAds() {
 
   document.getElementById('ga-tab-badge').textContent = camps.length + ' campanhas';
 
-  // ── GRUPOS DE ANÚNCIOS ──
-  const groupsRows = await gadsQuery(token, `
-    SELECT ad_group.name, campaign.name, ad_group.status,
-           metrics.impressions, metrics.clicks, metrics.ctr,
-           metrics.average_cpc, metrics.cost_micros, metrics.conversions
-    FROM ad_group
-    WHERE ${dateFilter}
-    ORDER BY metrics.cost_micros DESC
-    LIMIT 100`);
+  const groupsRows = ga.adGroups || [];
+  document.getElementById('ga-groups-body').innerHTML = groupsRows.length ? groupsRows.map(r=>`<tr>
+      <td><div class="t-name">${r.name}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${r.campaign}</td>
+      <td>${statusChip(r.status==='ENABLED'?'ACTIVE':r.status)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td class="${r.ctr>3?'rej-ok':r.ctr>1?'rej-warn':'rej-bad'}">${r.ctr.toFixed(2)}%</td>
+      <td style="font-family:var(--mono)">${r.cpc>0?brl(r.cpc):'—'}</td>
+      <td style="font-family:var(--mono)">${brl(r.spend)}</td>
+      <td>${fmt(Math.round(r.conv))}</td>
+    </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhum grupo no período</td></tr>';
 
-  document.getElementById('ga-groups-body').innerHTML = groupsRows.length ? groupsRows.map(r=>{
-    const spend = parseFloat(r.metrics.costMicros||0)/1000000;
-    const ctr = parseFloat(r.metrics.ctr||0)*100;
-    return `<tr>
-      <td><div class="t-name">${r.adGroup.name}</div></td>
-      <td style="font-size:11px;color:var(--muted)">${r.campaign.name}</td>
-      <td>${statusChip(r.adGroup.status==='ENABLED'?'ACTIVE':r.adGroup.status)}</td>
-      <td>${fmt(r.metrics.impressions||0)}</td>
-      <td>${fmt(r.metrics.clicks||0)}</td>
-      <td class="${ctr>3?'rej-ok':ctr>1?'rej-warn':'rej-bad'}">${ctr.toFixed(2)}%</td>
-      <td style="font-family:var(--mono)">${parseFloat(r.metrics.averageCpc||0)>0?brl(parseFloat(r.metrics.averageCpc||0)/1000000):'—'}</td>
-      <td style="font-family:var(--mono)">${brl(spend)}</td>
-      <td>${fmt(Math.round(parseFloat(r.metrics.conversions||0)))}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="9" class="empty">Nenhum grupo no período</td></tr>';
-
-  // ── PALAVRAS-CHAVE ──
-  const kwRows = await gadsQuery(token, `
-    SELECT ad_group_criterion.keyword.text, ad_group.name, ad_group_criterion.status,
-           metrics.impressions, metrics.clicks, metrics.ctr,
-           metrics.average_cpc, metrics.cost_micros,
-           ad_group_criterion.quality_info.quality_score
-    FROM keyword_view
-    WHERE ${dateFilter}
-    ORDER BY metrics.cost_micros DESC
-    LIMIT 100`);
-
+  const kwRows = ga.keywords || [];
   document.getElementById('ga-keywords-body').innerHTML = kwRows.length ? kwRows.map(r=>{
-    const spend = parseFloat(r.metrics.costMicros||0)/1000000;
-    const ctr = parseFloat(r.metrics.ctr||0)*100;
-    const qs = r.adGroupCriterion?.qualityInfo?.qualityScore;
+    const qs = r.qualityScore;
     const qsColor = qs>=7?'rej-ok':qs>=4?'rej-warn':'rej-bad';
     return `<tr>
-      <td><div class="t-name">${r.adGroupCriterion?.keyword?.text||'—'}</div></td>
-      <td style="font-size:11px;color:var(--muted)">${r.adGroup.name}</td>
-      <td>${statusChip(r.adGroupCriterion?.status==='ENABLED'?'ACTIVE':r.adGroupCriterion?.status)}</td>
-      <td>${fmt(r.metrics.impressions||0)}</td>
-      <td>${fmt(r.metrics.clicks||0)}</td>
-      <td class="${ctr>3?'rej-ok':ctr>1?'rej-warn':'rej-bad'}">${ctr.toFixed(2)}%</td>
-      <td style="font-family:var(--mono)">${parseFloat(r.metrics.averageCpc||0)>0?brl(parseFloat(r.metrics.averageCpc||0)/1000000):'—'}</td>
-      <td style="font-family:var(--mono)">${brl(spend)}</td>
+      <td><div class="t-name">${r.text||'—'}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${r.adGroup}</td>
+      <td>${statusChip(r.status==='ENABLED'?'ACTIVE':r.status)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td class="${r.ctr>3?'rej-ok':r.ctr>1?'rej-warn':'rej-bad'}">${r.ctr.toFixed(2)}%</td>
+      <td style="font-family:var(--mono)">${r.cpc>0?brl(r.cpc):'—'}</td>
+      <td style="font-family:var(--mono)">${brl(r.spend)}</td>
       <td class="${qsColor}">${qs||'—'}/10</td>
     </tr>`;
   }).join('') : '<tr><td colspan="9" class="empty">Nenhuma palavra-chave no período</td></tr>';
 
-  // ── ANÚNCIOS ──
-  const adsRows = await gadsQuery(token, `
-    SELECT ad_group_ad.ad.name, ad_group_ad.ad.type, ad_group.name,
-           ad_group_ad.status, metrics.impressions, metrics.clicks,
-           metrics.ctr, metrics.cost_micros, metrics.conversions
-    FROM ad_group_ad
-    WHERE ${dateFilter}
-    ORDER BY metrics.cost_micros DESC
-    LIMIT 100`);
+  const adsRows = ga.ads || [];
+  document.getElementById('ga-ads-body').innerHTML = adsRows.length ? adsRows.map(r=>`<tr>
+      <td><div class="t-name">${r.name||'—'}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${r.adGroup}</td>
+      <td>${statusChip(r.status==='ENABLED'?'ACTIVE':r.status)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td class="${r.ctr>3?'rej-ok':r.ctr>1?'rej-warn':'rej-bad'}">${r.ctr.toFixed(2)}%</td>
+      <td style="font-family:var(--mono)">${brl(r.spend)}</td>
+      <td>${fmt(Math.round(r.conv))}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Nenhum anúncio no período</td></tr>';
 
-  document.getElementById('ga-ads-body').innerHTML = adsRows.length ? adsRows.map(r=>{
-    const spend = parseFloat(r.metrics.costMicros||0)/1000000;
-    const ctr = parseFloat(r.metrics.ctr||0)*100;
-    return `<tr>
-      <td><div class="t-name">${r.adGroupAd?.ad?.name||r.adGroupAd?.ad?.type||'—'}</div></td>
-      <td style="font-size:11px;color:var(--muted)">${r.adGroup.name}</td>
-      <td>${statusChip(r.adGroupAd?.status==='ENABLED'?'ACTIVE':r.adGroupAd?.status)}</td>
-      <td>${fmt(r.metrics.impressions||0)}</td>
-      <td>${fmt(r.metrics.clicks||0)}</td>
-      <td class="${ctr>3?'rej-ok':ctr>1?'rej-warn':'rej-bad'}">${ctr.toFixed(2)}%</td>
-      <td style="font-family:var(--mono)">${brl(spend)}</td>
-      <td>${fmt(Math.round(parseFloat(r.metrics.conversions||0)))}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">Nenhum anúncio no período</td></tr>';
-
-  // Gráficos
   const spendRows = [...camps].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
   mkBars(document.getElementById('gads-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], CORES[0]);
 
