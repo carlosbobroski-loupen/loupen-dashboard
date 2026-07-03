@@ -102,6 +102,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .chip-active{background:var(--green-dim);color:var(--green)}
 .chip-paused{background:var(--amber-dim);color:var(--amber)}
 .chip-other{background:var(--surface2);color:var(--muted)}
+.kpi-nav{cursor:pointer;transition:border-color .15s,transform .15s}
+.kpi-nav:hover{border-color:var(--blue2,var(--blue))}
+.kpi-nav:hover .kpi-value{color:var(--blue)}
+.kpi-label{cursor:help}
+.tbl tr[data-nav]{cursor:pointer}
+.tbl tr[data-nav]:hover{background:var(--surface2)}
+.breadcrumb-drill{display:none;align-items:center;gap:6px;color:var(--blue);font-size:12px;cursor:pointer;margin:-16px 0 20px;font-weight:500}
+.breadcrumb-drill.visible{display:flex}
+.active-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;background:var(--blue-dim);color:var(--blue);padding:3px 9px;border-radius:6px;font-weight:500;margin-left:8px}
+.active-chip i{cursor:pointer;font-size:13px}
+.chart-click-hint{font-size:10px;color:var(--dim);margin-top:4px;font-style:italic}
 </style>
 </head>
 <body>
@@ -116,7 +127,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item active" onclick="showView('overview')"><i class="ti ti-layout-dashboard"></i>Visão geral</button>
     <div class="nav-label">Fontes</div>
     <button class="nav-item" onclick="showView('leads')"><i class="ti ti-users"></i>Leads RD Station</button>
-    <button class="nav-item" onclick="showView('rdstation')"><i class="ti ti-mail"></i>RD Station CRM</button>
+    <button class="nav-item" onclick="showView('rdstation')"><i class="ti ti-mail"></i>RD Station Marketing</button>
     <button class="nav-item" onclick="showView('ga4')"><i class="ti ti-chart-line"></i>Google Analytics</button>
     <button class="nav-item" onclick="showView('utm')"><i class="ti ti-link"></i>Campanhas UTM</button>
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
@@ -150,6 +161,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
   </div>
 
+  <!-- BREADCRUMB DE DRILL-DOWN -->
+  <div class="breadcrumb-drill" id="drill-breadcrumb" onclick="showView('overview')"><i class="ti ti-arrow-left"></i><span>Voltar à Visão geral</span></div>
+
   <!-- FILTROS GLOBAIS -->
   <div class="global-filters" id="global-filters">
     <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
@@ -162,6 +176,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <option value="apenas_lead">Lead (não qualificado)</option>
     </select>
     <button class="filter-clear" onclick="limparFiltros()"><i class="ti ti-x"></i>Limpar</button>
+    <span class="active-chip" id="l-canal-chip" style="display:none">Canal: <span id="l-canal-chip-label"></span><i class="ti ti-x" onclick="filtrarPorCanalLead('')"></i></span>
     <span style="font-size:12px;color:var(--muted);margin-left:auto" id="l-filter-count"></span>
   </div>
 
@@ -173,6 +188,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <option value="503864241">loupen.com.br</option>
       <option value="541927286">pages.loupen.com.br</option>
     </select>
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px;margin-left:8px"><i class="ti ti-route"></i>Canal</span>
+    <select class="filter-sel" id="f-canal" onchange="mudarCanal(this.value)" title="Filtra sessões (e campanhas UTM) pelo agrupamento de canal padrão do GA4. Landing Pages não possuem essa dimensão no relatório.">
+      <option value="">Todos os canais</option>
+    </select>
     <div style="font-size:11px;color:var(--muted);display:flex;gap:12px;margin-left:8px">
       <span id="ga-prop-1" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block"></span>loupen.com.br</span>
       <span id="ga-prop-2" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>pages.loupen.com.br</span>
@@ -182,12 +201,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- OVERVIEW -->
   <div class="view active" id="view-overview">
     <div class="kpi-grid" style="grid-template-columns:repeat(6,1fr)">
-      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-coin"></i>Investimento total</div><div class="kpi-value" id="ovx-spend-value">—</div><div class="kpi-footer" id="ovx-spend-trend"></div></div>
-      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
-      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-target"></i>CPL blended</div><div class="kpi-value" id="ovx-cpl-value">—</div><div class="kpi-footer" id="ovx-cpl-trend"></div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-star"></i>Taxa de qualificação</div><div class="kpi-value" id="ovx-qualif-value">—</div><div class="kpi-footer" id="ovx-qualif-trend"></div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-eye"></i>Sessões</div><div class="kpi-value" id="ovx-sessions-value">—</div><div class="kpi-footer" id="ovx-sessions-trend"></div></div>
-      <div class="kpi red"><div class="kpi-label"><i class="ti ti-bounce-right"></i>Rejeição</div><div class="kpi-value" id="ovx-bounce-value">—</div><div class="kpi-footer" id="ovx-bounce-trend"></div></div>
+      <div class="kpi purple kpi-nav" onclick="scrollToCard('card-canais')"><div class="kpi-label" title="Soma do investimento em Google Ads + Meta Ads + LinkedIn Ads no período selecionado."><i class="ti ti-coin"></i>Investimento total</div><div class="kpi-value" id="ovx-spend-value">—</div><div class="kpi-footer" id="ovx-spend-trend"></div></div>
+      <div class="kpi blue kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="Total de leads recebidos no período, vindos do RD Station (todos os canais e formulários)."><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
+      <div class="kpi amber kpi-nav" onclick="scrollToCard('card-canais')"><div class="kpi-label" title="Custo por Lead combinado: investimento total em mídia paga dividido pelo total de leads do período (não separa por canal)."><i class="ti ti-target"></i>CPL blended</div><div class="kpi-value" id="ovx-cpl-value">—</div><div class="kpi-footer" id="ovx-cpl-trend"></div></div>
+      <div class="kpi green kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="% dos leads do período marcados como 'Lead Qualificado' no RD Station."><i class="ti ti-star"></i>Taxa de qualificação</div><div class="kpi-value" id="ovx-qualif-value">—</div><div class="kpi-footer" id="ovx-qualif-trend"></div></div>
+      <div class="kpi green kpi-nav" onclick="showView('ga4', true)"><div class="kpi-label" title="Total de sessões no site (Google Analytics 4), somando os domínios selecionados no filtro."><i class="ti ti-eye"></i>Sessões</div><div class="kpi-value" id="ovx-sessions-value">—</div><div class="kpi-footer" id="ovx-sessions-trend"></div></div>
+      <div class="kpi red kpi-nav" onclick="showView('ga4', true)"><div class="kpi-label" title="% de sessões que saíram do site sem interagir com outra página. Abaixo de 40% é bom, acima de 65% é preocupante."><i class="ti ti-bounce-right"></i>Rejeição</div><div class="kpi-value" id="ovx-bounce-value">—</div><div class="kpi-footer" id="ovx-bounce-trend"></div></div>
     </div>
 
     <div class="card">
@@ -195,8 +214,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div id="ovx-funnel"></div>
     </div>
 
-    <div class="card">
-      <div class="section-row"><div class="section-title"><i class="ti ti-scale"></i>Comparação de canais pagos</div></div>
+    <div class="card" id="card-canais">
+      <div class="section-row"><div class="section-title"><i class="ti ti-scale"></i>Comparação de canais pagos</div><div class="section-badge">clique numa linha para ver detalhes</div></div>
       <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>Canal</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Resultados</th><th>Custo/result.</th><th>% do investimento</th></tr></thead>
@@ -205,16 +224,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       </div>
     </div>
 
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-arrows-join"></i>Sessões × Leads por canal</div><div class="section-badge" title="Cruza sessões do GA4 (agrupamento padrão de canal) com leads do RD Station, aproximando cada canal do GA4 ao canal correspondente de origem do lead.">GA4 + RD Station</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Canal</th><th>Sessões (GA4)</th><th>Leads (aprox.)</th><th>Taxa de conversão</th><th>Rejeição</th></tr></thead>
+        <tbody id="ovx-cross-body"></tbody>
+      </table>
+      </div>
+      <div class="chart-click-hint">Agrupa os canais do GA4 no mesmo critério usado para classificar a origem dos leads (Paid Search/Display = Google ADS, Paid Social = Meta ADS, Organic/Referral = Orgânico). Passe o mouse no nome do canal para ver quais grupos do GA4 foram somados. Clique numa linha para abrir o Google Analytics filtrado.</div>
+    </div>
+
     <div class="two-col">
       <div class="card">
         <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Sessões por canal (GA4)</div></div>
         <div class="legend" id="ovx-sess-leg"></div>
         <div class="chart-wrap" style="height:200px"><canvas id="c-ovx-canal" role="img" aria-label="Sessões por canal"></canvas></div>
+        <div class="chart-click-hint">Clique numa barra para abrir o Google Analytics filtrado por esse canal.</div>
       </div>
       <div class="card">
         <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Distribuição do investimento</div></div>
         <div class="legend" id="ovx-spend-leg"></div>
         <div class="chart-wrap" style="height:200px"><canvas id="c-ovx-spend" role="img" aria-label="Distribuição do investimento por canal"></canvas></div>
+        <div class="chart-click-hint">Clique numa fatia para abrir a aba de anúncios daquele canal.</div>
       </div>
     </div>
 
@@ -227,14 +259,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- LEADS -->
   <div class="view" id="view-leads">
     <div class="kpi-grid-4">
-      <div class="kpi blue"><div class="kpi-label">Total de leads</div><div class="kpi-value" id="l-total">—</div></div>
-      <div class="kpi green"><div class="kpi-label">Qualificados</div><div class="kpi-value" id="l-lq">—</div></div>
-      <div class="kpi amber"><div class="kpi-label">Taxa qualif.</div><div class="kpi-value" id="l-taxa">—</div></div>
-      <div class="kpi purple"><div class="kpi-label">Eventos</div><div class="kpi-value" id="l-camps">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Total de leads no período selecionado, considerando os filtros ativos (evento, estágio, canal).">Total de leads</div><div class="kpi-value" id="l-total">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Leads marcados como 'Lead Qualificado' no RD Station.">Qualificados</div><div class="kpi-value" id="l-lq">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="% de leads qualificados sobre o total filtrado.">Taxa qualif.</div><div class="kpi-value" id="l-taxa">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Quantidade de eventos/campanhas de conversão distintos no período.">Eventos</div><div class="kpi-value" id="l-camps">—</div></div>
     </div>
 
     <div class="two-col">
-      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Por canal</div></div><div id="l-canal"></div></div>
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Por canal</div><div class="section-badge">clique para filtrar</div></div><div id="l-canal"></div></div>
       <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-briefcase"></i>Por cargo</div></div><div id="l-cargo"></div></div>
     </div>
     <div class="two-col">
@@ -251,11 +283,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <div class="view" id="view-rdstation">
     <!-- KPIs Funil -->
     <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
-      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-users"></i>Total Contatos</div><div class="kpi-value" id="rd-total">—</div><div class="kpi-footer">Base completa</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-user-plus"></i>Leads</div><div class="kpi-value" id="rd-leads">—</div><div class="kpi-footer">Estágio Lead</div></div>
-      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-star"></i>MQL</div><div class="kpi-value" id="rd-mql">—</div><div class="kpi-footer">Lead Qualificado</div></div>
-      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-briefcase"></i>Oportunidades</div><div class="kpi-value" id="rd-opp">—</div><div class="kpi-footer">Em negociação</div></div>
-      <div class="kpi red"><div class="kpi-label"><i class="ti ti-check"></i>Clientes</div><div class="kpi-value" id="rd-clients">—</div><div class="kpi-footer">Convertidos</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Todos os contatos cadastrados na base do RD Station Marketing, independente do estágio no funil."><i class="ti ti-users"></i>Total Contatos</div><div class="kpi-value" id="rd-total">—</div><div class="kpi-footer">Base completa</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Contatos no estágio 'Lead' — já converteram em algum formulário mas ainda não foram qualificados."><i class="ti ti-user-plus"></i>Leads</div><div class="kpi-value" id="rd-leads">—</div><div class="kpi-footer">Estágio Lead</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="MQL (Marketing Qualified Lead): lead qualificado pelo marketing, pronto para abordagem comercial."><i class="ti ti-star"></i>MQL</div><div class="kpi-value" id="rd-mql">—</div><div class="kpi-footer">Lead Qualificado</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Contatos em negociação ativa com o time comercial."><i class="ti ti-briefcase"></i>Oportunidades</div><div class="kpi-value" id="rd-opp">—</div><div class="kpi-footer">Em negociação</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Contatos que fecharam negócio e se tornaram clientes."><i class="ti ti-check"></i>Clientes</div><div class="kpi-value" id="rd-clients">—</div><div class="kpi-footer">Convertidos</div></div>
     </div>
 
     <div class="two-col">
@@ -301,10 +333,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- GA4 -->
   <div class="view" id="view-ga4">
     <div class="kpi-grid-4">
-      <div class="kpi green"><div class="kpi-label">Sessões</div><div class="kpi-value" id="ga-sess">—</div></div>
-      <div class="kpi blue"><div class="kpi-label">Usuários ativos</div><div class="kpi-value" id="ga-users">—</div></div>
-      <div class="kpi amber"><div class="kpi-label">Conversões</div><div class="kpi-value" id="ga-conv">—</div></div>
-      <div class="kpi red"><div class="kpi-label">Rejeição média</div><div class="kpi-value" id="ga-bounce">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Total de sessões no site no período, para o domínio selecionado no filtro acima.">Sessões</div><div class="kpi-value" id="ga-sess">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Usuários únicos que visitaram o site no período (podem ter mais de uma sessão).">Usuários ativos</div><div class="kpi-value" id="ga-users">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Eventos de conversão configurados no GA4 (ex: envio de formulário, clique em CTA).">Conversões</div><div class="kpi-value" id="ga-conv">—</div></div>
+      <div class="kpi red"><div class="kpi-label" title="% de sessões de uma única página, sem interação. Abaixo de 40% é bom, acima de 65% merece atenção.">Rejeição média</div><div class="kpi-value" id="ga-bounce">—</div></div>
     </div>
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Sessões por canal</div></div>
@@ -336,12 +368,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- META ADS -->
   <div class="view" id="view-meta">
     <div class="kpi-grid-6">
-      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="m-spend">—</div><div class="kpi-footer">No período</div></div>
-      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="m-impr">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
-      <div class="kpi red"><div class="kpi-label"><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer">Custo por resultado</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Total investido em Meta Ads (Facebook + Instagram) no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="m-spend">—</div><div class="kpi-footer">No período</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="m-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões. Acima de 2% é considerado bom para Meta Ads."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Pessoas únicas que viram o anúncio (diferente de impressões, que conta repetições)."><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Custo por resultado: gasto total ÷ resultados (leads ou cliques no link, conforme o objetivo da campanha)."><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer">Custo por resultado</div></div>
     </div>
 
     <div class="card" style="padding:0">
@@ -390,12 +422,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- LINKEDIN ADS -->
   <div class="view" id="view-linkedin">
     <div class="kpi-grid-6">
-      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="li-spend">—</div><div class="kpi-footer">No período</div></div>
-      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="li-impr">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="li-clicks">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="li-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
-      <div class="kpi red"><div class="kpi-label"><i class="ti ti-users"></i>Conversões</div><div class="kpi-value" id="li-conv">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="li-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Total investido em LinkedIn Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="li-spend">—</div><div class="kpi-footer">No período</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="li-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="li-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="li-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Conversões atribuídas pelo LinkedIn (ex: formulário preenchido no site após o clique)."><i class="ti ti-users"></i>Conversões</div><div class="kpi-value" id="li-conv">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Custo por lead: gasto total ÷ conversões."><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="li-cpl">—</div><div class="kpi-footer">Custo por lead</div></div>
     </div>
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas</div><div class="section-badge" id="li-camps-badge">—</div></div>
@@ -421,12 +453,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <div class="view" id="view-gads">
     <!-- KPIs -->
     <div class="kpi-grid-6">
-      <div class="kpi blue"><div class="kpi-label"><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="ga-spend">—</div><div class="kpi-footer">No período</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="ga-impr">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi purple"><div class="kpi-label"><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="ga-clicks">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi amber"><div class="kpi-label"><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="ga-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
-      <div class="kpi red"><div class="kpi-label"><i class="ti ti-target"></i>Conversões</div><div class="kpi-value" id="ga-conv-ads">—</div><div class="kpi-footer">Total</div></div>
-      <div class="kpi green"><div class="kpi-label"><i class="ti ti-receipt"></i>CPA</div><div class="kpi-value" id="ga-cpa">—</div><div class="kpi-footer">Custo por conversão</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Total investido em Google Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="ga-spend">—</div><div class="kpi-footer">No período</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="ga-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="ga-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões. Acima de 3% é considerado bom na Rede de Pesquisa."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="ga-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Conversões rastreadas pelo Google Ads (envio de formulário, ligação, etc.)."><i class="ti ti-target"></i>Conversões</div><div class="kpi-value" id="ga-conv-ads">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Custo por Aquisição: gasto total ÷ conversões."><i class="ti ti-receipt"></i>CPA</div><div class="kpi-value" id="ga-cpa">—</div><div class="kpi-footer">Custo por conversão</div></div>
     </div>
 
     <!-- TABS -->
@@ -513,7 +545,7 @@ const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Stat
 let CC={};
 
 // ── NAV ─────────────────────────────────────────────────────
-function showView(id){
+function showView(id, fromDrill){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
@@ -524,6 +556,18 @@ function showView(id){
   const gaf = document.getElementById('ga-filters');
   if (gf)  gf.classList.toggle('visible',  id==='leads');
   if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
+  // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
+  const bc = document.getElementById('drill-breadcrumb');
+  if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
+}
+function scrollToCard(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  el.style.transition = 'border-color .3s';
+  const orig = el.style.borderColor;
+  el.style.borderColor = 'var(--blue)';
+  setTimeout(()=>{ el.style.borderColor = orig; }, 900);
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -536,7 +580,16 @@ function pill(s){const l=(s||'').toLowerCase();if(l.includes('google ads')||l===
 function statusChip(s){const l=(s||'').toUpperCase();if(l==='ACTIVE')return`<span class="status-chip chip-active">Ativo</span>`;if(l==='PAUSED')return`<span class="status-chip chip-paused">Pausado</span>`;return`<span class="status-chip chip-other">${s}</span>`;}
 function mkChart(id,type,labels,datasets,extra={}){if(CC[id])CC[id].destroy();const c=document.getElementById(id);if(!c)return;CC[id]=new Chart(c,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},...extra}});}
 function mkLeg(el,labels){if(!el)return;el.innerHTML=labels.map((l,i)=>`<div class="leg"><div class="leg-dot" style="background:${CORES[i%CORES.length]}"></div>${l}</div>`).join('');}
-function mkBars(el,rows,color){if(!el)return;const max=Math.max(...rows.map(r=>r.v),1);const tot=rows.reduce((a,r)=>a+r.v,0);el.innerHTML=rows.map(r=>`<div class="bar-row"><div class="bar-label">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.v/max*100)}%;background:${color}"></div></div><div class="bar-val">${r.fmt?r.fmt:fmt(r.v)}</div></div>`).join('');}
+function mkBars(el,rows,color,onClickLabel){
+  if(!el)return;
+  const max=Math.max(...rows.map(r=>r.v),1);
+  el.innerHTML=rows.map(r=>{
+    const clickable = typeof onClickLabel === 'function';
+    const safeLabel = String(r.label).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const attrs = clickable ? `style="cursor:pointer" onclick="(${onClickLabel.name})('${safeLabel}')"` : '';
+    return `<div class="bar-row" ${attrs}><div class="bar-label">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.v/max*100)}%;background:${color}"></div></div><div class="bar-val">${r.fmt?r.fmt:fmt(r.v)}</div></div>`;
+  }).join('');
+}
 function setPreset(days, btn) {
   const h = new Date();
   const f = x => x.toISOString().slice(0,10);
@@ -622,6 +675,38 @@ function mudarDominio(val) {
   Promise.all([loadGA4(), loadOverview()]).catch(console.error);
 }
 
+// ── FILTRO DE CANAL (GA4) — aplicado em Sessões por canal e Campanhas UTM ──
+let activeChannel = '';
+function mudarCanal(val) {
+  activeChannel = val || '';
+  loadGA4();
+}
+
+// ── FILTRO DE CANAL NOS LEADS (clique nas barras "Por canal") ──
+let fCanalLead = '';
+function filtrarPorCanalLead(label) {
+  fCanalLead = label || '';
+  const chip = document.getElementById('l-canal-chip');
+  const chipLabel = document.getElementById('l-canal-chip-label');
+  if (chip) chip.style.display = fCanalLead ? 'inline-flex' : 'none';
+  if (chipLabel) chipLabel.textContent = fCanalLead;
+  aplicarFiltros();
+}
+
+// ── Aproxima o agrupamento de canal do GA4 ao canal de origem do lead (RD Station) ──
+function ga4ToLeadBucket(channel) {
+  const c = (channel || '').toLowerCase();
+  if (c.includes('paid search')) return 'Google ADS';
+  if (c.includes('display')) return 'Google ADS';
+  if (c.includes('paid social')) return 'Meta ADS';
+  if (c.includes('organic search')) return 'Orgânico';
+  if (c.includes('organic social')) return 'Orgânico';
+  if (c.includes('referral')) return 'Orgânico';
+  if (c.includes('email')) return 'E-mail';
+  if (c.includes('direct')) return 'Direto';
+  return 'Direto';
+}
+
 function aplicarFiltros() {
   const fEvento = document.getElementById('f-evento')?.value || '';
   const fStage  = document.getElementById('f-stage')?.value || '';
@@ -645,10 +730,13 @@ function aplicarFiltros() {
   } else if (fStage === 'apenas_lead') {
     rows = rows.filter(r => !(r.c[24]?.v||'').toLowerCase().includes('qualificado'));
   }
+  if (fCanalLead) {
+    rows = rows.filter(r => normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v) === fCanalLead);
+  }
 
   renderLeads(rows);
 
-  const hasFilter = fEvento || fStage;
+  const hasFilter = fEvento || fStage || fCanalLead;
   const cnt = document.getElementById('l-filter-count');
   if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
 }
@@ -656,6 +744,8 @@ function aplicarFiltros() {
 function limparFiltros() {
   const fe = document.getElementById('f-evento'); if(fe) fe.value='';
   const fs = document.getElementById('f-stage');  if(fs) fs.value='';
+  fCanalLead = '';
+  const chip = document.getElementById('l-canal-chip'); if (chip) chip.style.display = 'none';
   aplicarFiltros();
   const cnt = document.getElementById('l-filter-count'); if(cnt) cnt.textContent='';
 }
@@ -669,7 +759,7 @@ function renderLeads(rows) {
   const byCan={};
   rows.forEach(r=>{const v=normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v);byCan[v]=(byCan[v]||0)+1;});
   const canRows=Object.entries(byCan).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}));
-  mkBars(document.getElementById('l-canal'),canRows,CORES[0]);
+  mkBars(document.getElementById('l-canal'),canRows,CORES[0],filtrarPorCanalLead);
 
   const byCargo={};
   rows.forEach(r=>{const v=normCargo(r.c[6]?.v);byCargo[v]=(byCargo[v]||0)+1;});
@@ -800,11 +890,12 @@ async function loadOverview(){
     { label:'LinkedIn ADS', spend:lA.spend||0, impr:lA.impr||0, clicks:lA.clicks||0, ctr:lA.ctr||0, results:lA.conv||0, cpl:lA.cpl||0, color:CORES[5] }
   ];
   const totalSpendAll = rowsChannels.reduce((s,r)=>s+r.spend,0) || 1;
+  const navByLabel = { 'Google ADS':'gads', 'Meta ADS':'meta', 'LinkedIn ADS':'linkedin' };
   const chBody = document.getElementById('ovx-channel-body');
   if (chBody) {
     chBody.innerHTML = rowsChannels.map(r=>{
       const share = Math.round(r.spend/totalSpendAll*100);
-      return `<tr>
+      return `<tr data-nav onclick="showView('${navByLabel[r.label]}', true)">
       <td><div class="t-name">${r.label}</div></td>
       <td style="font-family:var(--mono);font-weight:500">${brl(r.spend)}</td>
       <td>${fmt(r.impr)}</td>
@@ -818,12 +909,57 @@ async function loadOverview(){
   }
 
   mkLeg(document.getElementById('ovx-spend-leg'), rowsChannels.map(r=>r.label));
-  mkChart('c-ovx-spend','doughnut', rowsChannels.map(r=>r.label), [{data:rowsChannels.map(r=>r.spend), backgroundColor:rowsChannels.map(r=>r.color), borderWidth:0}], {cutout:'62%'});
+  mkChart('c-ovx-spend','doughnut', rowsChannels.map(r=>r.label), [{data:rowsChannels.map(r=>r.spend), backgroundColor:rowsChannels.map(r=>r.color), borderWidth:0}], {
+    cutout:'62%',
+    onClick:(evt,els)=>{ if(!els.length)return; const label=rowsChannels[els[0].index].label; showView(navByLabel[label], true); }
+  });
 
   const chLabs = (ga4?.channels||[]).map(c=>c.channel);
   const chData = (ga4?.channels||[]).map(c=>c.sessions);
   mkLeg(document.getElementById('ovx-sess-leg'), chLabs);
-  mkChart('c-ovx-canal','bar', chLabs, [{label:'Sessões',data:chData,backgroundColor:CORES.slice(0,chLabs.length),borderWidth:0,borderRadius:4}], {scales:scOpts()});
+  mkChart('c-ovx-canal','bar', chLabs, [{label:'Sessões',data:chData,backgroundColor:CORES.slice(0,chLabs.length),borderWidth:0,borderRadius:4}], {
+    scales:scOpts(),
+    onClick:(evt,els)=>{ if(!els.length)return; activeChannel=chLabs[els[0].index]; showView('ga4', true); loadGA4(); }
+  });
+
+  // ── Sessões × Leads por canal (cruzamento GA4 + RD Station) ──
+  // Agrega os canais do GA4 pelo mesmo agrupamento usado nos leads (evita contar o mesmo
+  // lead mais de uma vez quando vários canais do GA4 caem no mesmo grupo, ex: Direct/Unassigned/Cross-network → Direto)
+  const leadsByBucket = {};
+  curLeads.forEach(r=>{ const b = normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v); leadsByBucket[b]=(leadsByBucket[b]||0)+1; });
+  const crossBody = document.getElementById('ovx-cross-body');
+  if (crossBody) {
+    const bucketAgg = {};
+    (ga4?.channels||[]).forEach(c=>{
+      const bucket = ga4ToLeadBucket(c.channel);
+      if (!bucketAgg[bucket]) bucketAgg[bucket] = { sessions:0, _bw:0, channels:[] };
+      bucketAgg[bucket].sessions += c.sessions;
+      bucketAgg[bucket]._bw += c.sessions * c.bounceRate;
+      bucketAgg[bucket].channels.push(c.channel);
+    });
+    const bucketOrder = ['Google ADS','Meta ADS','Orgânico','E-mail','Direto'];
+    // Mostra o bucket se houver sessões OU leads — um bucket com leads e 0 sessões no GA4
+    // é um sinal real de gap de rastreamento (ex: UTM medium não reconhecido pelo GA4), não deve ser escondido.
+    const crossRows = bucketOrder.filter(b=>bucketAgg[b] || leadsByBucket[b]).map(b=>{
+      const agg = bucketAgg[b] || { sessions:0, _bw:0, channels:[] };
+      const leads = leadsByBucket[b]||0;
+      return { bucket:b, sessions:agg.sessions, leads, convRate: agg.sessions>0 ? leads/agg.sessions*100 : 0, bounceRate: agg.sessions>0 ? agg._bw/agg.sessions : 0, subChannels: agg.channels };
+    });
+    crossBody.innerHTML = crossRows.length ? crossRows.map(r=>{
+      const onlyChannel = r.subChannels.length===1 ? r.subChannels[0].replace(/'/g,"\\'") : '';
+      const semRastreio = r.sessions===0 && r.leads>0;
+      const convCell = semRastreio
+        ? `<span style="color:var(--amber)" title="Há leads atribuídos a este canal, mas o GA4 não registrou sessões correspondentes — provável UTM medium não reconhecido pelo agrupamento padrão de canal.">sem rastreio</span>`
+        : `${r.convRate.toFixed(2)}%`;
+      return `<tr data-nav onclick="activeChannel='${onlyChannel}';showView('ga4', true);loadGA4();">
+      <td><div class="t-name">${r.bucket}</div><div class="t-sub">${r.subChannels.join(', ')||'—'}</div></td>
+      <td>${fmt(r.sessions)}</td>
+      <td style="font-weight:500">${fmt(r.leads)}</td>
+      <td>${convCell}</td>
+      <td class="${r.bounceRate*100<40?'rej-ok':r.bounceRate*100<65?'rej-warn':'rej-bad'}">${r.sessions>0?(r.bounceRate*100).toFixed(1)+'%':'—'}</td>
+    </tr>`;
+    }).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
+  }
 
   // ── Leads recentes ──
   const badge2 = document.getElementById('leads-badge2'); if (badge2) badge2.textContent = curLeads.length + ' leads no período';
@@ -860,24 +996,41 @@ async function loadGA4(){
   document.getElementById('ga-conv').textContent   = fmt(t.conversions||0);
   document.getElementById('ga-bounce').textContent = ((t.bounceRate||0)*100).toFixed(1)+'%';
 
+  // ── Popular o seletor de canal (mantém seleção atual se ainda existir) ──
+  const selCanal = document.getElementById('f-canal');
+  if (selCanal) {
+    const cur = activeChannel;
+    selCanal.innerHTML = '<option value="">Todos os canais</option>' +
+      channels.map(c=>`<option value="${c.channel}"${c.channel===cur?' selected':''}>${c.channel}</option>`).join('');
+    if (cur && !channels.some(c=>c.channel===cur)) activeChannel = '';
+  }
+
   const labs = channels.map(c=>c.channel);
   const dS   = channels.map(c=>c.sessions);
   mkLeg(document.getElementById('ga-leg'), labs);
-  mkChart('c-ga-canal','bar',labs,[{label:'Sessões',data:dS,backgroundColor:CORES.slice(0,labs.length),borderWidth:0,borderRadius:4}],sc);
+  mkChart('c-ga-canal','bar',labs,[{label:'Sessões',data:dS,backgroundColor:labs.map((l,i)=>!activeChannel||l===activeChannel?CORES[i%CORES.length]:'rgba(255,255,255,0.08)'),borderWidth:0,borderRadius:4}],{
+    ...sc,
+    onClick:(evt,els)=>{ if(!els.length)return; const i=els[0].index; const val=labs[i]===activeChannel?'':labs[i]; activeChannel=val; if(selCanal) selCanal.value=val; loadGA4(); }
+  });
 
-  document.getElementById('ga-body').innerHTML = channels.length ? channels.map((c,i)=>`<tr>
+  const channelsFiltered = activeChannel ? channels.filter(c=>c.channel===activeChannel) : channels;
+  document.getElementById('ga-body').innerHTML = channelsFiltered.length ? channelsFiltered.map((c)=>{
+    const i = channels.indexOf(c);
+    return `<tr>
     <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CORES[i%CORES.length]};margin-right:8px;vertical-align:middle"></span>${c.channel}</td>
     <td>${fmt(c.sessions)}</td><td>${fmt(c.users)}</td><td>${fmt(c.conversions)}</td>
     <td class="${c.bounceRate*100<40?'rej-ok':c.bounceRate*100<65?'rej-warn':'rej-bad'}">${(c.bounceRate*100).toFixed(1)}%</td>
-  </tr>`).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
+  </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
 
   const campaigns = ga.campaigns || [];
-  document.getElementById('utm-body').innerHTML = campaigns.length ? campaigns.map(c=>`<tr>
-    <td><div class="t-name">${c.campaign||'(sem nome)'}</div></td>
+  const campaignsFiltered = activeChannel ? campaigns.filter(c=>c.channel===activeChannel) : campaigns;
+  document.getElementById('utm-body').innerHTML = campaignsFiltered.length ? campaignsFiltered.map(c=>`<tr>
+    <td><div class="t-name">${c.campaign||'(sem nome)'}</div><div class="t-sub">${c.channel||''}</div></td>
     <td style="font-size:11px;color:var(--muted)">${c.source} / ${c.medium}</td>
     <td>${fmt(c.sessions)}</td><td>${fmt(c.conversions)}</td>
     <td class="${c.bounceRate*100<40?'rej-ok':c.bounceRate*100<65?'rej-warn':'rej-bad'}">${(c.bounceRate*100).toFixed(1)}%</td>
-  </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhuma campanha UTM no período</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhuma campanha UTM no período (ou nenhuma no canal filtrado)</td></tr>';
 
   const landingPages = ga.landingPages || [];
   document.getElementById('lp-body').innerHTML = landingPages.length ? landingPages.map(r=>{
