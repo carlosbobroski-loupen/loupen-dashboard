@@ -281,6 +281,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- RD STATION -->
   <div class="view" id="view-rdstation">
+    <div class="chart-click-hint" style="margin-bottom:12px">Estes números são o estado atual de toda a base de contatos do RD Station Marketing — não são filtrados pelo período selecionado no topo (a API de segmentações não aceita filtro de data).</div>
     <!-- KPIs Funil -->
     <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
       <div class="kpi blue"><div class="kpi-label" title="Todos os contatos cadastrados na base do RD Station Marketing, independente do estágio no funil."><i class="ti ti-users"></i>Total Contatos</div><div class="kpi-value" id="rd-total">—</div><div class="kpi-footer">Base completa</div></div>
@@ -1281,43 +1282,29 @@ async function loadGoogleAds() {
 }
 
 async function loadRDStation(){
-  // Lê do cache do Google Sheets (atualizado hourly pelo n8n)
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=RD_Funil`;
-  const r = await fetch(url);
-  const txt = await r.text();
-  const start = txt.indexOf('{');
-  const end   = txt.lastIndexOf('}') + 1;
-  const d = JSON.parse(txt.slice(start, end));
-  const rows = (d.table?.rows || []).filter(r => r.c && r.c[1]?.v);
+  // Contagens de funil vêm do backend seguro do n8n (segmentações padrão do RD Station Marketing).
+  // Importante: são o estado ATUAL da base inteira, não filtradas pelo período selecionado no topo —
+  // a API de segmentações do RD Station não aceita filtro de data.
+  const d = await fetchAdsData();
+  const rd = d.rdStation || {};
 
-  if (!rows.length) {
-    // Aba ainda não existe ou está vazia — mostrar mensagem
+  if (rd.total == null) {
     ['rd-total','rd-leads','rd-mql','rd-opp','rd-clients'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.textContent = '—';
     });
     document.getElementById('rd-funil-bars').innerHTML =
-      '<div style="color:var(--muted);font-size:13px;padding:12px 0">Configure o workflow n8n para popular os dados do RD Station.<br>Importe o arquivo <strong style="color:var(--text)">rdstation_cache.json</strong> no seu n8n e execute.</div>';
-    document.getElementById('rd-automations-list').innerHTML =
-      '<div style="color:var(--muted);font-size:13px">Aguardando dados do n8n...</div>';
-    document.getElementById('rd-lps-body').innerHTML =
-      '<tr><td colspan="5" class="empty">Aguardando dados do n8n...</td></tr>';
+      '<div style="color:var(--muted);font-size:13px;padding:12px 0">Não foi possível carregar os dados do RD Station Marketing (verifique a credencial OAuth2 no n8n).</div>';
+    document.getElementById('rd-automations-list').innerHTML = '<div style="color:var(--muted);font-size:13px">—</div>';
+    document.getElementById('rd-lps-body').innerHTML = '<tr><td colspan="5" class="empty">—</td></tr>';
     return;
   }
 
-  // Mapear dados do Sheets: [0]=atualizadoEm [1]=metrica [2]=valor [3]=etapa
-  const dataMap = {};
-  rows.forEach(r => {
-    const etapa = r.c[3]?.v || '';
-    const valor = r.c[2]?.v || 0;
-    dataMap[etapa] = valor;
-  });
-
-  const total   = parseInt(dataMap['total']    || 0);
-  const leads   = parseInt(dataMap['lead']     || 0);
-  const mql     = parseInt(dataMap['mql']      || 0);
-  const opp     = parseInt(dataMap['opportunity'] || 0);
-  const clients = parseInt(dataMap['customer'] || 0);
+  const total   = rd.total || 0;
+  const leads   = rd.leads || 0;
+  const mql     = rd.mql || 0;
+  const opp     = rd.opportunities || 0;
+  const clients = rd.customers || 0;
 
   // KPIs
   document.getElementById('rd-total').textContent   = fmt(total);
@@ -1353,20 +1340,14 @@ async function loadRDStation(){
       <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--green)">${t.v}</div>
     </div>`).join('');
 
-  // Automações e LPs — aguardam abas próprias no Sheets
-  document.getElementById('rd-auto-badge').textContent = '—';
+  // Automações e Landing Pages: a API pública do RD Station Marketing não expõe status de
+  // fluxos de automação nem métricas agregadas de LP/formulário — não é uma questão de configuração.
+  document.getElementById('rd-auto-badge').textContent = 'indisponível na API';
   document.getElementById('rd-automations-list').innerHTML =
-    '<div style="color:var(--muted);font-size:12px;line-height:1.7">Automações serão exibidas aqui após configurar a aba <strong style="color:var(--text)">RD_Automacoes</strong> no n8n.</div>';
-  document.getElementById('rd-lp-badge').textContent = '—';
+    '<div style="color:var(--muted);font-size:12px;line-height:1.7">A API pública do RD Station Marketing não expõe o status de fluxos de automação. Esse dado só está disponível pela interface do RD Station.</div>';
+  document.getElementById('rd-lp-badge').textContent = 'indisponível na API';
   document.getElementById('rd-lps-body').innerHTML =
-    '<tr><td colspan="5" class="empty">LPs serão exibidas após configurar a aba RD_LandingPages no n8n.</td></tr>';
-
-  // Atualizar última atualização
-  const ultimaAtt = rows[0]?.c[0]?.v;
-  if (ultimaAtt) {
-    const stxt = document.getElementById('stxt');
-    if (stxt) stxt.textContent = 'RD: ' + ultimaAtt.toString().slice(0,19);
-  }
+    '<tr><td colspan="5" class="empty">A API pública do RD Station Marketing não expõe métricas agregadas por Landing Page/formulário. Use a aba "Landing Pages" (dados do GA4) para sessões e conversões por página.</td></tr>';
 }
 
 async function initDates(){
