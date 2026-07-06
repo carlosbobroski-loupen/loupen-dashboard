@@ -131,6 +131,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('ga4')"><i class="ti ti-chart-line"></i>Google Analytics</button>
     <button class="nav-item" onclick="showView('utm')"><i class="ti ti-link"></i>Campanhas UTM</button>
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
+    <div class="nav-label">Comercial</div>
+    <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
     <div class="nav-label">Anúncios</div>
     <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
     <button class="nav-item" onclick="showView('linkedin')"><i class="ti ti-brand-linkedin"></i>LinkedIn ADS</button>
@@ -196,6 +198,31 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <span id="ga-prop-1" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block"></span>loupen.com.br</span>
       <span id="ga-prop-2" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>pages.loupen.com.br</span>
     </div>
+  </div>
+
+  <!-- FILTRO OPORTUNIDADES (CRM Comercial) -->
+  <div class="global-filters" id="opp-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="o-origem" onchange="aplicarFiltrosOpp()">
+      <option value="">Toda origem/campanha</option>
+    </select>
+    <select class="filter-sel" id="o-canal" onchange="aplicarFiltrosOpp()">
+      <option value="">Todos os canais</option>
+    </select>
+    <select class="filter-sel" id="o-fase" onchange="aplicarFiltrosOpp()">
+      <option value="">Todos os estágios</option>
+      <option value="cadencia">Em cadência</option>
+      <option value="qualificado">Qualificado (sem oportunidade)</option>
+      <option value="oportunidade">Virou oportunidade</option>
+      <option value="aberta">Oportunidade em aberto</option>
+      <option value="perdida">Perdida</option>
+      <option value="rejeitado">Rejeitado</option>
+    </select>
+    <select class="filter-sel" id="o-motivo" onchange="aplicarFiltrosOpp()">
+      <option value="">Todos os motivos de perda</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltrosOpp()"><i class="ti ti-x"></i>Limpar</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="o-filter-count"></span>
   </div>
 
   <!-- OVERVIEW -->
@@ -363,6 +390,71 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-browser"></i>Landing Pages</div></div>
       <table class="tbl"><thead><tr><th>Página</th><th>Sessões</th><th>Conversões</th><th>Rejeição</th></tr></thead><tbody id="lp-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- OPORTUNIDADES (CRM Comercial) -->
+  <div class="view" id="view-oportunidades">
+    <div class="chart-click-hint" style="margin-bottom:12px">Cruza a planilha Leads Salesforce (CRM comercial) com a Central de Leads (canal/origem pago) por e-mail. Filtrado pelo período selecionado no topo (Data da conversão).</div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(6,1fr)">
+      <div class="kpi blue"><div class="kpi-label" title="Total de leads recebidos pelo comercial no período.">Leads recebidos</div><div class="kpi-value" id="o-total">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Leads em sequência de tentativas de contato (status 'Contato dia N').">Em cadência</div><div class="kpi-value" id="o-cadencia">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Leads marcados como Qualificado (já viraram oportunidade ou não).">Qualificados</div><div class="kpi-value" id="o-qualificados">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="% de leads do período que viraram oportunidade.">Taxa Lead → Opp</div><div class="kpi-value" id="o-taxa">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Soma do valor das oportunidades ainda em negociação (não ganhas nem perdidas).">Valor em pipeline</div><div class="kpi-value" id="o-pipeline" style="font-size:18px">—</div></div>
+    </div>
+    <div class="kpi-grid-4">
+      <div class="kpi purple"><div class="kpi-label" title="Oportunidades ainda em negociação (proposta enviada, POC, demonstração, etc).">Em negociação</div><div class="kpi-value" id="o-abertas">—</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Oportunidades marcadas como Perdido no CRM.">Perdidas</div><div class="kpi-value" id="o-perdidas">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Valor médio das oportunidades geradas no período.">Ticket médio</div><div class="kpi-value" id="o-ticket" style="font-size:18px">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Leads rejeitados no período (dados inválidos, sem orçamento, sem interesse etc).">Rejeitados</div><div class="kpi-value" id="o-qualificados-rej">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil comercial</div><div class="section-badge">Leads → Qualificados → Oportunidades → Ganhas</div></div>
+      <div id="o-funil"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-mood-sad"></i>Motivo da perda</div></div>
+        <div id="o-motivo-perda"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-ban"></i>Motivo da rejeição</div></div>
+        <div id="o-motivo-rejeicao"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-route"></i>Por canal de origem</div><div class="section-badge">clique para filtrar</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Canal</th><th>Leads</th><th>Oportunidades</th><th>Perdidas</th><th>Valor gerado</th><th>Taxa Lead→Opp</th></tr></thead>
+        <tbody id="o-canal-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por origem / campanha</div><div class="section-badge">clique para filtrar</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Origem / Campanha</th><th>Leads</th><th>Oportunidades</th><th>Perdidas</th><th>Valor gerado</th></tr></thead>
+        <tbody id="o-origem-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads comerciais</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Nome / Empresa</th><th>Origem</th><th>Canal</th><th>Status</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead>
+        <tbody id="o-all"></tbody>
+      </table>
+      </div>
     </div>
   </div>
 
@@ -542,7 +634,7 @@ const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff
 // GA4 agora é buscado pelo mesmo backend seguro do n8n (ver fetchAdsData/loadGA4) —
 // removida a assinatura JWT client-side com chave privada (era um risco de segurança).
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
 // ── NAV ─────────────────────────────────────────────────────
@@ -555,8 +647,10 @@ function showView(id, fromDrill){
   // Mostrar filtros por view
   const gf = document.getElementById('global-filters');
   const gaf = document.getElementById('ga-filters');
+  const of = document.getElementById('opp-filters');
   if (gf)  gf.classList.toggle('visible',  id==='leads');
   if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
+  if (of)  of.classList.toggle('visible',  id==='oportunidades');
   // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
   const bc = document.getElementById('drill-breadcrumb');
   if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
@@ -642,7 +736,9 @@ function normPorte(v) {
 
 function normCanal(utm_source, conv_channel, conv_source) {
   const s = (utm_source || conv_channel || conv_source || '').toLowerCase().trim();
-  if (s.includes('meta') || s.includes('facebook') || s.includes('instagram')) return 'Meta ADS';
+  // 'fb'/'ig'/'an'/'msg' são os valores literais que o Meta resolve em {{site_source_name}}
+  // (padrão de UTM definido em 2026-07-03) — sem isso, esses leads apareciam com canal "fb"/"ig" cru.
+  if (s.includes('meta') || s.includes('facebook') || s.includes('instagram') || ['fb','ig','an','msg'].includes(s)) return 'Meta ADS';
   if (s.includes('google') || s.includes('googleads')) return 'Google ADS';
   if (s === 'paid search' || s === 'cpc') return 'Google ADS';
   if (s === 'organic' || s.includes('organic')) return 'Orgânico';
@@ -1350,6 +1446,268 @@ async function loadRDStation(){
     '<tr><td colspan="5" class="empty">A API pública do RD Station Marketing não expõe métricas agregadas por Landing Page/formulário. Use a aba "Landing Pages" (dados do GA4) para sessões e conversões por página.</td></tr>';
 }
 
+// ── OPORTUNIDADES (cruza planilha Leads Salesforce/CRM com Central de Leads) ──
+const SHEET_SF = '1xSC6e91_uHYRPkzD0idX3jJcb-GmhL-BCY4BMsZQuYc';
+let _allSalesforce = [];
+let _leadEmailMap = {};
+
+// Fallback de canal para leads antigos que não passaram pela automação (não têm e-mail
+// correspondente na Central de Leads) — inferido a partir do texto de origem do CRM.
+function inferCanalOrigem(origem) {
+  const s = (origem || '').toLowerCase();
+  if (s.includes('busca paga') || s.includes('google')) return 'Google ADS';
+  if (s.includes('facebook ads') || s.includes('-fb') || s.includes('_fb') || s.includes('fb+') || s.includes('fb ') || s.includes('meta') || s.includes('insta')) return 'Meta ADS';
+  if (s.includes('rd_station') || s.includes('contatos_rd')) return 'Base RD Station';
+  if (s.includes('chat')) return 'Chat';
+  if (s.includes('contato') || s.includes('novo formulário') || s.includes('novo formulario')) return 'Direto';
+  return 'Não identificado';
+}
+
+function buildLeadEmailMap() {
+  const map = {};
+  (_allLeads || []).forEach(r => {
+    const email = (r.c[2]?.v || '').toString().trim().toLowerCase();
+    if (!email) return;
+    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v) };
+  });
+  return map;
+}
+
+async function loadSalesforce() {
+  await loadLeads(); // garante _allLeads carregado, necessário para cruzar o canal por e-mail
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_SF}/gviz/tq?tqx=out:json&gid=0`;
+  const r = await fetch(url);
+  const txt = await r.text();
+  const start = txt.indexOf('{');
+  const end = txt.lastIndexOf('}') + 1;
+  const d = JSON.parse(txt.slice(start, end));
+  const rows = (d.table.rows || []).filter(row => row.c && row.c[4]?.v);
+
+  _leadEmailMap = buildLeadEmailMap();
+
+  _allSalesforce = rows.map(row => {
+    const c = row.c || [];
+    const v = i => (c[i] ? c[i].v : null);
+    const origem = v(0) || 'Não informado';
+    const email = (v(4) || '').toString().trim().toLowerCase();
+    const nomeOpp = v(10);
+    const fase = v(12);
+    const motivoPerda = v(13);
+    const valorNF = v(15);
+    const isOpportunity = !!nomeOpp;
+    const isLost = fase === 'Perdido';
+    const isWon = !!valorNF && !isLost;
+    const isOpen = isOpportunity && !isLost && !isWon;
+    const info = _leadEmailMap[email];
+    const canal = (info && info.canal) ? info.canal : inferCanalOrigem(origem);
+    return {
+      origem, dataConversao: parseDataLead(v(2)), nome: v(3) || '—', email,
+      empresa: v(5) || '—', dataCriacao: parseDataLead(v(6)), status: v(7) || 'Não informado',
+      motivoRejeicao: v(8), nomeOpp, produto: v(11), fase, motivoPerda,
+      valorOpp: v(14) || 0, valorNF: valorNF || 0, dataFechamento: parseDataLead(v(16)),
+      isOpportunity, isLost, isWon, isOpen, canal
+    };
+  });
+
+  const origens = [...new Set(_allSalesforce.map(row => row.origem))].sort();
+  const selOrigem = document.getElementById('o-origem');
+  if (selOrigem) {
+    const cur = selOrigem.value;
+    selOrigem.innerHTML = '<option value="">Toda origem/campanha</option>' +
+      origens.map(o => `<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('');
+  }
+  const canais = [...new Set(_allSalesforce.map(row => row.canal))].sort();
+  const selCanal = document.getElementById('o-canal');
+  if (selCanal) {
+    const cur = selCanal.value;
+    selCanal.innerHTML = '<option value="">Todos os canais</option>' +
+      canais.map(cn => `<option value="${cn}"${cn===cur?' selected':''}>${cn}</option>`).join('');
+  }
+  const motivos = [...new Set(_allSalesforce.map(row => row.motivoPerda).filter(Boolean))].sort();
+  const selMotivo = document.getElementById('o-motivo');
+  if (selMotivo) {
+    const cur = selMotivo.value;
+    selMotivo.innerHTML = '<option value="">Todos os motivos de perda</option>' +
+      motivos.map(m => `<option value="${m}"${m===cur?' selected':''}>${m}</option>`).join('');
+  }
+
+  aplicarFiltrosOpp();
+}
+
+function salesforceInRange(startDate, endDate) {
+  const s = new Date(startDate+'T00:00:00'), e = new Date(endDate+'T23:59:59');
+  return (_allSalesforce||[]).filter(row => {
+    const d = row.dataConversao || row.dataCriacao;
+    if (!d) return true;
+    return d >= s && d <= e;
+  });
+}
+
+function aplicarFiltrosOpp() {
+  const fOrigem = document.getElementById('o-origem')?.value || '';
+  const fCanal  = document.getElementById('o-canal')?.value  || '';
+  const fFase   = document.getElementById('o-fase')?.value   || '';
+  const fMotivo = document.getElementById('o-motivo')?.value || '';
+
+  const p = period();
+  let rows = salesforceInRange(p.startDate, p.endDate);
+
+  if (fOrigem) rows = rows.filter(row => row.origem === fOrigem);
+  if (fCanal)  rows = rows.filter(row => row.canal === fCanal);
+  if (fMotivo) rows = rows.filter(row => row.motivoPerda === fMotivo);
+  if (fFase) {
+    rows = rows.filter(row => {
+      const statusLower = (row.status||'').toLowerCase();
+      switch (fFase) {
+        case 'cadencia': return statusLower.startsWith('contato dia');
+        case 'qualificado': return statusLower === 'qualificado' && !row.isOpportunity;
+        case 'oportunidade': return row.isOpportunity;
+        case 'aberta': return row.isOpen;
+        case 'perdida': return row.isLost;
+        case 'rejeitado': return statusLower === 'rejeitado';
+        default: return true;
+      }
+    });
+  }
+
+  renderOportunidades(rows);
+
+  const hasFilter = fOrigem || fCanal || fFase || fMotivo;
+  const cnt = document.getElementById('o-filter-count');
+  if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
+}
+
+function limparFiltrosOpp() {
+  ['o-origem','o-canal','o-fase','o-motivo'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
+  aplicarFiltrosOpp();
+}
+
+function filtrarPorOrigemOpp(origem) {
+  const sel = document.getElementById('o-origem');
+  if (sel) sel.value = origem;
+  aplicarFiltrosOpp();
+}
+function filtrarPorCanalOpp(canal) {
+  const sel = document.getElementById('o-canal');
+  if (sel) sel.value = canal;
+  aplicarFiltrosOpp();
+}
+
+function renderOportunidades(rows) {
+  const total = rows.length;
+  const cadencia = rows.filter(row => (row.status||'').toLowerCase().startsWith('contato dia')).length;
+  const qualificados = rows.filter(row => (row.status||'').toLowerCase() === 'qualificado').length;
+  const rejeitados = rows.filter(row => (row.status||'').toLowerCase() === 'rejeitado').length;
+  const oportunidades = rows.filter(row => row.isOpportunity).length;
+  const abertas = rows.filter(row => row.isOpen);
+  const perdidas = rows.filter(row => row.isLost);
+  const ganhas = rows.filter(row => row.isWon);
+  const taxaOpp = total > 0 ? (oportunidades/total*100) : 0;
+  const valorPipeline = abertas.reduce((s,row)=>s+(row.valorOpp||0),0);
+  const valoresOpp = rows.filter(row=>row.isOpportunity && row.valorOpp>0).map(row=>row.valorOpp);
+  const ticketMedio = valoresOpp.length ? valoresOpp.reduce((a,b)=>a+b,0)/valoresOpp.length : 0;
+
+  document.getElementById('o-total').textContent = fmt(total);
+  document.getElementById('o-cadencia').textContent = fmt(cadencia);
+  document.getElementById('o-qualificados').textContent = fmt(qualificados);
+  document.getElementById('o-oportunidades').textContent = fmt(oportunidades);
+  document.getElementById('o-taxa').textContent = total ? taxaOpp.toFixed(1)+'%' : '—';
+  document.getElementById('o-pipeline').textContent = brl(valorPipeline);
+  document.getElementById('o-abertas').textContent = fmt(abertas.length);
+  document.getElementById('o-perdidas').textContent = fmt(perdidas.length);
+  document.getElementById('o-ticket').textContent = ticketMedio>0 ? brl(ticketMedio) : '—';
+  document.getElementById('o-qualificados-rej').textContent = fmt(rejeitados);
+
+  const maxFunil = Math.max(total, qualificados+oportunidades, oportunidades, ganhas.length, 1);
+  const funilRows = [
+    { label:'Leads recebidos', v: total, color: CORES[0] },
+    { label:'Qualificados', v: qualificados + oportunidades, color: CORES[2] },
+    { label:'Oportunidades', v: oportunidades, color: CORES[3] },
+    { label:'Ganhas', v: ganhas.length, color: CORES[1] }
+  ];
+  const funilEl = document.getElementById('o-funil');
+  if (funilEl) {
+    funilEl.innerHTML = funilRows.map((r,i)=>{
+      const w = maxFunil>0 ? Math.round(r.v/maxFunil*100) : 0;
+      const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
+      return `<div class="bar-row"><div class="bar-label" style="width:150px">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${r.color}"></div></div><div class="bar-val" style="width:180px;text-align:right">${fmt(r.v)} <span style="color:var(--muted);font-size:10px">${conv}</span></div></div>`;
+    }).join('');
+  }
+
+  const byMotivoPerda = {};
+  perdidas.forEach(row => { const m = row.motivoPerda || 'Não informado'; byMotivoPerda[m] = (byMotivoPerda[m]||0)+1; });
+  const motivoPerdaRows = Object.entries(byMotivoPerda).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('o-motivo-perda'), motivoPerdaRows.length?motivoPerdaRows:[{label:'Sem perdas no período',v:0}], CORES[4]);
+
+  const byMotivoRej = {};
+  rows.filter(row=>(row.status||'').toLowerCase()==='rejeitado').forEach(row => { const m = row.motivoRejeicao || 'Não informado'; byMotivoRej[m] = (byMotivoRej[m]||0)+1; });
+  const motivoRejRows = Object.entries(byMotivoRej).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('o-motivo-rejeicao'), motivoRejRows.length?motivoRejRows:[{label:'Sem rejeições no período',v:0}], CORES[4]);
+
+  const byCanal = {};
+  rows.forEach(row => {
+    byCanal[row.canal] = byCanal[row.canal] || {leads:0,opp:0,perdidas:0,valor:0};
+    byCanal[row.canal].leads++;
+    if (row.isOpportunity) byCanal[row.canal].opp++;
+    if (row.isLost) byCanal[row.canal].perdidas++;
+    byCanal[row.canal].valor += (row.valorOpp||0);
+  });
+  const canalBody = document.getElementById('o-canal-body');
+  if (canalBody) {
+    const canalRowsArr = Object.entries(byCanal).sort((a,b)=>b[1].leads-a[1].leads);
+    canalBody.innerHTML = canalRowsArr.length ? canalRowsArr.map(([canal,agg])=>`<tr style="cursor:pointer" onclick="filtrarPorCanalOpp('${canal.replace(/'/g,"\\'")}')">
+      <td><div class="t-name">${canal}</div></td>
+      <td>${fmt(agg.leads)}</td>
+      <td>${fmt(agg.opp)}</td>
+      <td>${fmt(agg.perdidas)}</td>
+      <td style="font-family:var(--mono)">${brl(agg.valor)}</td>
+      <td>${agg.leads>0?(agg.opp/agg.leads*100).toFixed(1)+'%':'—'}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Sem dados no período</td></tr>';
+  }
+
+  const byOrigem = {};
+  rows.forEach(row => {
+    byOrigem[row.origem] = byOrigem[row.origem] || {leads:0,opp:0,perdidas:0,valor:0};
+    byOrigem[row.origem].leads++;
+    if (row.isOpportunity) byOrigem[row.origem].opp++;
+    if (row.isLost) byOrigem[row.origem].perdidas++;
+    byOrigem[row.origem].valor += (row.valorOpp||0);
+  });
+  const origemBody = document.getElementById('o-origem-body');
+  if (origemBody) {
+    const origemRowsArr = Object.entries(byOrigem).sort((a,b)=>b[1].leads-a[1].leads);
+    origemBody.innerHTML = origemRowsArr.length ? origemRowsArr.map(([origem,agg])=>`<tr style="cursor:pointer" onclick="filtrarPorOrigemOpp('${origem.replace(/'/g,"\\'")}')">
+      <td><div class="t-name">${origem}</div></td>
+      <td>${fmt(agg.leads)}</td>
+      <td>${fmt(agg.opp)}</td>
+      <td>${fmt(agg.perdidas)}</td>
+      <td style="font-family:var(--mono)">${brl(agg.valor)}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
+  }
+
+  const allBody = document.getElementById('o-all');
+  if (allBody) {
+    const statusBadge = row => {
+      if (row.isWon) return `<span class="badge lq">Ganha</span>`;
+      if (row.isLost) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
+      if (row.isOpen) return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Em negociação</span>`;
+      const sl = (row.status||'').toLowerCase();
+      if (sl==='rejeitado') return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Rejeitado</span>`;
+      if (sl.startsWith('contato dia')) return `<span class="badge" style="background:var(--amber-dim);color:var(--amber)">${row.status}</span>`;
+      return `<span class="badge lead">${row.status||'—'}</span>`;
+    };
+    allBody.innerHTML = rows.length ? rows.slice().sort((a,b)=>(b.dataConversao||b.dataCriacao||0)-(a.dataConversao||a.dataCriacao||0)).map(row => `<tr>
+      <td><div class="t-name">${row.nome}</div><div class="t-sub">${row.empresa}</div></td>
+      <td style="font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${row.origem}">${row.origem}</td>
+      <td>${pill(row.canal)}</td>
+      <td>${statusBadge(row)}</td>
+      <td style="font-size:12px;color:var(--muted)">${row.motivoPerda || row.motivoRejeicao || '—'}</td>
+      <td style="font-family:var(--mono)">${row.valorOpp>0?brl(row.valorOpp):'—'}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${row.dataConversao ? row.dataConversao.toLocaleDateString('pt-BR') : (row.dataCriacao ? row.dataCriacao.toLocaleDateString('pt-BR') : '—')}</td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">Sem leads comerciais no período</td></tr>';
+  }
+}
+
 async function initDates(){
   const h = new Date();
   const f = x => x.toISOString().slice(0,10);
@@ -1365,7 +1723,7 @@ async function carregarTudo(){
   const stxt=document.getElementById('stxt');
   pulse.style.background='var(--amber)';
   stxt.textContent='Atualizando...';
-  const results=await Promise.allSettled([loadLeads(),loadRDStation(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds()]);
+  const results=await Promise.allSettled([loadLeads(),loadRDStation(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds(),loadSalesforce()]);
   const ovResult=await Promise.allSettled([loadOverview()]);
   const errors=results.concat(ovResult).filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Erro desconhecido');
   if(errors.length){
