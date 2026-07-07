@@ -203,6 +203,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- FILTRO OPORTUNIDADES (CRM Comercial) -->
   <div class="global-filters" id="opp-filters">
     <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="o-segmento" onchange="aplicarFiltrosOpp()" title="Marketing = e-mail bateu com um lead da Central de Leads (veio de mídia paga rastreada). Comercial = lead cadastrado direto no CRM, sem rastreio de mídia.">
+      <option value="">Marketing + Comercial</option>
+      <option value="marketing">Só Marketing</option>
+      <option value="comercial">Só Comercial</option>
+    </select>
     <select class="filter-sel" id="o-origem" onchange="aplicarFiltrosOpp()">
       <option value="">Toda origem/campanha</option>
     </select>
@@ -397,7 +402,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <div class="view" id="view-oportunidades">
     <div class="chart-click-hint" style="margin-bottom:12px">Cruza a planilha Leads Salesforce (CRM comercial) com a Central de Leads (canal/origem pago) por e-mail. Filtrado pelo período selecionado no topo (Data da conversão).</div>
     <div class="kpi-grid" style="grid-template-columns:repeat(6,1fr)">
-      <div class="kpi blue"><div class="kpi-label" title="Total de leads recebidos pelo comercial no período.">Leads recebidos</div><div class="kpi-value" id="o-total">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Total de leads recebidos pelo comercial no período.">Leads recebidos</div><div class="kpi-value" id="o-total">—</div><div class="kpi-footer" id="o-segmento-split"></div></div>
       <div class="kpi amber"><div class="kpi-label" title="Leads em sequência de tentativas de contato (status 'Contato dia N').">Em cadência</div><div class="kpi-value" id="o-cadencia">—</div></div>
       <div class="kpi green"><div class="kpi-label" title="Leads marcados como Qualificado (já viraram oportunidade ou não).">Qualificados</div><div class="kpi-value" id="o-qualificados">—</div></div>
       <div class="kpi purple"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div></div>
@@ -451,7 +456,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads comerciais</div></div>
       <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Nome / Empresa</th><th>Origem</th><th>Canal</th><th>Status</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead>
+        <thead><tr><th>Nome / Empresa</th><th>Segmento</th><th>Origem</th><th>Canal</th><th>Status</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead>
         <tbody id="o-all"></tbody>
       </table>
       </div>
@@ -1468,7 +1473,9 @@ function buildLeadEmailMap() {
   (_allLeads || []).forEach(r => {
     const email = (r.c[2]?.v || '').toString().trim().toLowerCase();
     if (!email) return;
-    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v) };
+    // Evento já vem padronizado da Central de Leads (LOGMEIN_RESCUE-LICENCA-ECO_07-26,
+    // GOTO_INSTITUCIONAL_07-26, GOTO_WEBINAR_07-26, GOTO_SAUDE_07-26— padrão definido em 2026-07-07).
+    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '' };
   });
   return map;
 }
@@ -1499,13 +1506,18 @@ async function loadSalesforce() {
     const isWon = !!valorNF && !isLost;
     const isOpen = isOpportunity && !isLost && !isWon;
     const info = _leadEmailMap[email];
+    const isMarketing = !!info;
+    // Leads de Marketing usam a nomenclatura padronizada da Central de Leads (o e-mail bateu
+    // com um lead que veio pela automação de anúncios); leads só do Comercial mantêm a origem
+    // como foi digitada no CRM (não passaram pelo rastreio de mídia paga).
+    const origemPadronizada = isMarketing ? (info.campanha || origem) : origem;
     const canal = (info && info.canal) ? info.canal : inferCanalOrigem(origem);
     return {
-      origem, dataConversao: parseDataLead(v(2)), nome: v(3) || '—', email,
+      origem: origemPadronizada, origemCRM: origem, dataConversao: parseDataLead(v(2)), nome: v(3) || '—', email,
       empresa: v(5) || '—', dataCriacao: parseDataLead(v(6)), status: v(7) || 'Não informado',
       motivoRejeicao: v(8), nomeOpp, produto: v(11), fase, motivoPerda,
       valorOpp: v(14) || 0, valorNF: valorNF || 0, dataFechamento: parseDataLead(v(16)),
-      isOpportunity, isLost, isWon, isOpen, canal
+      isOpportunity, isLost, isWon, isOpen, canal, isMarketing
     };
   });
 
@@ -1544,14 +1556,17 @@ function salesforceInRange(startDate, endDate) {
 }
 
 function aplicarFiltrosOpp() {
-  const fOrigem = document.getElementById('o-origem')?.value || '';
-  const fCanal  = document.getElementById('o-canal')?.value  || '';
-  const fFase   = document.getElementById('o-fase')?.value   || '';
-  const fMotivo = document.getElementById('o-motivo')?.value || '';
+  const fOrigem   = document.getElementById('o-origem')?.value   || '';
+  const fCanal    = document.getElementById('o-canal')?.value    || '';
+  const fFase     = document.getElementById('o-fase')?.value     || '';
+  const fMotivo   = document.getElementById('o-motivo')?.value   || '';
+  const fSegmento = document.getElementById('o-segmento')?.value || '';
 
   const p = period();
   let rows = salesforceInRange(p.startDate, p.endDate);
 
+  if (fSegmento === 'marketing') rows = rows.filter(row => row.isMarketing);
+  else if (fSegmento === 'comercial') rows = rows.filter(row => !row.isMarketing);
   if (fOrigem) rows = rows.filter(row => row.origem === fOrigem);
   if (fCanal)  rows = rows.filter(row => row.canal === fCanal);
   if (fMotivo) rows = rows.filter(row => row.motivoPerda === fMotivo);
@@ -1572,13 +1587,13 @@ function aplicarFiltrosOpp() {
 
   renderOportunidades(rows);
 
-  const hasFilter = fOrigem || fCanal || fFase || fMotivo;
+  const hasFilter = fOrigem || fCanal || fFase || fMotivo || fSegmento;
   const cnt = document.getElementById('o-filter-count');
   if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
 }
 
 function limparFiltrosOpp() {
-  ['o-origem','o-canal','o-fase','o-motivo'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
+  ['o-origem','o-canal','o-fase','o-motivo','o-segmento'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
   aplicarFiltrosOpp();
 }
 
@@ -1607,7 +1622,12 @@ function renderOportunidades(rows) {
   const valoresOpp = rows.filter(row=>row.isOpportunity && row.valorOpp>0).map(row=>row.valorOpp);
   const ticketMedio = valoresOpp.length ? valoresOpp.reduce((a,b)=>a+b,0)/valoresOpp.length : 0;
 
+  const nMarketing = rows.filter(row => row.isMarketing).length;
+  const nComercial = total - nMarketing;
+
   document.getElementById('o-total').textContent = fmt(total);
+  const segSplitEl = document.getElementById('o-segmento-split');
+  if (segSplitEl) segSplitEl.textContent = `${fmt(nMarketing)} Marketing · ${fmt(nComercial)} Comercial`;
   document.getElementById('o-cadencia').textContent = fmt(cadencia);
   document.getElementById('o-qualificados').textContent = fmt(qualificados);
   document.getElementById('o-oportunidades').textContent = fmt(oportunidades);
@@ -1698,13 +1718,14 @@ function renderOportunidades(rows) {
     };
     allBody.innerHTML = rows.length ? rows.slice().sort((a,b)=>(b.dataConversao||b.dataCriacao||0)-(a.dataConversao||a.dataCriacao||0)).map(row => `<tr>
       <td><div class="t-name">${row.nome}</div><div class="t-sub">${row.empresa}</div></td>
+      <td>${row.isMarketing ? '<span class="badge lq">Marketing</span>' : '<span class="badge" style="background:var(--surface2);color:var(--muted)">Comercial</span>'}</td>
       <td style="font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${row.origem}">${row.origem}</td>
       <td>${pill(row.canal)}</td>
       <td>${statusBadge(row)}</td>
       <td style="font-size:12px;color:var(--muted)">${row.motivoPerda || row.motivoRejeicao || '—'}</td>
       <td style="font-family:var(--mono)">${row.valorOpp>0?brl(row.valorOpp):'—'}</td>
       <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${row.dataConversao ? row.dataConversao.toLocaleDateString('pt-BR') : (row.dataCriacao ? row.dataCriacao.toLocaleDateString('pt-BR') : '—')}</td>
-    </tr>`).join('') : '<tr><td colspan="7" class="empty">Sem leads comerciais no período</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Sem leads comerciais no período</td></tr>';
   }
 }
 
