@@ -1456,6 +1456,22 @@ const SHEET_SF = '1xSC6e91_uHYRPkzD0idX3jJcb-GmhL-BCY4BMsZQuYc';
 let _allSalesforce = [];
 let _leadEmailMap = {};
 
+// Mesma regra usada para padronizar o Evento na Central de Leads (2026-07-07): aplicada
+// aqui também em cima da origem crua do CRM, para leads que ainda não bateram por e-mail
+// (ex: "[CP07][LOGMEIN][FUNDO][LEAD]" no CRM deve virar LOGMEIN_RESCUE-LICENCA-ECO_07-26
+// mesmo sem correspondência na Central de Leads).
+function standardizeCampanha(v) {
+  if (!v) return v;
+  const s = v.toLowerCase();
+  if (s.includes('rescue') || s.includes('logmein')) return 'LOGMEIN_RESCUE-LICENCA-ECO_07-26';
+  if (s.includes('goto') || s.includes('linkedin')) {
+    if (s.includes('webinar')) return 'GOTO_WEBINAR_07-26';
+    if (s.includes('saude')) return 'GOTO_SAUDE_07-26';
+    return 'GOTO_INSTITUCIONAL_07-26';
+  }
+  return v;
+}
+
 // Fallback de canal para leads antigos que não passaram pela automação (não têm e-mail
 // correspondente na Central de Leads) — inferido a partir do texto de origem do CRM.
 function inferCanalOrigem(origem) {
@@ -1510,7 +1526,10 @@ async function loadSalesforce() {
     // Leads de Marketing usam a nomenclatura padronizada da Central de Leads (o e-mail bateu
     // com um lead que veio pela automação de anúncios); leads só do Comercial mantêm a origem
     // como foi digitada no CRM (não passaram pelo rastreio de mídia paga).
-    const origemPadronizada = isMarketing ? (info.campanha || origem) : origem;
+    const origemBase = isMarketing ? (info.campanha || origem) : origem;
+    // Padroniza sempre, tenha vindo da Central de Leads (marketing) ou cru do CRM (comercial) —
+    // não muda nada em quem já está padronizado, mas corrige quem só existe no Salesforce.
+    const origemPadronizada = standardizeCampanha(origemBase);
     const canal = (info && info.canal) ? info.canal : inferCanalOrigem(origem);
     return {
       origem: origemPadronizada, origemCRM: origem, dataConversao: parseDataLead(v(2)), nome: v(3) || '—', email,
