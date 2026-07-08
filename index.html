@@ -133,6 +133,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
     <div class="nav-label">Comercial</div>
     <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
+    <button class="nav-item" onclick="showView('criativos')"><i class="ti ti-photo"></i>Criativos</button>
     <div class="nav-label">Anúncios</div>
     <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
     <button class="nav-item" onclick="showView('linkedin')"><i class="ti ti-brand-linkedin"></i>LinkedIn ADS</button>
@@ -228,6 +229,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </select>
     <button class="filter-clear" onclick="limparFiltrosOpp()"><i class="ti ti-x"></i>Limpar</button>
     <span style="font-size:12px;color:var(--muted);margin-left:auto" id="o-filter-count"></span>
+  </div>
+
+  <div class="global-filters" id="criativo-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="cr-plataforma" onchange="aplicarFiltrosCriativos()">
+      <option value="">Todas as plataformas</option>
+    </select>
+    <select class="filter-sel" id="cr-campanha" onchange="aplicarFiltrosCriativos()">
+      <option value="">Toda campanha</option>
+    </select>
+    <select class="filter-sel" id="cr-conjunto" onchange="aplicarFiltrosCriativos()">
+      <option value="">Todo conjunto</option>
+    </select>
+    <select class="filter-sel" id="cr-criativo" onchange="aplicarFiltrosCriativos()">
+      <option value="">Todo criativo</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltrosCriativos()"><i class="ti ti-x"></i>Limpar</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="cr-filter-count"></span>
   </div>
 
   <!-- OVERVIEW -->
@@ -469,6 +488,48 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
   </div>
 
+  <!-- CRIATIVOS (Ads x Central de Leads x CRM comercial) -->
+  <div class="view" id="view-criativos">
+    <div class="chart-click-hint" style="margin-bottom:12px">Cruza o investimento por campanha/conjunto/criativo (Meta, Google e LinkedIn Ads) com os leads reais da Central de Leads e o estágio no CRM comercial (Salesforce). O CPL aqui é sempre <strong style="color:var(--text)">investimento ÷ leads reais da Central de Leads</strong> — nunca o "resultado" auto-reportado pela Meta, que mistura leads do site com leads nativos do formulário e mascara o custo real.</div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi purple"><div class="kpi-label" title="Investimento somado das campanhas/criativos no recorte atual.">Investimento</div><div class="kpi-value" id="cr-spend">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Contagem real de linhas na Central de Leads que batem com o recorte de campanha/conjunto/criativo selecionado — não é o 'resultado' da Meta.">Leads reais</div><div class="kpi-value" id="cr-leads">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Investimento ÷ Leads reais.">CPL real</div><div class="kpi-value" id="cr-cpl">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Soma do valor de oportunidades ainda abertas + já ganhas, atribuídas a este recorte via e-mail do lead.">Pipe + Ganho</div><div class="kpi-value" id="cr-pipe" style="font-size:18px">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por campanha</div><div class="section-badge">clique para filtrar</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Campanha</th><th>Plataforma(s)</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th><th>Oportunidades</th><th>Taxa Lead→Opp</th><th>Pipe (R$)</th><th>Ganho (R$)</th></tr></thead>
+        <tbody id="cr-campanha-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-photo"></i>Por conjunto / criativo</div><div class="section-badge" id="cr-semmapear-badge">—</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Conjunto</th><th>Criativo</th><th>Plataforma</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th></tr></thead>
+        <tbody id="cr-criativo-body"></tbody>
+      </table>
+      </div>
+      <div class="chart-click-hint">Só aparece aqui quando o lead tem conjunto/criativo capturado (leads de formulário nativo do Meta/Google). Leads de landing page/e-mail (ex: webinars) e leads sem UTM completa entram na contagem de "Leads reais" da campanha acima, mas não têm criativo específico para atribuir o investimento — por isso não aparecem nesta tabela.</div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Leads deste recorte</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Nome / Empresa</th><th>Campanha</th><th>Conjunto</th><th>Criativo</th><th>Estágio (CRM)</th><th>Valor</th><th>Data</th></tr></thead>
+        <tbody id="cr-leads-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
   <!-- META ADS -->
   <div class="view" id="view-meta">
     <div class="card" id="m-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
@@ -483,7 +544,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
       <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões. Acima de 2% é considerado bom para Meta Ads."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
       <div class="kpi red"><div class="kpi-label" title="Pessoas únicas que viram o anúncio (diferente de impressões, que conta repetições)."><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
-      <div class="kpi green"><div class="kpi-label" title="Custo por resultado: gasto total ÷ resultados (leads ou cliques no link, conforme o objetivo da campanha)."><i class="ti ti-target"></i>CPL</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer">Custo por resultado</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Custo por Lead real: investimento total ÷ leads reais da Central de Leads no período (não usa o 'resultado' auto-reportado pela Meta, que mistura leads de site com leads nativos do formulário)."><i class="ti ti-target"></i>CPL real</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer" id="m-cpl-footer">Leads reais</div></div>
     </div>
 
     <div class="card" style="padding:0">
@@ -663,7 +724,7 @@ const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff
 // GA4 agora é buscado pelo mesmo backend seguro do n8n (ver fetchAdsData/loadGA4) —
 // removida a assinatura JWT client-side com chave privada (era um risco de segurança).
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
 // ── NAV ─────────────────────────────────────────────────────
@@ -677,9 +738,11 @@ function showView(id, fromDrill){
   const gf = document.getElementById('global-filters');
   const gaf = document.getElementById('ga-filters');
   const of = document.getElementById('opp-filters');
+  const crf = document.getElementById('criativo-filters');
   if (gf)  gf.classList.toggle('visible',  id==='leads');
   if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
   if (of)  of.classList.toggle('visible',  id==='oportunidades');
+  if (crf) crf.classList.toggle('visible', id==='criativos');
   // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
   const bc = document.getElementById('drill-breadcrumb');
   if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
@@ -1199,6 +1262,7 @@ let _metaData = { camps: [], adsets: [], ads: [] };
 async function loadMeta(){
   const d = await fetchAdsData();
   showChannelError('m', d.metaAds);
+  await loadLeads(); // garante _allLeads pronto p/ CPL real, independente da ordem do Promise.allSettled em carregarTudo
   const m = d.metaAds || {};
   const camps  = (m.campaigns || []).map(c => ({ ...c, resultType: c.resultType || '—' }));
   const adsets = (m.adsets || []).map(a => ({ ...a, resultType: a.resultType || '—' }));
@@ -1213,7 +1277,12 @@ async function loadMeta(){
   const totReach  = camps.reduce((s,c) => s+c.reach, 0);
   const totResults= camps.reduce((s,c) => s+c.results, 0);
   const ctrGeral  = totImpr > 0 ? (totClicks/totImpr*100) : 0;
-  const cplGeral  = totResults > 0 ? totSpend/totResults : 0;
+  // CPL real: investimento / leads reais da Central de Leads (NÃO o "resultado" auto-reportado
+  // pela Meta, que mistura leads de site com leads nativos do formulário e mascara o custo real —
+  // ver print do usuário: campanha reportando "Leads: 124 = 35 no site + 89 na Meta").
+  const leadsPorCampanha = leadsReaisPorCampanha();
+  const totalLeadsReais = camps.reduce((s,c) => s + (leadsPorCampanha[standardizeCampanha(c.name) || c.name] || 0), 0);
+  const cplGeral  = totalLeadsReais > 0 ? totSpend/totalLeadsReais : 0;
 
   document.getElementById('m-spend').textContent  = brl(totSpend);
   document.getElementById('m-impr').textContent   = fmt(totImpr);
@@ -1221,6 +1290,8 @@ async function loadMeta(){
   document.getElementById('m-ctr').textContent    = ctrGeral.toFixed(2)+'%';
   document.getElementById('m-reach').textContent  = fmt(totReach);
   document.getElementById('m-cpl').textContent    = cplGeral > 0 ? brl(cplGeral) : '—';
+  const mCplFooter = document.getElementById('m-cpl-footer');
+  if (mCplFooter) mCplFooter.textContent = `${fmt(totalLeadsReais)} leads reais (Meta reportou ${fmt(totResults)})`;
 
   // ── TABELA CAMPANHAS ──
   document.getElementById('m-camps-body').innerHTML = camps.length ? camps.map(c => `<tr>
@@ -1794,6 +1865,264 @@ function renderOportunidades(rows) {
   }
 }
 
+// ── CRIATIVOS (Ads x Central de Leads x CRM comercial) ──────────
+// Conta leads reais (Central de Leads) por campanha padronizada, no período selecionado.
+// Usado tanto pela aba Criativos quanto para corrigir o CPL da aba Meta Ads (que antes usava
+// o "resultado" auto-reportado pela Meta, misturando leads de site com leads nativos do
+// formulário — ver print do usuário: "Leads: 124 (Leads no site: 35, Leads na Meta: 89)").
+function leadsReaisPorCampanha(){
+  const p = period();
+  const dStart = new Date(p.startDate+'T00:00:00'), dEnd = new Date(p.endDate+'T23:59:59');
+  const counts = {};
+  (_allLeads||[]).forEach(r=>{
+    const c = r.c||[];
+    const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
+    if (d && (d<dStart || d>dEnd)) return;
+    const campanhaRaw = c[8]?.v || c[1]?.v || '';
+    const campanha = standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado';
+    counts[campanha] = (counts[campanha]||0)+1;
+  });
+  return counts;
+}
+
+function flattenAdsSpend(d){
+  const rows = [];
+  const metaAdsets = (d.metaAds && d.metaAds.adsets) || [];
+  const adsetToCampanha = {};
+  metaAdsets.forEach(as => { adsetToCampanha[as.name] = as.campaign; });
+  ((d.metaAds && d.metaAds.ads) || []).forEach(ad => {
+    const campanhaRaw = adsetToCampanha[ad.adset] || ad.adset || '';
+    rows.push({ plataforma:'Meta ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: ad.adset||'—', criativo: ad.name||'—', spend: ad.spend||0 });
+  });
+  const gAdGroups = (d.googleAds && d.googleAds.adGroups) || [];
+  const grupoToCampanha = {};
+  gAdGroups.forEach(g => { grupoToCampanha[g.name] = g.campaign; });
+  ((d.googleAds && d.googleAds.ads) || []).forEach(ad => {
+    const campanhaRaw = grupoToCampanha[ad.adGroup] || ad.adGroup || '';
+    rows.push({ plataforma:'Google ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: ad.adGroup||'—', criativo: ad.name||'—', spend: ad.spend||0 });
+  });
+  ((d.linkedIn && d.linkedIn.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'LinkedIn ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', conjunto:'—', criativo:'—', spend: c.spend||0 });
+  });
+  return rows;
+}
+
+function buildCriativoData(adsData){
+  const adRows = flattenAdsSpend(adsData || {});
+  const p = period();
+  const dStart = new Date(p.startDate+'T00:00:00'), dEnd = new Date(p.endDate+'T23:59:59');
+  const leadRows = (_allLeads||[]).filter(r=>{
+    const c = r.c||[];
+    const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
+    if (!d) return true;
+    return d>=dStart && d<=dEnd;
+  }).map(r=>{
+    const c = r.c||[];
+    const campanhaRaw = c[8]?.v || c[1]?.v || '';
+    return {
+      email: (c[2]?.v||'').toLowerCase().trim(),
+      nome: c[3]?.v||'—', empresa: c[5]?.v||'—',
+      campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado',
+      conjunto: c[19]?.v || '—',
+      criativo: c[16]?.v || '—',
+      data: parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v)
+    };
+  });
+
+  const sfByEmail = {};
+  (_allSalesforce||[]).forEach(sf => { if (sf.email) sfByEmail[sf.email] = sf; });
+  const leadByEmailPrimeiro = {};
+  leadRows.forEach(l => { if (l.email && !leadByEmailPrimeiro[l.email]) leadByEmailPrimeiro[l.email] = l; });
+
+  const bucketKey = l => l.campanha+'|||'+l.conjunto+'|||'+l.criativo;
+  const buckets = {};
+  leadRows.forEach(l => {
+    const k = bucketKey(l);
+    if (!buckets[k]) buckets[k] = { campanha:l.campanha, conjunto:l.conjunto, criativo:l.criativo, leads:[], oportunidades:0, pipe:0, ganho:0 };
+    buckets[k].leads.push(l);
+  });
+
+  const sfRowsPeriodo = salesforceInRange(p.startDate, p.endDate);
+  sfRowsPeriodo.forEach(sf => {
+    const l = sf.email ? leadByEmailPrimeiro[sf.email] : null;
+    if (!l) return; // lead comercial sem rastreio de ads (isMarketing=false) nao entra no cruzamento de criativo
+    const k = bucketKey(l);
+    if (!buckets[k]) return;
+    if (sf.isOpportunity) buckets[k].oportunidades++;
+    if (sf.isOpen) buckets[k].pipe += (sf.valorOpp||0);
+    if (sf.isWon) buckets[k].ganho += (sf.valorNF||0);
+  });
+
+  const bucketList = Object.values(buckets).map(b => {
+    // Só tenta casar no nível de conjunto/criativo quando o lead realmente tem os dois capturados —
+    // evita que o placeholder "—" (usado pelo LinkedIn, que só tem nível de campanha) colida com
+    // leads sem UTM Term/Content e herde gasto de uma plataforma que não foi a origem real do lead.
+    const temConjuntoCriativo = b.conjunto !== '—' && b.criativo !== '—';
+    const exact = temConjuntoCriativo ? adRows.find(a => a.campanha===b.campanha && a.conjunto===b.conjunto && a.criativo===b.criativo) : null;
+    return { ...b, spend: exact ? exact.spend : null, plataforma: exact ? exact.plataforma : null };
+  });
+
+  const spendByCampanha = {};
+  const platformsByCampanha = {};
+  adRows.forEach(a => {
+    spendByCampanha[a.campanha] = (spendByCampanha[a.campanha]||0) + a.spend;
+    platformsByCampanha[a.campanha] = platformsByCampanha[a.campanha] || new Set();
+    platformsByCampanha[a.campanha].add(a.plataforma);
+  });
+  const campanhaAgg = {};
+  bucketList.forEach(b => {
+    if (!campanhaAgg[b.campanha]) campanhaAgg[b.campanha] = { campanha:b.campanha, leads:0, oportunidades:0, pipe:0, ganho:0 };
+    campanhaAgg[b.campanha].leads += b.leads.length;
+    campanhaAgg[b.campanha].oportunidades += b.oportunidades;
+    campanhaAgg[b.campanha].pipe += b.pipe;
+    campanhaAgg[b.campanha].ganho += b.ganho;
+  });
+  const campanhaRows = Object.values(campanhaAgg).map(c => ({
+    ...c,
+    spend: spendByCampanha[c.campanha] || 0,
+    plataformas: platformsByCampanha[c.campanha] ? [...platformsByCampanha[c.campanha]] : []
+  }));
+
+  return { bucketList, campanhaRows, leadRows, sfByEmail };
+}
+
+let _criativoData = null;
+let fCrCampanha='', fCrConjunto='', fCrCriativo='', fCrPlataforma='';
+
+async function loadCriativos(){
+  await loadSalesforce(); // garante _allLeads, _allSalesforce e _leadEmailMap prontos
+  const ads = await fetchAdsData();
+  _criativoData = buildCriativoData(ads);
+
+  const popularSelect = (id, valores, placeholder) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">${placeholder}</option>` + valores.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
+  };
+  popularSelect('cr-campanha', [...new Set(_criativoData.campanhaRows.map(c=>c.campanha))].sort(), 'Toda campanha');
+  popularSelect('cr-conjunto', [...new Set(_criativoData.bucketList.map(b=>b.conjunto).filter(x=>x&&x!=='—'))].sort(), 'Todo conjunto');
+  popularSelect('cr-criativo', [...new Set(_criativoData.bucketList.map(b=>b.criativo).filter(x=>x&&x!=='—'))].sort(), 'Todo criativo');
+  popularSelect('cr-plataforma', [...new Set(_criativoData.bucketList.map(b=>b.plataforma).filter(Boolean))].sort(), 'Todas as plataformas');
+
+  aplicarFiltrosCriativos();
+}
+
+function aplicarFiltrosCriativos(){
+  fCrCampanha   = document.getElementById('cr-campanha')?.value   || '';
+  fCrConjunto   = document.getElementById('cr-conjunto')?.value   || '';
+  fCrCriativo   = document.getElementById('cr-criativo')?.value   || '';
+  fCrPlataforma = document.getElementById('cr-plataforma')?.value || '';
+  renderCriativos();
+}
+function limparFiltrosCriativos(){
+  ['cr-campanha','cr-conjunto','cr-criativo','cr-plataforma'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  aplicarFiltrosCriativos();
+}
+function filtrarPorCampanhaCriativo(campanha){
+  const sel = document.getElementById('cr-campanha'); if (sel) sel.value = campanha;
+  aplicarFiltrosCriativos();
+}
+function filtrarPorConjuntoCriativo(conjunto){
+  const sel = document.getElementById('cr-conjunto'); if (sel) sel.value = conjunto;
+  aplicarFiltrosCriativos();
+}
+
+function renderCriativos(){
+  if (!_criativoData) return;
+  const { bucketList, campanhaRows, leadRows, sfByEmail } = _criativoData;
+
+  let campRows = campanhaRows;
+  if (fCrCampanha)   campRows = campRows.filter(c=>c.campanha===fCrCampanha);
+  if (fCrPlataforma) campRows = campRows.filter(c=>c.plataformas.includes(fCrPlataforma));
+
+  let critRows = bucketList.filter(b=>b.spend!=null);
+  if (fCrCampanha)   critRows = critRows.filter(b=>b.campanha===fCrCampanha);
+  if (fCrConjunto)   critRows = critRows.filter(b=>b.conjunto===fCrConjunto);
+  if (fCrCriativo)   critRows = critRows.filter(b=>b.criativo===fCrCriativo);
+  if (fCrPlataforma) critRows = critRows.filter(b=>b.plataforma===fCrPlataforma);
+
+  let leadsFiltrados = leadRows;
+  if (fCrCampanha) leadsFiltrados = leadsFiltrados.filter(l=>l.campanha===fCrCampanha);
+  if (fCrConjunto) leadsFiltrados = leadsFiltrados.filter(l=>l.conjunto===fCrConjunto);
+  if (fCrCriativo) leadsFiltrados = leadsFiltrados.filter(l=>l.criativo===fCrCriativo);
+
+  const usarNivelCriativo = !!(fCrConjunto || fCrCriativo);
+  const spendTotal = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.spend||0),0) : campRows.reduce((s,c)=>s+(c.spend||0),0);
+  const leadsTotal = leadsFiltrados.length;
+  const oppTotal   = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.oportunidades||0),0) : campRows.reduce((s,c)=>s+(c.oportunidades||0),0);
+  const pipeTotal  = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.pipe||0)+(b.ganho||0),0) : campRows.reduce((s,c)=>s+(c.pipe||0)+(c.ganho||0),0);
+  const cpl = leadsTotal>0 ? spendTotal/leadsTotal : 0;
+
+  document.getElementById('cr-spend').textContent = brl(spendTotal);
+  document.getElementById('cr-leads').textContent  = fmt(leadsTotal);
+  document.getElementById('cr-cpl').textContent    = leadsTotal>0 ? brl(cpl) : '—';
+  document.getElementById('cr-pipe').textContent   = brl(pipeTotal);
+
+  const campBody = document.getElementById('cr-campanha-body');
+  if (campBody) {
+    const sorted = campRows.slice().sort((a,b)=>b.leads-a.leads);
+    campBody.innerHTML = sorted.length ? sorted.map(c => {
+      const cplC = c.leads>0 ? c.spend/c.leads : 0;
+      const taxa = c.leads>0 ? (c.oportunidades/c.leads*100).toFixed(1)+'%' : '—';
+      const plats = c.plataformas.map(p=>pill(p)).join(' ');
+      return `<tr style="cursor:pointer" onclick="filtrarPorCampanhaCriativo('${c.campanha.replace(/'/g,"\\'")}')">
+        <td><div class="t-name">${c.campanha}</div></td>
+        <td>${plats||'—'}</td>
+        <td style="font-family:var(--mono)">${brl(c.spend)}</td>
+        <td>${fmt(c.leads)}</td>
+        <td style="font-family:var(--mono);font-weight:500">${c.leads>0?brl(cplC):'—'}</td>
+        <td>${fmt(c.oportunidades)}</td>
+        <td>${taxa}</td>
+        <td style="font-family:var(--mono)">${brl(c.pipe)}</td>
+        <td style="font-family:var(--mono)">${brl(c.ganho)}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="9" class="empty">Sem dados no período</td></tr>';
+  }
+
+  const critBody = document.getElementById('cr-criativo-body');
+  const semMapear = leadsFiltrados.length - critRows.reduce((s,b)=>s+b.leads.length,0);
+  const semMapearBadge = document.getElementById('cr-semmapear-badge');
+  if (semMapearBadge) semMapearBadge.textContent = semMapear>0 ? `${fmt(semMapear)} leads sem criativo mapeado` : '—';
+  if (critBody) {
+    const sorted = critRows.slice().sort((a,b)=>b.leads.length-a.leads.length);
+    critBody.innerHTML = sorted.length ? sorted.map(b => {
+      const cplB = b.leads.length>0 ? b.spend/b.leads.length : 0;
+      return `<tr style="cursor:pointer" onclick="filtrarPorConjuntoCriativo('${b.conjunto.replace(/'/g,"\\'")}')">
+        <td style="font-size:11px">${b.conjunto}</td>
+        <td><div class="t-name" style="font-size:12px">${b.criativo}</div></td>
+        <td>${pill(b.plataforma)}</td>
+        <td style="font-family:var(--mono)">${brl(b.spend)}</td>
+        <td>${fmt(b.leads.length)}</td>
+        <td style="font-family:var(--mono);font-weight:500">${brl(cplB)}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" class="empty">Nenhum criativo com investimento e leads mapeados neste recorte</td></tr>';
+  }
+
+  const leadsBody = document.getElementById('cr-leads-body');
+  if (leadsBody) {
+    const statusBadge = sf => {
+      if (!sf) return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Sem CRM</span>`;
+      if (sf.isWon) return `<span class="badge lq">Ganha</span>`;
+      if (sf.isLost) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
+      if (sf.isOpen) return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Em negociação</span>`;
+      return `<span class="badge lead">${sf.status||'—'}</span>`;
+    };
+    leadsBody.innerHTML = leadsFiltrados.length ? leadsFiltrados.slice().sort((a,b)=>(b.data||0)-(a.data||0)).map(l => {
+      const sf = l.email ? sfByEmail[l.email] : null;
+      return `<tr>
+        <td><div class="t-name">${l.nome}</div><div class="t-sub">${l.empresa}</div></td>
+        <td style="font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.campanha}">${l.campanha}</td>
+        <td style="font-size:11px;color:var(--muted)">${l.conjunto}</td>
+        <td style="font-size:11px;color:var(--muted)">${l.criativo}</td>
+        <td>${statusBadge(sf)}</td>
+        <td style="font-family:var(--mono)">${sf && sf.valorOpp>0 ? brl(sf.valorOpp) : '—'}</td>
+        <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${l.data ? l.data.toLocaleDateString('pt-BR') : '—'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" class="empty">Sem leads no período/recorte selecionado</td></tr>';
+  }
+}
+
 async function initDates(){
   const h = new Date();
   const f = x => x.toISOString().slice(0,10);
@@ -1809,7 +2138,7 @@ async function carregarTudo(){
   const stxt=document.getElementById('stxt');
   pulse.style.background='var(--amber)';
   stxt.textContent='Atualizando...';
-  const results=await Promise.allSettled([loadLeads(),loadRDStation(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds(),loadSalesforce()]);
+  const results=await Promise.allSettled([loadLeads(),loadRDStation(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds(),loadSalesforce(),loadCriativos()]);
   const ovResult=await Promise.allSettled([loadOverview()]);
   const errors=results.concat(ovResult).filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Erro desconhecido');
   if(errors.length){
