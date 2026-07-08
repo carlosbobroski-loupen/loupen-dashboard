@@ -754,11 +754,16 @@ function normCanal(utm_source, conv_channel, conv_source) {
 
 function normEvento(v) {
   if (!v) return 'Não informado';
-  const s = v.toLowerCase();
+  // Remove sufixo de Form ID do LinkedIn (ex: "-1018790131"), que fragmentava o filtro/gráficos
+  // de Evento em entradas separadas da mesma campanha (ver normCanal/standardizeCampanha).
+  const stripped = v.replace(/-\d{6,}$/, '');
+  const s = stripped.toLowerCase();
   if (s.includes('rescue') && s.includes('eco')) return 'Rescue Licença Eco';
-  if (s.includes('webinar') && s.includes('goto')) return 'Webinar GoTo — Jul/26';
+  if (s.includes('webinar') && (s.includes('goto') || s.includes('linkedin'))) return 'Webinar GoTo — Jul/26';
   if (s.includes('webinar')) return 'Webinar';
-  return v;
+  if (s.includes('goto') && s.includes('saude')) return 'GoTo Saúde';
+  if (s.includes('goto') && s.includes('institucional')) return 'GoTo Institucional';
+  return stripped;
 }
 
 function parseDataLead(v) {
