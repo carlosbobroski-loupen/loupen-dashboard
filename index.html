@@ -1471,7 +1471,7 @@ function standardizeCampanha(v) {
   if (s.includes('rescue') || s.includes('logmein')) return 'LOGMEIN_RESCUE-LICENCA-ECO_07-26';
   if (s.includes('goto') || s.includes('linkedin')) {
     if (s.includes('webinar')) return 'GOTO_WEBINAR_07-26';
-    if (s.includes('saude')) return 'GOTO_SAUDE_07-26';
+    if (s.includes('saude')) return 'GOTO_SAUDE_06-26';
     return 'GOTO_INSTITUCIONAL_07-26';
   }
   return v;
@@ -1495,7 +1495,8 @@ function buildLeadEmailMap() {
     const email = (r.c[2]?.v || '').toString().trim().toLowerCase();
     if (!email) return;
     // Evento já vem padronizado da Central de Leads (LOGMEIN_RESCUE-LICENCA-ECO_07-26,
-    // GOTO_INSTITUCIONAL_07-26, GOTO_WEBINAR_07-26, GOTO_SAUDE_07-26— padrão definido em 2026-07-07).
+    // GOTO_INSTITUCIONAL_07-26, GOTO_WEBINAR_07-26, GOTO_SAUDE_06-26 — padrão definido em 2026-07-07,
+    // mês do GoTo Saúde corrigido para 06-26 em 2026-07-08).
     map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '' };
   });
   return map;
