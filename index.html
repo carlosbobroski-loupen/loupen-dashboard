@@ -365,6 +365,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- GA4 -->
   <div class="view" id="view-ga4">
+    <div class="card" id="ga4-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do GA4:</strong> <span id="ga4-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
     <div class="kpi-grid-4">
       <div class="kpi green"><div class="kpi-label" title="Total de sessões no site no período, para o domínio selecionado no filtro acima.">Sessões</div><div class="kpi-value" id="ga-sess">—</div></div>
       <div class="kpi blue"><div class="kpi-label" title="Usuários únicos que visitaram o site no período (podem ter mais de uma sessão).">Usuários ativos</div><div class="kpi-value" id="ga-users">—</div></div>
@@ -465,6 +471,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- META ADS -->
   <div class="view" id="view-meta">
+    <div class="card" id="m-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do Meta Ads:</strong> <span id="m-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
     <div class="kpi-grid-6">
       <div class="kpi purple"><div class="kpi-label" title="Total investido em Meta Ads (Facebook + Instagram) no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="m-spend">—</div><div class="kpi-footer">No período</div></div>
       <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="m-impr">—</div><div class="kpi-footer">Total</div></div>
@@ -519,6 +531,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- LINKEDIN ADS -->
   <div class="view" id="view-linkedin">
+    <div class="card" id="li-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do LinkedIn Ads:</strong> <span id="li-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
     <div class="kpi-grid-6">
       <div class="kpi purple"><div class="kpi-label" title="Total investido em LinkedIn Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="li-spend">—</div><div class="kpi-footer">No período</div></div>
       <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="li-impr">—</div><div class="kpi-footer">Total</div></div>
@@ -549,6 +567,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- GOOGLE ADS -->
   <div class="view" id="view-gads">
+    <div class="card" id="gads-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do Google Ads:</strong> <span id="gads-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
     <!-- KPIs -->
     <div class="kpi-grid-6">
       <div class="kpi blue"><div class="kpi-label" title="Total investido em Google Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="ga-spend">—</div><div class="kpi-footer">No período</div></div>
@@ -1090,8 +1114,21 @@ function ga4ForActiveProp(d) {
   return activeProp === 'all' ? d.ga4.merged : (d.ga4.byProperty?.[activeProp] || d.ga4.merged);
 }
 
+// Mostra/esconde o banner de erro de um canal com base no status devolvido pelo
+// backend n8n (status:"error" quando a chamada à API do canal falhou — token
+// expirado, rate limit etc — evita mostrar "0" como se fosse um período sem dados).
+function showChannelError(prefix, channelData) {
+  const banner = document.getElementById(prefix + '-error-banner');
+  const msg = document.getElementById(prefix + '-error-msg');
+  if (!banner) return;
+  const hasError = channelData && channelData.status === 'error';
+  banner.style.display = hasError ? 'block' : 'none';
+  if (hasError && msg) msg.textContent = channelData.error || 'erro desconhecido';
+}
+
 async function loadGA4(){
   const d = await fetchAdsData();
+  showChannelError('ga4', d.ga4);
   const ga = ga4ForActiveProp(d);
   const sc = { scales: scOpts() };
 
@@ -1161,6 +1198,7 @@ let _metaData = { camps: [], adsets: [], ads: [] };
 
 async function loadMeta(){
   const d = await fetchAdsData();
+  showChannelError('m', d.metaAds);
   const m = d.metaAds || {};
   const camps  = (m.campaigns || []).map(c => ({ ...c, resultType: c.resultType || '—' }));
   const adsets = (m.adsets || []).map(a => ({ ...a, resultType: a.resultType || '—' }));
@@ -1270,6 +1308,7 @@ async function fetchAdsDataPrev(){
 
 async function loadLinkedIn(){
   const d = await fetchAdsData();
+  showChannelError('li', d.linkedIn);
   const li = d.linkedIn || {};
   const campRows = li.campaigns || [];
   const t = li.totals || {};
@@ -1311,6 +1350,7 @@ function switchGadsTab(tab) {
 
 async function loadGoogleAds() {
   const d = await fetchAdsData();
+  showChannelError('gads', d.googleAds);
   const ga = d.googleAds || {};
   const camps = ga.campaigns || [];
   const t = ga.totals || {};
