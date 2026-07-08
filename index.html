@@ -1894,15 +1894,34 @@ function flattenAdsSpend(d){
     const campanhaRaw = adsetToCampanha[ad.adset] || ad.adset || '';
     rows.push({ plataforma:'Meta ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: ad.adset||'—', criativo: ad.name||'—', spend: ad.spend||0 });
   });
+  // Google Ads não tem nome de anúncio de verdade via API/macro — usa a palavra-chave como
+  // "criativo" (granularidade real disponível) e o grupo de anúncios como "conjunto".
   const gAdGroups = (d.googleAds && d.googleAds.adGroups) || [];
   const grupoToCampanha = {};
   gAdGroups.forEach(g => { grupoToCampanha[g.name] = g.campaign; });
-  ((d.googleAds && d.googleAds.ads) || []).forEach(ad => {
-    const campanhaRaw = grupoToCampanha[ad.adGroup] || ad.adGroup || '';
-    rows.push({ plataforma:'Google ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: ad.adGroup||'—', criativo: ad.name||'—', spend: ad.spend||0 });
+  ((d.googleAds && d.googleAds.keywords) || []).forEach(kw => {
+    const campanhaRaw = grupoToCampanha[kw.adGroup] || kw.adGroup || '';
+    rows.push({ plataforma:'Google ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: kw.adGroup||'—', criativo: kw.text||'—', spend: kw.spend||0 });
   });
   ((d.linkedIn && d.linkedIn.campaigns) || []).forEach(c => {
     rows.push({ plataforma:'LinkedIn ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', conjunto:'—', criativo:'—', spend: c.spend||0 });
+  });
+  return rows;
+}
+
+// Totais por campanha vêm sempre da entidade de campanha da própria API (autoritativa),
+// nunca somados a partir de anúncio/palavra-chave — campanhas Display/PMax não têm palavra-chave
+// e ficariam sub-contadas se o total dependesse da soma do nível de criativo.
+function flattenCampanhaSpend(d){
+  const rows = [];
+  ((d.metaAds && d.metaAds.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'Meta ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', spend: c.spend||0 });
+  });
+  ((d.googleAds && d.googleAds.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'Google ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', spend: c.spend||0 });
+  });
+  ((d.linkedIn && d.linkedIn.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'LinkedIn ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', spend: c.spend||0 });
   });
   return rows;
 }
@@ -1975,10 +1994,11 @@ function buildCriativoData(adsData){
     return { ...b, spend: exact ? exact.spend : null, plataforma: exact ? exact.plataforma : null };
   });
 
+  const campanhaSpendRows = flattenCampanhaSpend(adsData || {});
   const spendByCampanha = {};
   const platformsByCampanha = {};
   const spendByCampanhaPlataforma = {};
-  adRows.forEach(a => {
+  campanhaSpendRows.forEach(a => {
     spendByCampanha[a.campanha] = (spendByCampanha[a.campanha]||0) + a.spend;
     platformsByCampanha[a.campanha] = platformsByCampanha[a.campanha] || new Set();
     platformsByCampanha[a.campanha].add(a.plataforma);
