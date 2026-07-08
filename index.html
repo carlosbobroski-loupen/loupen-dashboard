@@ -1907,6 +1907,18 @@ function flattenAdsSpend(d){
   return rows;
 }
 
+// Google Ads não tem macro de nome de campanha/anúncio (ValueTrack só dá IDs) e o LinkedIn só
+// devolve custo em nível de campanha — então leads dessas duas plataformas quase nunca têm
+// conjunto/criativo capturado. Sem isso, a tabela "Por conjunto/criativo" mostrava só Meta ADS,
+// dando a impressão errada de que só o Meta tinha investimento na campanha.
+function inferPlataformaLead(utmSource, convSource){
+  const s = (utmSource || convSource || '').toString().toLowerCase();
+  if (s.includes('linkedin')) return 'LinkedIn ADS';
+  if (s.includes('google')) return 'Google ADS';
+  if (['ig','fb','an','msg'].includes(s) || s.includes('meta') || s.includes('facebook') || s.includes('instagram') || s.startsWith('[cj')) return 'Meta ADS';
+  return null;
+}
+
 function buildCriativoData(adsData){
   const adRows = flattenAdsSpend(adsData || {});
   const p = period();
@@ -1925,6 +1937,7 @@ function buildCriativoData(adsData){
       campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado',
       conjunto: c[19]?.v || '—',
       criativo: c[16]?.v || '—',
+      plataforma: inferPlataformaLead(c[15]?.v, c[10]?.v),
       data: parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v)
     };
   });
@@ -1964,11 +1977,40 @@ function buildCriativoData(adsData){
 
   const spendByCampanha = {};
   const platformsByCampanha = {};
+  const spendByCampanhaPlataforma = {};
   adRows.forEach(a => {
     spendByCampanha[a.campanha] = (spendByCampanha[a.campanha]||0) + a.spend;
     platformsByCampanha[a.campanha] = platformsByCampanha[a.campanha] || new Set();
     platformsByCampanha[a.campanha].add(a.plataforma);
+    const kp = a.campanha+'|||'+a.plataforma;
+    spendByCampanhaPlataforma[kp] = (spendByCampanhaPlataforma[kp]||0) + a.spend;
   });
+
+  // Linhas de fallback: plataformas com investimento real na campanha mas sem NENHUM criativo
+  // batendo com lead nenhum (típico de Google Ads e LinkedIn) — sem isso, o investimento delas
+  // some da visão "Por conjunto/criativo" e parece que só o Meta rodou a campanha.
+  const spendJaAtribuido = {};
+  bucketList.forEach(b => {
+    if (b.spend==null) return;
+    const kp = b.campanha+'|||'+b.plataforma;
+    spendJaAtribuido[kp] = (spendJaAtribuido[kp]||0) + b.spend;
+  });
+  const bucketKeysComMatch = new Set(bucketList.filter(b=>b.spend!=null).map(b=>bucketKey(b)));
+  const fallbackAgg = {};
+  leadRows.forEach(l => {
+    const k = bucketKey(l);
+    if (bucketKeysComMatch.has(k) || !l.plataforma) return;
+    const kp = l.campanha+'|||'+l.plataforma;
+    if (!spendByCampanhaPlataforma[kp]) return; // plataforma sem nenhum gasto registrado nessa campanha no período
+    if (!fallbackAgg[kp]) fallbackAgg[kp] = { campanha:l.campanha, conjunto:'—', criativo:'Sem detalhamento de criativo', plataforma:l.plataforma, leads:[] };
+    fallbackAgg[kp].leads.push(l);
+  });
+  const fallbackRows = Object.entries(fallbackAgg).map(([kp,f]) => ({
+    ...f,
+    spend: Math.max(0, (spendByCampanhaPlataforma[kp]||0) - (spendJaAtribuido[kp]||0))
+  }));
+  const criativoRows = bucketList.filter(b=>b.spend!=null).concat(fallbackRows);
+
   const campanhaAgg = {};
   bucketList.forEach(b => {
     if (!campanhaAgg[b.campanha]) campanhaAgg[b.campanha] = { campanha:b.campanha, leads:0, oportunidades:0, pipe:0, ganho:0 };
@@ -1983,7 +2025,7 @@ function buildCriativoData(adsData){
     plataformas: platformsByCampanha[c.campanha] ? [...platformsByCampanha[c.campanha]] : []
   }));
 
-  return { bucketList, campanhaRows, leadRows, sfByEmail };
+  return { bucketList, criativoRows, campanhaRows, leadRows, sfByEmail };
 }
 
 let _criativoData = null;
@@ -2030,13 +2072,13 @@ function filtrarPorConjuntoCriativo(conjunto){
 
 function renderCriativos(){
   if (!_criativoData) return;
-  const { bucketList, campanhaRows, leadRows, sfByEmail } = _criativoData;
+  const { criativoRows, campanhaRows, leadRows, sfByEmail } = _criativoData;
 
   let campRows = campanhaRows;
   if (fCrCampanha)   campRows = campRows.filter(c=>c.campanha===fCrCampanha);
   if (fCrPlataforma) campRows = campRows.filter(c=>c.plataformas.includes(fCrPlataforma));
 
-  let critRows = bucketList.filter(b=>b.spend!=null);
+  let critRows = criativoRows;
   if (fCrCampanha)   critRows = critRows.filter(b=>b.campanha===fCrCampanha);
   if (fCrConjunto)   critRows = critRows.filter(b=>b.conjunto===fCrConjunto);
   if (fCrCriativo)   critRows = critRows.filter(b=>b.criativo===fCrCriativo);
@@ -2088,7 +2130,9 @@ function renderCriativos(){
     const sorted = critRows.slice().sort((a,b)=>b.leads.length-a.leads.length);
     critBody.innerHTML = sorted.length ? sorted.map(b => {
       const cplB = b.leads.length>0 ? b.spend/b.leads.length : 0;
-      return `<tr style="cursor:pointer" onclick="filtrarPorConjuntoCriativo('${b.conjunto.replace(/'/g,"\\'")}')">
+      const clicavel = b.conjunto !== '—';
+      const attrs = clicavel ? `style="cursor:pointer" onclick="filtrarPorConjuntoCriativo('${b.conjunto.replace(/'/g,"\\'")}')"` : '';
+      return `<tr ${attrs}>
         <td style="font-size:11px">${b.conjunto}</td>
         <td><div class="t-name" style="font-size:12px">${b.criativo}</div></td>
         <td>${pill(b.plataforma)}</td>
