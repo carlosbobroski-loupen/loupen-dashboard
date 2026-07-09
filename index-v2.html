@@ -1,0 +1,2854 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loupen — Marketing Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{--bg:#0d0f12;--surface:#141619;--surface2:#1c1f24;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f0;--muted:#7a7f8a;--dim:#3d424d;--blue:#3b82f6;--blue-dim:rgba(59,130,246,0.12);--green:#22c55e;--green-dim:rgba(34,197,94,0.12);--amber:#f59e0b;--amber-dim:rgba(245,158,11,0.12);--red:#ef4444;--red-dim:rgba(239,68,68,0.12);--purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);--font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;min-height:100vh}
+.shell{display:flex;min-height:100vh}
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;overflow-y:auto}
+.main{margin-left:220px;flex:1;padding:28px 32px;max-width:1300px}
+.logo{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
+.logo-name{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.nav{padding:12px 10px;flex:1}
+.nav-label{font-size:10px;font-weight:500;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:0 10px;margin:16px 0 6px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;color:var(--muted);font-size:13px;cursor:pointer;transition:all .15s;margin-bottom:1px;border:none;background:none;width:100%;text-align:left;font-family:var(--font)}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--blue-dim);color:var(--blue)}
+.nav-item i{font-size:16px}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+.last-update{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-.3px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.period-select{background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:13px;font-family:var(--font);cursor:pointer;outline:none}
+.btn-refresh{background:var(--blue);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:var(--font);transition:opacity .15s}
+.btn-refresh:hover{opacity:.85}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi-grid-6{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.blue::before{background:var(--blue)}.kpi.green::before{background:var(--green)}.kpi.amber::before{background:var(--amber)}.kpi.purple::before{background:var(--purple)}.kpi.red::before{background:var(--red)}
+.kpi-label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.kpi-value{font-size:24px;font-weight:600;font-family:var(--mono);letter-spacing:-1px;line-height:1}
+.kpi-footer{font-size:11px;color:var(--muted);margin-top:6px}
+.section-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.section-title i{font-size:16px;color:var(--muted)}
+.section-badge{font-size:10px;background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:10px;font-weight:500}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.chart-wrap{position:relative;width:100%}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 0 10px;border-bottom:1px solid var(--border)}
+.tbl th:not(:first-child){text-align:right}
+.tbl td{padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.tbl td:not(:first-child){text-align:right}
+.tbl tr:last-child td{border-bottom:none}
+.t-name{font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 8px;border-radius:6px}
+.badge.lead{background:var(--blue-dim);color:var(--blue)}
+.badge.lq{background:var(--green-dim);color:var(--green)}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px}
+.bar-row:last-child{margin-bottom:0}
+.bar-label{width:130px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.bar-track{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+.bar-val{width:55px;text-align:right;font-family:var(--mono);font-size:12px;flex-shrink:0}
+.rej-ok{color:var(--green)}.rej-warn{color:var(--amber)}.rej-bad{color:var(--red)}
+.sp{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;font-weight:500;font-family:var(--mono)}
+.sp-g{background:var(--blue-dim);color:var(--blue)}
+.sp-m{background:var(--purple-dim);color:var(--purple)}
+.sp-d{background:var(--surface2);color:var(--muted)}
+.sp-o{background:var(--amber-dim);color:var(--amber)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.view{display:none}
+.view.active{display:block}
+.empty{color:var(--muted);text-align:center;padding:24px;font-size:13px}
+.meta-tabs{display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 8px}
+.meta-tab{background:none;border:none;color:var(--muted);font-size:13px;font-family:var(--font);padding:12px 16px;cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;transition:all .15s}
+.meta-tab:hover{color:var(--text)}
+.meta-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.meta-tab i{font-size:15px}
+
+.filter-sel{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;outline:none;min-width:160px}
+.filter-clear{background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:4px}
+.filter-clear:hover{border-color:var(--red);color:var(--red)}
+.date-range-wrap{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 12px}
+.date-input{background:none;border:none;color:var(--text);font-size:12px;font-family:var(--font);cursor:pointer;outline:none;width:110px}
+.date-input::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:pointer}
+.date-presets{display:flex;gap:4px;margin-left:4px;border-left:1px solid var(--border);padding-left:8px}
+.preset-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:5px;font-size:11px;font-family:var(--font);cursor:pointer;transition:all .15s}
+.preset-btn:hover,.preset-btn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+.global-filters{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:20px}
+.global-filters.visible{display:flex}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+.meta-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:6px;background:var(--purple-dim);color:var(--purple);font-weight:500}
+.status-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:5px;font-weight:500}
+.chip-active{background:var(--green-dim);color:var(--green)}
+.chip-paused{background:var(--amber-dim);color:var(--amber)}
+.chip-other{background:var(--surface2);color:var(--muted)}
+.kpi-nav{cursor:pointer;transition:border-color .15s,transform .15s}
+.kpi-nav:hover{border-color:var(--blue2,var(--blue))}
+.kpi-nav:hover .kpi-value{color:var(--blue)}
+.kpi-label{cursor:help}
+.tbl tr[data-nav]{cursor:pointer}
+.tbl tr[data-nav]:hover{background:var(--surface2)}
+.breadcrumb-drill{display:none;align-items:center;gap:6px;color:var(--blue);font-size:12px;cursor:pointer;margin:-16px 0 20px;font-weight:500}
+.breadcrumb-drill.visible{display:flex}
+.active-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;background:var(--blue-dim);color:var(--blue);padding:3px 9px;border-radius:6px;font-weight:500;margin-left:8px}
+.active-chip i{cursor:pointer;font-size:13px}
+.chart-click-hint{font-size:10px;color:var(--dim);margin-top:4px;font-style:italic}
+/* v2: selo de meta — reusa cores do design system, semáforo calculado por metaHTML() (ux-spec §1.1) */
+.meta-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;font-family:var(--mono);letter-spacing:.02em}
+.meta-pill i{font-size:11px}
+.meta-hit{background:var(--green-dim);color:var(--green)}
+.meta-near{background:var(--amber-dim);color:var(--amber)}
+.meta-miss{background:var(--red-dim);color:var(--red)}
+.meta-none{background:var(--surface2);color:var(--muted)}
+.kpi-footer .meta-pill{margin-top:4px}
+/* v2: selo de escopo (CPL real vs plataforma, escopo de funil) (ux-spec §1.1) */
+.scope-tag{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em;vertical-align:middle;cursor:help}
+.scope-real{background:var(--green-dim);color:var(--green)}
+.scope-plat{background:var(--surface2);color:var(--muted)}
+.scope-base{background:var(--blue-dim);color:var(--blue)}
+.scope-period{background:var(--purple-dim);color:var(--purple)}
+/* v2: grid de 8 KPIs (Overview 6→8), aditivo (ux-spec §2) */
+.kpi-grid-8{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-bottom:24px}
+@media(max-width:1100px){.kpi-grid-8{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-name">Loupen</div>
+    <div class="logo-sub">Marketing Dashboard</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-label">Geral</div>
+    <button class="nav-item active" onclick="showView('overview')"><i class="ti ti-layout-dashboard"></i>Visão geral</button>
+    <div class="nav-label">Fontes</div>
+    <button class="nav-item" onclick="showView('leads')"><i class="ti ti-users"></i>Leads RD Station</button>
+    <button class="nav-item" onclick="showView('rdstation')"><i class="ti ti-mail"></i>RD Station Marketing</button>
+    <button class="nav-item" onclick="showView('ga4')"><i class="ti ti-chart-line"></i>Google Analytics</button>
+    <button class="nav-item" onclick="showView('utm')"><i class="ti ti-link"></i>Campanhas UTM</button>
+    <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
+    <div class="nav-label">Comercial</div>
+    <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
+    <button class="nav-item" onclick="showView('criativos')"><i class="ti ti-photo"></i>Criativos</button>
+    <div class="nav-label">Anúncios</div>
+    <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
+    <button class="nav-item" onclick="showView('linkedin')"><i class="ti ti-brand-linkedin"></i>LinkedIn ADS</button>
+    <button class="nav-item" onclick="showView('gads')"><i class="ti ti-brand-google"></i>Google ADS</button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="last-update"><div class="pulse" id="pulse"></div><span id="stxt">Carregando...</span></div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="page-title" id="page-title">Visão geral</div>
+    <div class="topbar-right">
+      <div class="date-range-wrap">
+        <i class="ti ti-calendar" style="color:var(--muted);font-size:15px"></i>
+        <input type="date" class="date-input" id="date-start" onchange="carregarTudo()">
+        <span style="color:var(--muted);font-size:12px">até</span>
+        <input type="date" class="date-input" id="date-end" onchange="carregarTudo()">
+        <div class="date-presets">
+          <button class="preset-btn active" onclick="setPreset(7,this)">7d</button>
+          <button class="preset-btn" onclick="setPreset(30,this)">30d</button>
+          <button class="preset-btn" onclick="setPreset(60,this)">60d</button>
+          <button class="preset-btn" onclick="setPreset(90,this)">90d</button>
+        </div>
+      </div>
+      <button class="btn-refresh" onclick="carregarTudo()"><i class="ti ti-refresh"></i>Atualizar</button>
+    </div>
+  </div>
+
+  <!-- BREADCRUMB DE DRILL-DOWN -->
+  <div class="breadcrumb-drill" id="drill-breadcrumb" onclick="showView('overview')"><i class="ti ti-arrow-left"></i><span>Voltar à Visão geral</span></div>
+
+  <!-- FILTROS GLOBAIS -->
+  <div class="global-filters" id="global-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="f-evento" onchange="aplicarFiltros()">
+      <option value="">Todos os eventos</option>
+    </select>
+    <select class="filter-sel" id="f-stage" onchange="aplicarFiltros()">
+      <option value="">Todos os estágios</option>
+      <option value="qualificado">Lead Qualificado</option>
+      <option value="apenas_lead">Lead (não qualificado)</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltros()"><i class="ti ti-x"></i>Limpar</button>
+    <span class="active-chip" id="l-canal-chip" style="display:none">Canal: <span id="l-canal-chip-label"></span><i class="ti ti-x" onclick="filtrarPorCanalLead('')"></i></span>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="l-filter-count"></span>
+  </div>
+
+  <!-- FILTRO GA4 DOMÍNIO (visível nas views de analytics) -->
+  <div class="global-filters" id="ga-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-world"></i>Domínio</span>
+    <select class="filter-sel" id="f-dominio" onchange="mudarDominio(this.value)">
+      <option value="all">Todos os domínios</option>
+      <option value="503864241">loupen.com.br</option>
+      <option value="541927286">pages.loupen.com.br</option>
+    </select>
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px;margin-left:8px"><i class="ti ti-route"></i>Canal</span>
+    <select class="filter-sel" id="f-canal" onchange="mudarCanal(this.value)" title="Filtra sessões (e campanhas UTM) pelo agrupamento de canal padrão do GA4. Landing Pages não possuem essa dimensão no relatório.">
+      <option value="">Todos os canais</option>
+    </select>
+    <div style="font-size:11px;color:var(--muted);display:flex;gap:12px;margin-left:8px">
+      <span id="ga-prop-1" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block"></span>loupen.com.br</span>
+      <span id="ga-prop-2" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>pages.loupen.com.br</span>
+    </div>
+  </div>
+
+  <!-- FILTRO OPORTUNIDADES (CRM Comercial) -->
+  <div class="global-filters" id="opp-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="o-segmento" onchange="aplicarFiltrosOpp()" title="Marketing = e-mail bateu com um lead da Central de Leads (veio de mídia paga rastreada). Comercial = lead cadastrado direto no CRM, sem rastreio de mídia.">
+      <option value="">Marketing + Comercial</option>
+      <option value="marketing">Só Marketing</option>
+      <option value="comercial">Só Comercial</option>
+    </select>
+    <select class="filter-sel" id="o-origem" onchange="aplicarFiltrosOpp()">
+      <option value="">Toda origem/campanha</option>
+    </select>
+    <select class="filter-sel" id="o-canal" onchange="aplicarFiltrosOpp()">
+      <option value="">Todos os canais</option>
+    </select>
+    <select class="filter-sel" id="o-fase" onchange="aplicarFiltrosOpp()">
+      <option value="">Todos os estágios</option>
+      <option value="cadencia">Em cadência</option>
+      <option value="qualificado">Qualificado (sem oportunidade)</option>
+      <option value="oportunidade">Virou oportunidade</option>
+      <option value="aberta">Oportunidade em aberto</option>
+      <option value="perdida">Perdida</option>
+      <option value="rejeitado">Rejeitado</option>
+    </select>
+    <select class="filter-sel" id="o-motivo" onchange="aplicarFiltrosOpp()">
+      <option value="">Todos os motivos de perda</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltrosOpp()"><i class="ti ti-x"></i>Limpar</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="o-filter-count"></span>
+  </div>
+
+  <div class="global-filters" id="criativo-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="cr-plataforma" onchange="aplicarFiltrosCriativos()">
+      <option value="">Todas as plataformas</option>
+    </select>
+    <select class="filter-sel" id="cr-campanha" onchange="aplicarFiltrosCriativos()">
+      <option value="">Toda campanha</option>
+    </select>
+    <select class="filter-sel" id="cr-conjunto" onchange="aplicarFiltrosCriativos()">
+      <option value="">Todo conjunto</option>
+    </select>
+    <select class="filter-sel" id="cr-criativo" onchange="aplicarFiltrosCriativos()">
+      <option value="">Todo criativo</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltrosCriativos()"><i class="ti ti-x"></i>Limpar</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="cr-filter-count"></span>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="view active" id="view-overview">
+    <div class="card" id="ovx-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="color:var(--red);font-size:18px"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados de um ou mais canais:</strong> <span id="ovx-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
+    <div class="kpi-grid-8">
+      <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Soma do investimento em Google Ads + Meta Ads + LinkedIn Ads no período selecionado."><i class="ti ti-coin"></i>Investimento total</div><div class="kpi-value" id="ovx-spend-value">—</div><div class="kpi-footer" id="ovx-spend-trend"></div></div>
+      <div class="kpi blue kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="Total de leads recebidos no período, vindos do RD Station (todos os canais e formulários)."><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
+      <div class="kpi green kpi-nav" onclick="showView('oportunidades', true)"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período (Salesforce). O rodapé mostra quanto disso é atribuível a marketing (lead rastreado por e-mail)."><i class="ti ti-cash"></i>Receita ganha</div><div class="kpi-value" id="ovx-receita-value" style="font-size:18px">—</div><div class="kpi-footer" id="ovx-receita-foot"></div></div>
+      <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="ROAS blended = receita ganha atribuída a marketing ÷ investimento total em mídia paga no período. Acima de 1x significa que o marketing devolveu mais do que custou. Usa só a receita rastreada até a mídia, não a receita comercial direta."><i class="ti ti-trending-up"></i>ROAS blended</div><div class="kpi-value" id="ovx-roas-value">—</div><div class="kpi-footer" id="ovx-roas-trend"></div></div>
+      <div class="kpi amber kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Custo por Lead combinado: investimento total em mídia paga dividido pelo total de leads do período (não separa por canal)."><i class="ti ti-target"></i>CPL blended</div><div class="kpi-value" id="ovx-cpl-value">—</div><div class="kpi-footer" id="ovx-cpl-trend"></div></div>
+      <div class="kpi green kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="% dos leads do período marcados como 'Lead Qualificado' no RD Station."><i class="ti ti-star"></i>Taxa de qualificação</div><div class="kpi-value" id="ovx-qualif-value">—</div><div class="kpi-footer" id="ovx-qualif-trend"></div></div>
+      <div class="kpi green kpi-nav" onclick="showView('ga4', true)"><div class="kpi-label" title="Total de sessões no site (Google Analytics 4), somando os domínios selecionados no filtro."><i class="ti ti-eye"></i>Sessões</div><div class="kpi-value" id="ovx-sessions-value">—</div><div class="kpi-footer" id="ovx-sessions-trend"></div></div>
+      <div class="kpi red kpi-nav" onclick="showView('ga4', true)"><div class="kpi-label" title="% de sessões que saíram do site sem interagir com outra página. Abaixo de 40% é bom, acima de 65% é preocupante."><i class="ti ti-bounce-right"></i>Rejeição</div><div class="kpi-value" id="ovx-bounce-value">—</div><div class="kpi-footer" id="ovx-bounce-trend"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil de aquisição</div><div class="section-badge">Sessões → Leads → Qualificados</div></div>
+      <div id="ovx-funnel"></div>
+    </div>
+
+    <div class="card" id="card-canais">
+      <div class="section-row"><div class="section-title"><i class="ti ti-scale"></i>Comparação de canais pagos</div><div class="section-badge">clique numa linha para ver detalhes · leads reais da Central de Leads</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Canal</th><th>Investimento</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Leads reais <span class="scope-tag scope-real" title="Leads efetivamente recebidos na Central de Leads e atribuídos a este canal (normCanal). NÃO é o 'results'/'conv' auto-reportado pela plataforma de anúncios.">REAL</span></th><th>CPL real <span class="scope-tag scope-real" title="Investimento do canal ÷ leads reais do canal. É o custo por lead comparável entre canais — a métrica que o projeto trata como verdade.">REAL</span></th><th>% do investimento</th></tr></thead>
+        <tbody id="ovx-channel-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-arrows-join"></i>Sessões × Leads por canal</div><div class="section-badge" title="Cruza sessões do GA4 (agrupamento padrão de canal) com leads do RD Station, aproximando cada canal do GA4 ao canal correspondente de origem do lead.">GA4 + RD Station</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Canal</th><th>Sessões (GA4)</th><th>Leads (aprox.)</th><th>Taxa de conversão</th><th>Rejeição</th></tr></thead>
+        <tbody id="ovx-cross-body"></tbody>
+      </table>
+      </div>
+      <div class="chart-click-hint">Agrupa os canais do GA4 no mesmo critério usado para classificar a origem dos leads (Paid Search/Display = Google ADS, Paid Social = Meta ADS, Organic/Referral = Orgânico). Passe o mouse no nome do canal para ver quais grupos do GA4 foram somados. Clique numa linha para abrir o Google Analytics filtrado.</div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Sessões por canal (GA4)</div></div>
+        <div class="legend" id="ovx-sess-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-ovx-canal" role="img" aria-label="Sessões por canal"></canvas></div>
+        <div class="chart-click-hint">Clique numa barra para abrir o Google Analytics filtrado por esse canal.</div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Distribuição do investimento</div></div>
+        <div class="legend" id="ovx-spend-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-ovx-spend" role="img" aria-label="Distribuição do investimento por canal"></canvas></div>
+        <div class="chart-click-hint">Clique numa fatia para abrir a aba de anúncios daquele canal.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-users"></i>Leads recentes</div><div class="section-badge" id="leads-badge2">—</div></div>
+      <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Canal</th><th>Status</th><th>Data</th></tr></thead><tbody id="ovx-leads-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- LEADS -->
+  <div class="view" id="view-leads">
+    <div class="kpi-grid-4">
+      <div class="kpi blue"><div class="kpi-label" title="Total de leads no período selecionado, considerando os filtros ativos (evento, estágio, canal).">Total de leads</div><div class="kpi-value" id="l-total">—</div><div class="kpi-footer" id="l-total-trend"></div></div>
+      <div class="kpi green"><div class="kpi-label" title="Leads marcados como 'Lead Qualificado' no RD Station.">Qualificados</div><div class="kpi-value" id="l-lq">—</div><div class="kpi-footer" id="l-lq-trend"></div></div>
+      <div class="kpi amber"><div class="kpi-label" title="% de leads qualificados sobre o total filtrado.">Taxa qualif.</div><div class="kpi-value" id="l-taxa">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Quantidade de eventos/campanhas de conversão distintos no período.">Eventos</div><div class="kpi-value" id="l-camps">—</div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Por canal</div><div class="section-badge">clique para filtrar</div></div><div id="l-canal"></div></div>
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-briefcase"></i>Por cargo</div></div><div id="l-cargo"></div></div>
+    </div>
+    <div class="two-col">
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-building"></i>Por tamanho de empresa</div></div><div id="l-porte"></div></div>
+      <div class="card"><div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por evento de conversão</div></div><div id="l-evento"></div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-chart-line"></i>Leads por período</div><div class="section-badge" id="l-serie-badge">—</div></div>
+      <div class="chart-wrap" style="height:220px"><canvas id="c-leads-serie" role="img" aria-label="Leads por período"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads</div></div>
+      <table class="tbl"><thead><tr><th>Nome / Empresa</th><th>Cargo</th><th>Porte</th><th>Canal</th><th>Evento</th><th>Status</th><th>Data</th></tr></thead><tbody id="l-all"></tbody></table>
+    </div>
+  </div>
+
+  <!-- RD STATION -->
+  <div class="view" id="view-rdstation">
+    <div class="chart-click-hint" style="margin-bottom:12px">Estes números são o estado atual de toda a base de contatos do RD Station Marketing — não são filtrados pelo período selecionado no topo (a API de segmentações não aceita filtro de data).</div>
+    <!-- KPIs Funil -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
+      <div class="kpi blue"><div class="kpi-label" title="Todos os contatos cadastrados na base do RD Station Marketing, independente do estágio no funil."><i class="ti ti-users"></i>Total Contatos</div><div class="kpi-value" id="rd-total">—</div><div class="kpi-footer">Base completa</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Contatos no estágio 'Lead' — já converteram em algum formulário mas ainda não foram qualificados."><i class="ti ti-user-plus"></i>Leads</div><div class="kpi-value" id="rd-leads">—</div><div class="kpi-footer">Estágio Lead</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="MQL (Marketing Qualified Lead): lead qualificado pelo marketing, pronto para abordagem comercial."><i class="ti ti-star"></i>MQL</div><div class="kpi-value" id="rd-mql">—</div><div class="kpi-footer">Lead Qualificado</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Contatos em negociação ativa com o time comercial."><i class="ti ti-briefcase"></i>Oportunidades</div><div class="kpi-value" id="rd-opp">—</div><div class="kpi-footer">Em negociação</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Contatos que fecharam negócio e se tornaram clientes."><i class="ti ti-check"></i>Clientes</div><div class="kpi-value" id="rd-clients">—</div><div class="kpi-footer">Convertidos</div></div>
+    </div>
+
+    <div class="two-col">
+      <!-- Funil visual -->
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil de conversão</div></div>
+        <div id="rd-funil-bars"></div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px" id="rd-taxas"></div>
+      </div>
+      <!-- Fluxos de automação -->
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-bolt"></i>Fluxos de automação</div><div class="section-badge" id="rd-auto-badge">—</div></div>
+        <div id="rd-automations-list"></div>
+      </div>
+    </div>
+
+    <!-- Landing Pages -->
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-browser"></i>Landing Pages & Formulários</div><div class="section-badge" id="rd-lp-badge">—</div></div>
+      <table class="tbl">
+        <thead><tr><th>Landing Page</th><th>Status</th><th>Conversões</th><th>Visitantes</th><th>Taxa</th></tr></thead>
+        <tbody id="rd-lps-body"></tbody>
+      </table>
+    </div>
+
+    <!-- E-mail marketing info -->
+    <div class="card" style="padding:16px 20px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <i class="ti ti-mail" style="font-size:20px;color:var(--amber);flex-shrink:0;margin-top:2px"></i>
+        <div>
+          <div style="font-weight:600;margin-bottom:4px;font-size:13px">E-mail Marketing</div>
+          <div style="color:var(--muted);font-size:12px;line-height:1.7">
+            Métricas de abertura e clique de e-mails não estão disponíveis na API REST do RD Station Marketing.
+            Para acompanhar disparos em tempo real, configure um <strong style="color:var(--text)">Webhook de E-mail</strong> no RD Station 
+            (Configurações → Integrações → Webhooks) apontando para o n8n — assim cada abertura/clique é capturado automaticamente.
+            Peça aqui no chat para configurar esse webhook.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GA4 -->
+  <div class="view" id="view-ga4">
+    <div class="card" id="ga4-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do GA4:</strong> <span id="ga4-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
+    <div class="kpi-grid-4">
+      <div class="kpi green"><div class="kpi-label" title="Total de sessões no site no período, para o domínio selecionado no filtro acima.">Sessões</div><div class="kpi-value" id="ga-sess">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Usuários únicos que visitaram o site no período (podem ter mais de uma sessão).">Usuários ativos</div><div class="kpi-value" id="ga-users">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Eventos de conversão configurados no GA4 (ex: envio de formulário, clique em CTA).">Conversões</div><div class="kpi-value" id="ga-conv">—</div><div class="kpi-footer" id="ga-conv-foot"></div></div>
+      <div class="kpi red"><div class="kpi-label" title="% de sessões de uma única página, sem interação. Abaixo de 40% é bom, acima de 65% merece atenção.">Rejeição média</div><div class="kpi-value" id="ga-bounce">—</div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Sessões por canal</div></div>
+      <div class="legend" id="ga-leg"></div>
+      <div class="chart-wrap" style="height:240px"><canvas id="c-ga-canal" role="img" aria-label="Sessões por canal GA4"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-table"></i>Detalhamento por canal</div></div>
+      <table class="tbl"><thead><tr><th>Canal</th><th>Sessões</th><th>Usuários</th><th>Conversões</th><th title="Taxa de conversão = conversões ÷ sessões.">Taxa conv.</th><th>Rejeição</th></tr></thead><tbody id="ga-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- UTM -->
+  <div class="view" id="view-utm">
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-link"></i>Campanhas UTM</div></div>
+      <table class="tbl"><thead><tr><th>Campanha</th><th>Source / Medium</th><th>Sessões</th><th>Conversões</th><th title="Taxa de conversão = conversões ÷ sessões.">Taxa conv.</th><th>Rejeição</th></tr></thead><tbody id="utm-body"></tbody></table>
+    </div>
+  </div>
+
+  <!-- LP -->
+  <div class="view" id="view-lp">
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-browser"></i>Landing Pages</div></div>
+      <table class="tbl"><thead><tr><th>Página</th><th>Sessões</th><th>Conversões</th><th title="Taxa de conversão = conversões ÷ sessões. Para landing pages é a métrica-fim: uma LP com poucas sessões e alta taxa converte melhor que uma com muitas sessões e taxa baixa.">Taxa conv.</th><th>Rejeição</th></tr></thead><tbody id="lp-body"></tbody></table>
+      <div class="chart-click-hint" id="lp-conv-hint">Ordenado por volume de sessões. A LP mais eficiente é a de maior taxa de conversão, não a de mais sessões.</div>
+    </div>
+  </div>
+
+  <!-- OPORTUNIDADES (CRM Comercial) -->
+  <div class="view" id="view-oportunidades">
+    <div class="chart-click-hint" style="margin-bottom:12px">Cruza a planilha Leads Salesforce (CRM comercial) com a Central de Leads (canal/origem pago) por e-mail. Filtrado pelo período selecionado no topo (Data da conversão).</div>
+    <div class="kpi-grid-8">
+      <div class="kpi blue"><div class="kpi-label" title="Total de leads recebidos pelo comercial no período.">Leads recebidos</div><div class="kpi-value" id="o-total">—</div><div class="kpi-footer" id="o-segmento-split"></div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Leads em sequência de tentativas de contato (status 'Contato dia N').">Em cadência</div><div class="kpi-value" id="o-cadencia">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Leads marcados como Qualificado no CRM/Salesforce dentro do período selecionado (escopo do CRM, não do RD Station — fontes distintas).">Qualificados (período/CRM)</div><div class="kpi-value" id="o-qualificados">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div><div class="kpi-footer" id="o-oportunidades-trend"></div></div>
+      <div class="kpi purple"><div class="kpi-label" title="% de leads do período que viraram oportunidade.">Taxa Lead → Opp</div><div class="kpi-value" id="o-taxa">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Soma do valor das oportunidades ainda em negociação (não ganhas nem perdidas).">Valor em pipeline</div><div class="kpi-value" id="o-pipeline" style="font-size:18px">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período. O rodapé mostra quanto é atribuível a marketing (lead rastreado por e-mail).">Receita ganha</div><div class="kpi-value" id="o-receita" style="font-size:18px">—</div><div class="kpi-footer" id="o-receita-foot"></div><div class="kpi-footer" id="o-receita-trend"></div></div>
+      <div class="kpi green"><div class="kpi-label" title="Win rate = oportunidades ganhas ÷ total de oportunidades. Termômetro da qualidade da oportunidade e da execução comercial.">Win rate</div><div class="kpi-value" id="o-winrate">—</div><div class="kpi-footer" id="o-winrate-foot"></div></div>
+    </div>
+    <div class="kpi-grid-4">
+      <div class="kpi purple"><div class="kpi-label" title="Oportunidades ainda em negociação (proposta enviada, POC, demonstração, etc).">Em negociação</div><div class="kpi-value" id="o-abertas">—</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Oportunidades marcadas como Perdido no CRM.">Perdidas</div><div class="kpi-value" id="o-perdidas">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Ticket médio de oportunidade = valor médio (valorOpp) das oportunidades geradas no período — não é o valor médio dos ganhos.">Ticket médio de oportunidade</div><div class="kpi-value" id="o-ticket" style="font-size:18px">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Leads rejeitados no período (dados inválidos, sem orçamento, sem interesse etc).">Rejeitados</div><div class="kpi-value" id="o-qualificados-rej">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Tempo mediano do lead virar oportunidade (data de criação → data de conversão no CRM). Mediana é robusta a outliers; o rodapé mostra a média e o nº de casos.">Tempo lead→opp</div><div class="kpi-value" id="o-ciclo-leadopp" style="font-size:18px">—</div><div class="kpi-footer" id="o-ciclo-leadopp-foot"></div></div>
+      <div class="kpi green"><div class="kpi-label" title="Tempo mediano da oportunidade virar ganho (data de conversão → data de fechamento no CRM). Mediana é robusta a outliers; o rodapé mostra a média e o nº de casos.">Tempo opp→ganho</div><div class="kpi-value" id="o-ciclo-oppganho" style="font-size:18px">—</div><div class="kpi-footer" id="o-ciclo-oppganho-foot"></div></div>
+      <div class="kpi amber"><div class="kpi-label" title="CAC por ganho = investimento total em mídia paga ÷ nº de negócios ganhos no período. Fica — quando não há investimento no período.">CAC por ganho</div><div class="kpi-value" id="o-cacganho" style="font-size:18px">—</div><div class="kpi-footer" id="o-cacganho-foot"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil comercial</div><div class="section-badge">Leads → Qualificados → Oportunidades → Ganhas</div></div>
+      <div id="o-funil"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-chart-line"></i>Oportunidades e ganhos por período</div><div class="section-badge" id="o-serie-badge">—</div></div>
+      <div class="chart-wrap" style="height:220px"><canvas id="c-opp-serie" role="img" aria-label="Oportunidades e ganhos por período"></canvas></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-mood-sad"></i>Motivo da perda</div></div>
+        <div id="o-motivo-perda"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-ban"></i>Motivo da rejeição</div></div>
+        <div id="o-motivo-rejeicao"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-route"></i>Por canal de origem</div><div class="section-badge">clique para filtrar</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Canal</th><th>Leads</th><th>Oportunidades</th><th>Perdidas</th><th>Valor gerado</th><th>Taxa Lead→Opp</th><th>Ganho (R$)</th><th title="CAC por oportunidade = investimento do canal ÷ nº de oportunidades. Canais sem mídia paga mostram —.">CAC/opp</th><th title="CAC por ganho = investimento do canal ÷ nº de negócios ganhos. Canais sem mídia paga mostram —.">CAC/ganho</th><th title="ROAS = receita ganha do canal ÷ investimento do canal. Canais sem mídia paga mostram —.">ROAS</th></tr></thead>
+        <tbody id="o-canal-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por origem / campanha</div><div class="section-badge">clique para filtrar</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Origem / Campanha</th><th>Leads</th><th>Oportunidades</th><th>Perdidas</th><th>Valor gerado</th></tr></thead>
+        <tbody id="o-origem-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads comerciais</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Nome / Empresa</th><th>Segmento</th><th>Origem</th><th>Canal</th><th>Status</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead>
+        <tbody id="o-all"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CRIATIVOS (Ads x Central de Leads x CRM comercial) -->
+  <div class="view" id="view-criativos">
+    <div class="chart-click-hint" style="margin-bottom:12px">Cruza o investimento por campanha/conjunto/criativo (Meta, Google e LinkedIn Ads) com os leads reais da Central de Leads e o estágio no CRM comercial (Salesforce). O CPL aqui é sempre <strong style="color:var(--text)">investimento ÷ leads reais da Central de Leads</strong> — nunca o "resultado" auto-reportado pela Meta, que mistura leads do site com leads nativos do formulário e mascara o custo real.</div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+      <div class="kpi purple"><div class="kpi-label" title="Investimento somado das campanhas/criativos no recorte atual.">Investimento</div><div class="kpi-value" id="cr-spend">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Contagem real de linhas na Central de Leads que batem com o recorte de campanha/conjunto/criativo selecionado — não é o 'resultado' da Meta.">Leads reais</div><div class="kpi-value" id="cr-leads">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Investimento ÷ Leads reais.">CPL real</div><div class="kpi-value" id="cr-cpl">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Soma do valor de oportunidades ainda abertas + já ganhas, atribuídas a este recorte via e-mail do lead.">Pipe + Ganho</div><div class="kpi-value" id="cr-pipe" style="font-size:18px">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="ROAS realizado = receita já ganha (fechada) do recorte ÷ investimento. Dinheiro no caixa. Sem investimento no recorte mostra —.">ROAS</div><div class="kpi-value" id="cr-roas">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por campanha</div><div class="section-badge">clique para filtrar</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Campanha</th><th>Plataforma(s)</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th><th>Oportunidades</th><th>Taxa Lead→Opp</th><th>Pipe (R$)</th><th>Ganho (R$)</th><th title="ROAS realizado = receita já ganha (fechada) da campanha ÷ investimento. Dinheiro no caixa.">ROAS realiz.</th><th title="ROAS projetado = (pipeline em aberto + receita ganha) ÷ investimento. Inclui negócios ainda não fechados — é uma projeção.">ROAS proj. <span class="scope-tag scope-plat" title="Inclui pipeline em aberto — valor probabilístico, ainda não fechado.">PROJ.</span></th><th title="Custo por oportunidade = investimento da campanha ÷ nº de oportunidades geradas.">Custo/opp</th></tr></thead>
+        <tbody id="cr-campanha-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-photo"></i>Por conjunto / criativo</div><div class="section-badge" id="cr-semmapear-badge">—</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Conjunto</th><th>Criativo</th><th>Plataforma</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th></tr></thead>
+        <tbody id="cr-criativo-body"></tbody>
+      </table>
+      </div>
+      <div class="chart-click-hint">Só aparece aqui quando o lead tem conjunto/criativo capturado (leads de formulário nativo do Meta/Google). Leads de landing page/e-mail (ex: webinars) e leads sem UTM completa entram na contagem de "Leads reais" da campanha acima, mas não têm criativo específico para atribuir o investimento — por isso não aparecem nesta tabela.</div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Leads deste recorte</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Nome / Empresa</th><th>Campanha</th><th>Conjunto</th><th>Criativo</th><th>Estágio (CRM)</th><th>Valor</th><th>Data</th></tr></thead>
+        <tbody id="cr-leads-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- META ADS -->
+  <div class="view" id="view-meta">
+    <div class="card" id="m-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do Meta Ads:</strong> <span id="m-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
+    <div class="kpi-grid-6">
+      <div class="kpi purple"><div class="kpi-label" title="Total investido em Meta Ads (Facebook + Instagram) no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="m-spend">—</div><div class="kpi-footer" id="m-spend-trend">No período</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="m-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões. Acima de 2% é considerado bom para Meta Ads."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Pessoas únicas que viram o anúncio (diferente de impressões, que conta repetições)."><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Custo por Lead real: investimento total ÷ leads reais da Central de Leads no período (não usa o 'resultado' auto-reportado pela Meta, que mistura leads de site com leads nativos do formulário)."><i class="ti ti-target"></i>CPL real</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer" id="m-cpl-footer">Leads reais</div></div>
+    </div>
+
+    <div class="card" style="padding:0">
+      <div class="meta-tabs">
+        <button class="meta-tab active" onclick="switchMetaTab('camps')"><i class="ti ti-speakerphone"></i>Campanhas</button>
+        <button class="meta-tab" onclick="switchMetaTab('adsets')"><i class="ti ti-layout-grid"></i>Conjuntos de anúncios</button>
+        <button class="meta-tab" onclick="switchMetaTab('ads')"><i class="ti ti-photo"></i>Anúncios</button>
+        <span style="margin-left:auto;padding:10px 16px;font-size:12px;color:var(--muted)" id="m-tab-badge">—</span>
+      </div>
+
+      <div id="meta-tab-camps" class="meta-tab-content" style="padding:0 20px 20px;overflow-x:auto">
+        <table class="tbl" style="min-width:1100px">
+          <thead><tr><th>Campanha</th><th>Veiculação</th><th>Resultados</th><th>Alcance</th><th>Freq.</th><th>Custo/Result.</th><th>Gasto</th><th>Cliques</th><th>CTR</th><th>CPC</th></tr></thead>
+          <tbody id="m-camps-body"></tbody>
+        </table>
+      </div>
+
+      <div id="meta-tab-adsets" class="meta-tab-content" style="display:none;padding:0 20px 20px;overflow-x:auto">
+        <table class="tbl" style="min-width:1100px">
+          <thead><tr><th>Conjunto</th><th>Campanha</th><th>Veiculação</th><th>Resultados</th><th>Alcance</th><th>Custo/Result.</th><th>Gasto</th><th>Cliques</th><th>CTR</th></tr></thead>
+          <tbody id="m-adsets-body"></tbody>
+        </table>
+      </div>
+
+      <div id="meta-tab-ads" class="meta-tab-content" style="display:none;padding:0 20px 20px;overflow-x:auto">
+        <table class="tbl" style="min-width:1100px">
+          <thead><tr><th>Anúncio</th><th>Conjunto</th><th>Veiculação</th><th>Resultados</th><th>Alcance</th><th>Custo/Result.</th><th>Gasto</th><th>Cliques</th><th>CTR</th></tr></thead>
+          <tbody id="m-ads-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Gasto por campanha</div></div>
+        <div id="m-spend-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Resultados por campanha</div></div>
+        <div class="legend" id="m-click-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-meta-clicks" role="img" aria-label="Resultados por campanha Meta"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LINKEDIN ADS -->
+  <div class="view" id="view-linkedin">
+    <div class="card" id="li-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do LinkedIn Ads:</strong> <span id="li-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
+    <div class="kpi-grid-6">
+      <div class="kpi purple"><div class="kpi-label" title="Total investido em LinkedIn Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="li-spend">—</div><div class="kpi-footer" id="li-spend-trend">No período</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="li-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="li-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="li-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Conversões atribuídas pelo LinkedIn (ex: formulário preenchido no site após o clique)."><i class="ti ti-users"></i>Conversões</div><div class="kpi-value" id="li-conv">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="CPL plataforma: gasto total ÷ conversões auto-reportadas pelo LinkedIn (é o número que aparece no gerenciador do LinkedIn, não os leads reais da Central de Leads)."><i class="ti ti-target"></i>CPL plataforma</div><div class="kpi-value" id="li-cpl">—</div><div class="kpi-footer">Conversões LinkedIn</div></div>
+      <div class="kpi green"><div class="kpi-label" title="CPL real: investimento ÷ leads reais da Central de Leads atribuídos ao canal LinkedIn (regra de ouro). Fica — quando não há leads reais rastreados para o canal no período."><i class="ti ti-target-arrow"></i>CPL real</div><div class="kpi-value" id="li-cpl-real">—</div><div class="kpi-footer" id="li-cpl-real-foot">Leads reais</div></div>
+    </div>
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas</div><div class="section-badge" id="li-camps-badge">—</div></div>
+      <table class="tbl">
+        <thead><tr><th>Campanha</th><th>Status</th><th>Gasto</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Conversões</th><th>CPL</th></tr></thead>
+        <tbody id="li-camps-body"></tbody>
+      </table>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Gasto por campanha</div></div>
+        <div id="li-spend-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Cliques por campanha</div></div>
+        <div class="legend" id="li-click-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-li-clicks" role="img" aria-label="Cliques por campanha LinkedIn"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOOGLE ADS -->
+  <div class="view" id="view-gads">
+    <div class="card" id="gads-error-banner" style="display:none;padding:14px 20px;margin-bottom:16px;border-color:var(--red)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--red);flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do Google Ads:</strong> <span id="gads-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
+      </div>
+    </div>
+    <!-- KPIs -->
+    <div class="kpi-grid-6">
+      <div class="kpi blue"><div class="kpi-label" title="Total investido em Google Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="ga-spend">—</div><div class="kpi-footer" id="ga-spend-trend">No período</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="ga-impr">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="ga-clicks">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões. Acima de 3% é considerado bom na Rede de Pesquisa."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="ga-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
+      <div class="kpi red"><div class="kpi-label" title="Conversões rastreadas pelo Google Ads (envio de formulário, ligação, etc.)."><i class="ti ti-target"></i>Conversões</div><div class="kpi-value" id="ga-conv-ads">—</div><div class="kpi-footer">Total</div></div>
+      <div class="kpi green"><div class="kpi-label" title="CPA plataforma: gasto total ÷ conversões auto-reportadas pelo Google Ads (é o número que aparece no gerenciador do Google, não os leads reais da Central de Leads)."><i class="ti ti-receipt"></i>CPA plataforma</div><div class="kpi-value" id="ga-cpa">—</div><div class="kpi-footer">Conversões Google</div></div>
+      <div class="kpi green"><div class="kpi-label" title="CPL real: investimento ÷ leads reais da Central de Leads atribuídos ao canal Google ADS (regra de ouro). Fica — quando não há leads reais rastreados para o canal no período."><i class="ti ti-target-arrow"></i>CPL real</div><div class="kpi-value" id="ga-cpl-real">—</div><div class="kpi-footer" id="ga-cpl-real-foot">Leads reais</div></div>
+    </div>
+
+    <!-- TABS -->
+    <div class="card" style="padding:0">
+      <div class="meta-tabs">
+        <button class="meta-tab active" onclick="switchGadsTab('camps')"><i class="ti ti-speakerphone"></i>Campanhas</button>
+        <button class="meta-tab" onclick="switchGadsTab('groups')"><i class="ti ti-layout-grid"></i>Grupos de anúncios</button>
+        <button class="meta-tab" onclick="switchGadsTab('keywords')"><i class="ti ti-key"></i>Palavras-chave</button>
+        <button class="meta-tab" onclick="switchGadsTab('ads')"><i class="ti ti-photo"></i>Anúncios</button>
+        <span style="margin-left:auto;padding:10px 16px;font-size:12px;color:var(--muted)" id="ga-tab-badge">—</span>
+      </div>
+
+      <!-- Campanhas -->
+      <div id="gads-tab-camps" class="meta-tab-content" style="padding:0 20px 20px">
+        <table class="tbl">
+          <thead><tr><th>Campanha</th><th>Status</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Gasto</th><th>Conversões</th><th>CPA</th></tr></thead>
+          <tbody id="ga-camps-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Grupos -->
+      <div id="gads-tab-groups" class="meta-tab-content" style="display:none;padding:0 20px 20px">
+        <table class="tbl">
+          <thead><tr><th>Grupo</th><th>Campanha</th><th>Status</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Gasto</th><th>Conversões</th></tr></thead>
+          <tbody id="ga-groups-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Palavras-chave -->
+      <div id="gads-tab-keywords" class="meta-tab-content" style="display:none;padding:0 20px 20px">
+        <table class="tbl">
+          <thead><tr><th>Palavra-chave</th><th>Grupo</th><th>Status</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>CPC</th><th>Gasto</th><th>Qualidade</th></tr></thead>
+          <tbody id="ga-keywords-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Anúncios -->
+      <div id="gads-tab-ads" class="meta-tab-content" style="display:none;padding:0 20px 20px">
+        <table class="tbl">
+          <thead><tr><th>Anúncio</th><th>Grupo</th><th>Status</th><th>Impressões</th><th>Cliques</th><th>CTR</th><th>Gasto</th><th>Conversões</th></tr></thead>
+          <tbody id="ga-ads-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Gasto por campanha</div></div>
+        <div id="gads-spend-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Cliques por campanha</div></div>
+        <div class="legend" id="gads-click-leg"></div>
+        <div class="chart-wrap" style="height:200px"><canvas id="c-gads-clicks" role="img" aria-label="Cliques por campanha Google ADS"></canvas></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+const PROPS = [
+  { id: '503864241',  label: 'loupen.com.br' },
+  { id: '541927286',  label: 'pages.loupen.com.br' }
+];
+let activeProp = 'all'; // 'all' | '503864241' | '541927286'
+const SHEET   = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
+// SECRETS REMOVED 2026-07-02: tokens que ficavam aqui foram movidos p/ backend n8n seguro
+// (credenciais vivem no n8n, nunca nesta página estática — ver ADS_API_URL). Histórico completo no git.
+const META_ACCOUNT = 'act_2412716725845249';
+const LI_ACCOUNT  = '533600351';
+const GADS_CUSTOMER_ID     = '4155543486';
+const GADS_MCC_ID          = '8437421207';
+const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff8e85ea49e64';
+// GA4 agora é buscado pelo mesmo backend seguro do n8n (ver fetchAdsData/loadGA4) —
+// removida a assinatura JWT client-side com chave privada (era um risco de segurança).
+const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
+let CC={};
+
+// ── v2: SEGURANÇA, METAS/BENCHMARKS E HELPERS DE RENDER ──────
+// esc(): escapa TODO campo vindo de Sheets/CRM/webhook antes de interpolar em template string.
+// Cobre contexto de texto E de atributo (aspas simples e duplas) numa única função (arquitetura §8.1).
+function esc(v){
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// escAttr(): valor seguro dentro de onclick="fn('...')" — neutraliza a sintaxe JS (barra/aspas
+// simples) E o breakout de atributo HTML (aspas duplas). Mesmo padrão já usado em mkBars.
+// Ponte até a migração dos drill-downs para data-* + delegação de eventos (arquitetura §8.4, Fase 4).
+function escAttr(v){
+  return String(v == null ? '' : v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+// ── METAS & BENCHMARKS (editável — sem backend; ver README "como ajustar metas") ──
+// null = sem meta definida (o indicador não aparece). invert:true = menor é melhor.
+const METAS = {
+  cplBlended:     { alvo: 150,  invert: true  }, // R$
+  taxaQualif:     { alvo: 25,   invert: false }, // %
+  roasBlended:    { alvo: 3.0,  invert: false }, // x
+  winRate:        { alvo: 20,   invert: false }, // %
+  lpConversion:   { alvo: 5,    invert: false }, // %
+  ga4Conversion:  { alvo: 3,    invert: false }, // %
+  cacPorGanho:    { alvo: 2000, invert: true  }, // R$
+  // Benchmarks de referência (semáforo — não são metas de negócio):
+  bench: { ctrMeta: 2, ctrSearch: 3, bounceOk: 40, bounceBad: 65, qualityScore: 7 }
+};
+
+// metaHTML(): selo (.meta-pill) de meta vs realizado, semáforo invert-aware (ux-spec §5).
+// Lógica pura — sem dependência de dado novo. Renderiza no .kpi-footer. Omite quando não há meta.
+// fmtAlvo (opcional): formatador do valor-alvo/atual exibido (ex: brl, x=>x+'%').
+function metaHTML(valorAtual, chaveMeta, fmtAlvo){
+  const meta = METAS[chaveMeta];
+  if (!meta || meta.alvo == null || valorAtual == null || isNaN(valorAtual)) return '';
+  const alvo = meta.alvo;
+  const ratio = meta.invert
+    ? (valorAtual > 0 ? alvo / valorAtual : 0)
+    : (alvo > 0 ? valorAtual / alvo : 0);
+  let cls, icon, sym, status;
+  if (ratio >= 1)         { cls='meta-hit';  icon='ti-flag-check'; sym='✓'; status='Acima'; }
+  else if (ratio >= 0.85) { cls='meta-near'; icon='ti-flag';       sym='≈'; status='Dentro de 15%'; }
+  else                    { cls='meta-miss'; icon='ti-flag-off';   sym='✗'; status='Abaixo'; }
+  const fmtFn = typeof fmtAlvo === 'function' ? fmtAlvo : (x=>x);
+  const alvoTxt  = esc(fmtFn(alvo));
+  const atualTxt = esc(fmtFn(valorAtual));
+  return `<span class="meta-pill ${cls}" title="Meta: ${alvoTxt}. Atual: ${atualTxt}. ${status} da meta." `
+    + `aria-label="Meta ${alvoTxt}, ${status}"><i class="ti ${icon}"></i>${sym} meta ${alvoTxt}</span>`;
+}
+
+// renderRows(): helper de render de linhas de tabela com esc() embutido (dedup PARCIAL — arquitetura §9).
+// Uso previsto: código NOVO e tabelas já tocadas pelas fases seguintes (não migra as tabelas de ads estáveis).
+// - tbodyEl : elemento <tbody> alvo
+// - rows    : array de dados
+// - colFns  : array de (row) => conteúdo da célula. String => escapada e envolvida em <td>.
+//             Objeto {html, attrs?} => HTML já confiável (ex: pill()/brl()/fmt()) + atributos opcionais do <td>.
+// - emptyMsg: HTML mostrado quando não há linhas
+// - rowAttrs: (row) => string opcional de atributos do <tr> (data-nav/tabindex/role — drill acessível)
+// TODO(refactor): migrar as tabelas de ads restantes (m-*/li-*/ga-*) para renderRows — fora do escopo v2.
+function renderRows(tbodyEl, rows, colFns, emptyMsg, rowAttrs){
+  if (!tbodyEl) return;
+  if (!rows || !rows.length){
+    const cols = colFns ? colFns.length : 1;
+    tbodyEl.innerHTML = `<tr><td colspan="${cols}" class="empty">${emptyMsg || 'Sem dados no período'}</td></tr>`;
+    return;
+  }
+  tbodyEl.innerHTML = rows.map(row => {
+    const attrs = typeof rowAttrs === 'function' ? (rowAttrs(row) || '') : '';
+    const cells = colFns.map(fn => {
+      const c = fn(row);
+      if (c && typeof c === 'object'){
+        return `<td ${c.attrs || ''}>${c.html != null ? c.html : ''}</td>`;
+      }
+      return `<td>${esc(c)}</td>`;
+    }).join('');
+    return `<tr ${attrs}>${cells}</tr>`;
+  }).join('');
+}
+
+// ── NAV ─────────────────────────────────────────────────────
+// View ativa atual — consumida pelo auto-refresh eficiente (arquitetura §8.3, Opção A).
+let viewAtiva = 'overview';
+function showView(id, fromDrill){
+  viewAtiva = id;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
+  document.getElementById('page-title').textContent=VIEWS[id]||id;
+  // Mostrar filtros por view
+  const gf = document.getElementById('global-filters');
+  const gaf = document.getElementById('ga-filters');
+  const of = document.getElementById('opp-filters');
+  const crf = document.getElementById('criativo-filters');
+  if (gf)  gf.classList.toggle('visible',  id==='leads');
+  if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
+  if (of)  of.classList.toggle('visible',  id==='oportunidades');
+  if (crf) crf.classList.toggle('visible', id==='criativos');
+  // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
+  const bc = document.getElementById('drill-breadcrumb');
+  if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
+}
+function scrollToCard(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  el.style.transition = 'border-color .3s';
+  const orig = el.style.borderColor;
+  el.style.borderColor = 'var(--blue)';
+  setTimeout(()=>{ el.style.borderColor = orig; }, 900);
+}
+
+// ── DELEGAÇÃO DE EVENTOS (arquitetura §8.4) ───────────────────
+// Drill-downs migrados de onclick inline para data-action/data-arg + UM listener único.
+// Ganha acessibilidade por teclado (Enter/Space) e tira JS de dentro do HTML.
+// A lista de ações é um ALLOWLIST FECHADO — nunca window[nome](...) genérico, para não
+// abrir superfície de execução arbitrária a partir de um atributo.
+// Wrapper que mantém a lógica de 3 passos do drill GA4 num único ponto nomeado/testável.
+function filtrarGA4Canal(canal){
+  activeChannel = canal || '';
+  showView('ga4', true);
+  loadGA4();
+}
+const DELEGATED_ACTIONS = {
+  filtrarPorCanalLead:        (a)    => filtrarPorCanalLead(a),
+  filtrarPorCanalOpp:         (a)    => filtrarPorCanalOpp(a),
+  filtrarPorOrigemOpp:        (a)    => filtrarPorOrigemOpp(a),
+  filtrarPorCampanhaCriativo: (a)    => filtrarPorCampanhaCriativo(a),
+  filtrarPorConjuntoCriativo: (a)    => filtrarPorConjuntoCriativo(a),
+  filtrarGA4Canal:            (a)    => filtrarGA4Canal(a),
+  scrollToCard:               (a)    => scrollToCard(a),
+  showView:                   (a, b) => showView(a, b === 'true')
+};
+function _dispatchDelegated(el){
+  const fn = DELEGATED_ACTIONS[el.getAttribute('data-action')];
+  if (!fn) return;
+  // dataset.* já vem decodificado de entidades HTML pelo browser.
+  fn(el.dataset.arg, el.dataset.arg2);
+}
+function handleDelegatedClick(event){
+  const el = event.target.closest('[data-action]');
+  if (el) _dispatchDelegated(el);
+}
+function handleDelegatedKeydown(event){
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const el = event.target.closest('[data-action]');
+  // Só dispara quando o próprio elemento focado é o alvo (não em cliques/foco de filho).
+  if (!el || event.target !== el) return;
+  if (event.key === ' ') event.preventDefault(); // evita scroll da página no Space
+  _dispatchDelegated(el);
+}
+document.addEventListener('click', handleDelegatedClick);
+document.addEventListener('keydown', handleDelegatedKeydown);
+
+// ── HELPERS ──────────────────────────────────────────────────
+const fmt  = n=>Number(n).toLocaleString('pt-BR');
+const fmtR = n=>Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct  = v=>(parseFloat(v)*100).toFixed(1)+'%';
+const rcl  = v=>{const n=parseFloat(v)*100;return n<40?'rej-ok':n<65?'rej-warn':'rej-bad';};
+const brl  = v=>'R$\u00a0'+fmtR(parseFloat(v)||0);
+function pill(s){const l=(s||'').toLowerCase();if(l.includes('google ads')||l==='google ads')return`<span class="sp sp-g">Google ADS</span>`;if(l.includes('meta ads')||l.includes('facebook'))return`<span class="sp sp-m">Meta ADS</span>`;if(l.includes('orgânico')||l.includes('organic'))return`<span class="sp sp-o">Orgânico</span>`;if(l.includes('direto')||l==='(direct)'||l==='direct')return`<span class="sp sp-d">Direto</span>`;if(l.includes('e-mail')||l.includes('email'))return`<span class="sp sp-o">E-mail</span>`;return`<span class="sp sp-o">${esc(s)||'—'}</span>`;}
+function statusChip(s){const l=(s||'').toUpperCase();if(l==='ACTIVE')return`<span class="status-chip chip-active">Ativo</span>`;if(l==='PAUSED')return`<span class="status-chip chip-paused">Pausado</span>`;return`<span class="status-chip chip-other">${esc(s)}</span>`;}
+function mkChart(id,type,labels,datasets,extra={}){if(CC[id])CC[id].destroy();const c=document.getElementById(id);if(!c)return;CC[id]=new Chart(c,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},...extra}});}
+function mkLeg(el,labels){if(!el)return;el.innerHTML=labels.map((l,i)=>`<div class="leg"><div class="leg-dot" style="background:${CORES[i%CORES.length]}"></div>${esc(l)}</div>`).join('');}
+function mkBars(el,rows,color,onClickLabel){
+  if(!el)return;
+  const max=Math.max(...rows.map(r=>r.v),1);
+  el.innerHTML=rows.map(r=>{
+    const clickable = typeof onClickLabel === 'function';
+    const attrs = clickable ? `style="cursor:pointer" role="button" tabindex="0" data-action="${esc(onClickLabel.name)}" data-arg="${esc(r.label)}"` : '';
+    return `<div class="bar-row" ${attrs}><div class="bar-label">${esc(r.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.v/max*100)}%;background:${color}"></div></div><div class="bar-val">${r.fmt?r.fmt:fmt(r.v)}</div></div>`;
+  }).join('');
+}
+function setPreset(days, btn) {
+  const h = new Date();
+  const f = x => x.toISOString().slice(0,10);
+  document.getElementById('date-end').value = f(h);
+  document.getElementById('date-start').value = f(new Date(h - days*86400000));
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  carregarTudo();
+}
+function period(){
+  const s = document.getElementById('date-start')?.value;
+  const e = document.getElementById('date-end')?.value;
+  const h = new Date();
+  const f = x => x.toISOString().slice(0,10);
+  const startDate = s || f(new Date(h - 30*86400000));
+  const endDate   = e || f(h);
+  const days = Math.round((new Date(endDate)-new Date(startDate))/86400000);
+  return{days,startDate,endDate,startUnix:Math.floor(new Date(startDate)/1000),endUnix:Math.floor(new Date(endDate)/1000)};
+}
+function scOpts(){return{x:{grid:{display:false},ticks:{color:'#7a7f8a',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#7a7f8a',font:{size:11}}}};}
+
+// ── META ADS ─────────────────────────────────────────────────
+let _allLeads = [];
+
+// ── NORMALIZAÇÃO DE DADOS ────────────────────────────────────
+function normCargo(v) {
+  if (!v) return 'Não informado';
+  const s = v.toLowerCase().replace(/_/g, ' ').replace(/,/g, ' ').trim();
+  if (s.includes('ceo') || s.includes('founder') || s.includes('sócio') || s.includes('socio')) return 'CEO / Founder / Sócio';
+  if (s.includes('diretor')) return 'Diretor';
+  if (s.includes('gerente')) return 'Gerente';
+  if (s.includes('coordenador') || s.includes('supervisor')) return 'Coordenador / Supervisor';
+  if (s.includes('analista')) return 'Analista';
+  if (s.includes('outro')) return 'Outro';
+  return v.replace(/_/g, ' ').replace(/,_/g, ', ');
+}
+
+function normPorte(v) {
+  if (!v) return 'Não informado';
+  const s = v.replace(/_/g, ' ').toLowerCase().trim();
+  if (s.includes('1 a 19') || s.includes('1_a_19')) return '1 a 19 func.';
+  if (s.includes('20 a 99') || s.includes('20_a_99')) return '20 a 99 func.';
+  if (s.includes('100 a 249') || s.includes('100_a_249')) return '100 a 249 func.';
+  if (s.includes('250 a 499') || s.includes('250_a_499')) return '250 a 499 func.';
+  if (s.includes('500') || s.includes('999')) return '500+ func.';
+  if (s.includes('1000') || s.includes('1.000')) return '1.000+ func.';
+  return v.replace(/_/g, ' ');
+}
+
+function normCanal(utm_source, conv_channel, conv_source) {
+  const s = (utm_source || conv_channel || conv_source || '').toLowerCase().trim();
+  // 'fb'/'ig'/'an'/'msg' são os valores literais que o Meta resolve em {{site_source_name}}
+  // (padrão de UTM definido em 2026-07-03) — sem isso, esses leads apareciam com canal "fb"/"ig" cru.
+  if (s.includes('meta') || s.includes('facebook') || s.includes('instagram') || ['fb','ig','an','msg'].includes(s)) return 'Meta ADS';
+  if (s.includes('linkedin')) return 'LinkedIn ADS';
+  if (s.includes('google') || s.includes('googleads')) return 'Google ADS';
+  if (s === 'paid search' || s === 'cpc') return 'Google ADS';
+  if (s === 'organic' || s.includes('organic')) return 'Orgânico';
+  if (s === 'email' || s.includes('email')) return 'E-mail';
+  if (s === 'direct' || s === '(direct)' || s === '') return 'Direto';
+  return utm_source || conv_channel || conv_source || 'Direto';
+}
+
+function normEvento(v) {
+  if (!v) return 'Não informado';
+  // Remove sufixo de Form ID do LinkedIn (ex: "-1018790131"), que fragmentava o filtro/gráficos
+  // de Evento em entradas separadas da mesma campanha (ver normCanal/standardizeCampanha).
+  const stripped = v.replace(/-\d{6,}$/, '');
+  const s = stripped.toLowerCase();
+  if (s.includes('rescue') && s.includes('eco')) return 'Rescue Licença Eco';
+  if (s.includes('webinar') && (s.includes('goto') || s.includes('linkedin'))) return 'Webinar GoTo — Jul/26';
+  if (s.includes('webinar')) return 'Webinar';
+  if (s.includes('goto') && s.includes('saude')) return 'GoTo Saúde';
+  if (s.includes('goto') && s.includes('institucional')) return 'GoTo Institucional';
+  return stripped;
+}
+
+function parseDataLead(v) {
+  if (!v) return null;
+  const s = v.toString();
+  const m = s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
+  const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m2) return new Date(parseInt(m2[3]), parseInt(m2[2])-1, parseInt(m2[1]));
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function mudarDominio(val) {
+  activeProp = val;
+  Promise.all([loadGA4(), loadOverview()]).catch(console.error);
+}
+
+// ── FILTRO DE CANAL (GA4) — aplicado em Sessões por canal e Campanhas UTM ──
+let activeChannel = '';
+function mudarCanal(val) {
+  activeChannel = val || '';
+  loadGA4();
+}
+
+// ── FILTRO DE CANAL NOS LEADS (clique nas barras "Por canal") ──
+let fCanalLead = '';
+function filtrarPorCanalLead(label) {
+  fCanalLead = label || '';
+  const chip = document.getElementById('l-canal-chip');
+  const chipLabel = document.getElementById('l-canal-chip-label');
+  if (chip) chip.style.display = fCanalLead ? 'inline-flex' : 'none';
+  if (chipLabel) chipLabel.textContent = fCanalLead;
+  aplicarFiltros();
+}
+
+// ── Aproxima o agrupamento de canal do GA4 ao canal de origem do lead (RD Station) ──
+function ga4ToLeadBucket(channel) {
+  const c = (channel || '').toLowerCase();
+  if (c.includes('paid search')) return 'Google ADS';
+  if (c.includes('display')) return 'Google ADS';
+  if (c.includes('paid social')) return 'Meta ADS';
+  if (c.includes('organic search')) return 'Orgânico';
+  if (c.includes('organic social')) return 'Orgânico';
+  if (c.includes('referral')) return 'Orgânico';
+  if (c.includes('email')) return 'E-mail';
+  if (c.includes('direct')) return 'Direto';
+  return 'Direto';
+}
+
+function aplicarFiltros() {
+  const fEvento = document.getElementById('f-evento')?.value || '';
+  const fStage  = document.getElementById('f-stage')?.value || '';
+  const p = period();
+  const dStart = new Date(p.startDate + 'T00:00:00');
+  const dEnd   = new Date(p.endDate   + 'T23:59:59');
+
+  let rows = _allLeads || [];
+
+  rows = rows.filter(r => {
+    const d = parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v);
+    if (!d) return true;
+    return d >= dStart && d <= dEnd;
+  });
+
+  if (fEvento) {
+    rows = rows.filter(r => normEvento(r.c[1]?.v) === fEvento);
+  }
+  if (fStage === 'qualificado') {
+    rows = rows.filter(r => (r.c[24]?.v||'').toLowerCase().includes('qualificado'));
+  } else if (fStage === 'apenas_lead') {
+    rows = rows.filter(r => !(r.c[24]?.v||'').toLowerCase().includes('qualificado'));
+  }
+  if (fCanalLead) {
+    rows = rows.filter(r => normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v) === fCanalLead);
+  }
+
+  renderLeads(rows);
+
+  const hasFilter = fEvento || fStage || fCanalLead;
+  const cnt = document.getElementById('l-filter-count');
+  if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
+}
+
+function limparFiltros() {
+  const fe = document.getElementById('f-evento'); if(fe) fe.value='';
+  const fs = document.getElementById('f-stage');  if(fs) fs.value='';
+  fCanalLead = '';
+  const chip = document.getElementById('l-canal-chip'); if (chip) chip.style.display = 'none';
+  aplicarFiltros();
+  const cnt = document.getElementById('l-filter-count'); if(cnt) cnt.textContent='';
+}
+
+function renderLeads(rows) {
+  const lq = rows.filter(r=>(r.c[24]?.v||'').toLowerCase().includes('qualificado')).length;
+  document.getElementById('l-total').textContent = fmt(rows.length);
+  document.getElementById('l-lq').textContent    = fmt(lq);
+  document.getElementById('l-taxa').textContent  = rows.length ? Math.round(lq/rows.length*100)+'%' : '—';
+
+  // % de qualificação por segmento (Média #11, §3.7) — mostrada como texto secundário na barra-valor.
+  const qualifFmt = s => `${fmt(s.total)} <span style="color:var(--muted);font-size:10px">${Math.round(s.taxa)}% qualif.</span>`;
+
+  const qualCanal = qualifPorSegmento(rows, c=>normCanal(c[15]?.v, c[14]?.v, c[10]?.v));
+  const canRows = qualCanal.sort((a,b)=>b.total-a.total).slice(0,6).map(s=>({label:s.label, v:s.total, fmt:qualifFmt(s)}));
+  mkBars(document.getElementById('l-canal'),canRows,CORES[0],filtrarPorCanalLead);
+
+  const byCargo={};
+  rows.forEach(r=>{const v=normCargo(r.c[6]?.v);byCargo[v]=(byCargo[v]||0)+1;});
+  mkBars(document.getElementById('l-cargo'),Object.entries(byCargo).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v})),CORES[2]);
+
+  const ordemPorte=['1 a 19 func.','20 a 99 func.','100 a 249 func.','250 a 499 func.','500+ func.','1.000+ func.','Não informado'];
+  const qualPorte = qualifPorSegmento(rows, c=>normPorte(c[7]?.v));
+  const porteRows = qualPorte.sort((a,b)=>(ordemPorte.indexOf(a.label)-ordemPorte.indexOf(b.label))||b.total-a.total).map(s=>({label:s.label, v:s.total, fmt:qualifFmt(s)}));
+  mkBars(document.getElementById('l-porte'),porteRows,CORES[4]);
+
+  // Trend período-a-período (Média #9, §6.2): reusa prevPeriod + leadsInRange + trendHTML. O período
+  // anterior é não-filtrado (mesma disciplina do Overview); com filtros ativos o trend é direcional.
+  const ppL = prevPeriod();
+  const ppLeads = leadsInRange(ppL.startDate, ppL.endDate);
+  const ppLQ = ppLeads.filter(r=>(r.c[24]?.v||'').toLowerCase().includes('qualificado')).length;
+  const lTotalTrend = document.getElementById('l-total-trend');
+  if (lTotalTrend) lTotalTrend.innerHTML = trendHTML(rows.length, ppLeads.length);
+  const lLqTrend = document.getElementById('l-lq-trend');
+  if (lLqTrend) lLqTrend.innerHTML = trendHTML(lq, ppLQ);
+
+  // Série temporal de leads (Média #7, §3.6/§6.1): dia/semana auto conforme a amplitude do período.
+  const serie = agruparPorPeriodo(rows, r=>parseDataLead(r.c[26]?.v)||parseDataLead(r.c[0]?.v), 'auto');
+  const serieBadge = document.getElementById('l-serie-badge');
+  if (serieBadge) serieBadge.textContent = serie.length ? `${serie.length} ponto${serie.length!==1?'s':''}` : 'sem dados no período';
+  mkChart('c-leads-serie','line', serie.map(p=>p.bucket), [{
+    label:'Leads', data:serie.map(p=>p.valor), borderColor:CORES[0],
+    backgroundColor:'rgba(96,165,250,.12)', fill:true, tension:.3, pointRadius:2, borderWidth:2
+  }], { scales:scOpts() });
+
+  const byEvento={};
+  rows.forEach(r=>{const v=normEvento(r.c[1]?.v);byEvento[v]=(byEvento[v]||0)+1;});
+  mkBars(document.getElementById('l-evento'),Object.entries(byEvento).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v})),CORES[3]);
+
+  document.getElementById('l-all').innerHTML=rows.slice().reverse().map(r=>{
+    const c=r.c||[];const bc=(c[24]?.v||'').toLowerCase().includes('qualificado')?'lq':'lead';
+    return`<tr><td><div class="t-name">${esc(c[3]?.v)||'—'}</div><div class="t-sub">${esc(c[5]?.v)||'—'}</div></td><td style="font-size:12px;color:var(--muted)">${esc(normCargo(c[6]?.v))}</td><td style="font-size:11px;color:var(--muted)">${esc(normPorte(c[7]?.v))}</td><td>${pill(normCanal(c[15]?.v,c[14]?.v,c[10]?.v))}</td><td style="font-size:11px;color:var(--muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(normEvento(c[1]?.v))}</td><td><span class="badge ${bc}">${esc(c[24]?.v)||'Lead'}</span></td><td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${esc((c[26]?.v||c[0]?.v||'').toString().slice(0,10))}</td></tr>`;
+  }).join('');
+}
+
+async function loadLeads(){
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
+  const r=await fetch(url);
+  const txt=await r.text();
+  const start=txt.indexOf('{');
+  const end=txt.lastIndexOf('}')+1;
+  const d=JSON.parse(txt.slice(start,end));
+  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
+
+  _allLeads = rows;
+
+  const eventos = [...new Set(rows.map(r=>normEvento(r.c[1]?.v)).filter(Boolean))].sort();
+  const selEvento = document.getElementById('f-evento');
+  if (selEvento) {
+    const cur = selEvento.value;
+    selEvento.innerHTML = '<option value="">Todos os eventos</option>' +
+      eventos.map(e=>`<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`).join('');
+  }
+
+  document.getElementById('l-camps').textContent = eventos.length;
+
+  aplicarFiltros();
+}
+
+// ── VISÃO GERAL EXECUTIVA ────────────────────────────────────
+function leadsInRange(startDate, endDate){
+  const s = new Date(startDate+'T00:00:00'), e = new Date(endDate+'T23:59:59');
+  return (_allLeads||[]).filter(r=>{
+    const d = parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v);
+    if (!d) return false;
+    return d >= s && d <= e;
+  });
+}
+// v2 CALC (arquitetura §3.2): leads reais por canal normalizado. PURA — não toca o DOM.
+// Extraída do `leadsByBucket` inline do Overview p/ reuso no cruzamento Sessões×Leads e na
+// futura correção da tabela "Comparação de canais pagos" (Fase 2) e no CPL real por canal.
+// Se `period` for informado, filtra as linhas recebidas pela data do lead; senão usa `leads` como estão.
+function leadsReaisPorCanal(leads, period){
+  let rows = leads || [];
+  if (period && period.startDate && period.endDate){
+    const s = new Date(period.startDate+'T00:00:00'), e = new Date(period.endDate+'T23:59:59');
+    rows = rows.filter(r=>{
+      const d = parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v);
+      if (!d) return false;
+      return d >= s && d <= e;
+    });
+  }
+  const out = {};
+  rows.forEach(r=>{
+    const c = r.c||[];
+    const canal = normCanal(c[15]?.v, c[14]?.v, c[10]?.v);
+    out[canal] = (out[canal]||0)+1;
+  });
+  return out;
+}
+
+// ── CALC (v2) — funções puras financeiras/taxas (arquitetura §3.1, §3.3). NÃO tocam o DOM. ──
+
+// convRate(): taxa de conversão (%) segura. Devolve null quando o denominador é <=0/indefinido —
+// quem renderiza mostra "—" (nunca NaN/Infinity). Arquitetura §3.3.
+function convRate(numerador, denominador){
+  const n = Number(numerador), d = Number(denominador);
+  if (isNaN(n) || isNaN(d) || d <= 0) return null;
+  return n / d * 100;
+}
+
+// financeSummary(): resumo financeiro do período. `spendPorCanal` = investimento total em mídia paga
+// (número) OU um mapa {canal:spend} (será somado). REGRA DE OURO (arquitetura §3.1, AUTO-DECISION §12):
+// roasRealizado/roasProjetado usam a receita GANHA marketing-atribuída (isWon && isMarketing), NUNCA
+// a receita total — creditar receita comercial não rastreada ao spend infla o ROAS. receitaGanhaTotal
+// (isWon sem filtro) serve só ao KPI mostrar "X% atribuído a marketing".
+function financeSummary(sfRows, spendPorCanal){
+  const rows = sfRows || [];
+  const spendTotal = (spendPorCanal && typeof spendPorCanal === 'object')
+    ? Object.values(spendPorCanal).reduce((s,v)=>s+(Number(v)||0),0)
+    : (Number(spendPorCanal)||0);
+  let receitaGanhaTotal = 0, receitaGanhaMkt = 0, pipeAberto = 0, nOpp = 0, nGanho = 0;
+  rows.forEach(r=>{
+    if (r.isWon){ receitaGanhaTotal += (r.valorNF||0); if (r.isMarketing) receitaGanhaMkt += (r.valorNF||0); nGanho++; }
+    if (r.isOpen) pipeAberto += (r.valorOpp||0);
+    if (r.isOpportunity) nOpp++;
+  });
+  return {
+    receitaGanhaTotal,
+    receitaGanhaMkt,
+    roasRealizado: spendTotal>0 ? receitaGanhaMkt/spendTotal : null,
+    roasProjetado: spendTotal>0 ? (pipeAberto+receitaGanhaMkt)/spendTotal : null,
+    cacPorOpp:   (spendTotal>0 && nOpp>0)   ? spendTotal/nOpp   : null,
+    cacPorGanho: (spendTotal>0 && nGanho>0) ? spendTotal/nGanho : null,
+    winRate:     nOpp>0   ? nGanho/nOpp*100   : null
+  };
+}
+
+// cacPorCanal(): agrupa oportunidades por canal (mesma lógica de `byCanal` de renderOportunidades),
+// estendida com `ganhos`/`receita` (Σ valorNF onde isWon) e cruzada com o spend por canal. Canais
+// sem mídia paga (Orgânico/Direto/Base RD) ficam com spend 0 → cac/roas null (render mostra "—",
+// nunca divide por zero). `spendPorCanalMap`: { 'Google ADS':n, 'Meta ADS':n, 'LinkedIn ADS':n }.
+function cacPorCanal(sfRows, spendPorCanalMap){
+  const rows = sfRows || [];
+  const map = spendPorCanalMap || {};
+  const out = {};
+  rows.forEach(r=>{
+    const canal = r.canal;
+    if (!out[canal]) out[canal] = { leads:0, opp:0, ganhos:0, receita:0, spend:0, cacOpp:null, cacGanho:null, roas:null };
+    out[canal].leads++;
+    if (r.isOpportunity) out[canal].opp++;
+    if (r.isWon){ out[canal].ganhos++; out[canal].receita += (r.valorNF||0); }
+  });
+  Object.keys(out).forEach(canal=>{
+    const o = out[canal];
+    const spend = Number(map[canal])||0;
+    o.spend = spend;
+    o.cacOpp   = (spend>0 && o.opp>0)    ? spend/o.opp    : null;
+    o.cacGanho = (spend>0 && o.ganhos>0) ? spend/o.ganhos : null;
+    o.roas     = (spend>0)               ? o.receita/spend : null;
+  });
+  return out;
+}
+
+// cplRealPorCanal(): CPL real padronizado por canal = investimento do canal ÷ leads reais do canal
+// (Central de Leads, via leadsReaisPorCanal §3.2). Dá CPL real também a Google/LinkedIn — não só Meta
+// (arquitetura §3.8, §5). PURA — não toca o DOM. `leads`: linhas de _allLeads já recortadas por período
+// pelo chamador. `spendPorCanalMap`: { 'Google ADS':n, 'Meta ADS':n, 'LinkedIn ADS':n }.
+// Retorna null se o spend do canal <=0 OU se não há leads reais no bucket do canal (render mostra "—",
+// nunca divide por zero). Nota honesta: só conta leads cujo normCanal cai no mesmo rótulo do mapa de
+// spend; se o bucket de origem não bater (lead sem rastreio de plataforma), o CPL real fica "—".
+function cplRealPorCanal(canal, leads, spendPorCanalMap){
+  const spend = Number(spendPorCanalMap && spendPorCanalMap[canal]) || 0;
+  if (spend <= 0) return null;
+  const n = (leadsReaisPorCanal(leads)[canal]) || 0;
+  return n > 0 ? spend / n : null;
+}
+
+// _mediana(): mediana de um array de números. Helper puro interno de tempoDeCiclo. null se vazio.
+function _mediana(arr){
+  if (!arr || !arr.length) return null;
+  const s = arr.slice().sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length % 2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+// tempoDeCiclo(): velocidade do funil comercial a partir das datas do CRM (arquitetura §3.5). PURA.
+// leadToOpp : dataCriacao → dataConversao (linhas isOpportunity)
+// oppToGanho: dataConversao → dataFechamento (linhas isWon)
+// Diferença em dias = (dataB - dataA)/86400000. Ignora linhas com data faltante/inválida ou diferença
+// negativa (dado sujo). Mediana é o destaque (robusta a outliers); média secundária. n=0 → render "—".
+function tempoDeCiclo(sfRows){
+  const rows = sfRows || [];
+  const DIA = 86400000;
+  const leadToOpp = [], oppToGanho = [];
+  rows.forEach(r=>{
+    if (r.isOpportunity && r.dataCriacao && r.dataConversao){
+      const dias = (r.dataConversao - r.dataCriacao)/DIA;
+      if (isFinite(dias) && dias >= 0) leadToOpp.push(dias);
+    }
+    if (r.isWon && r.dataConversao && r.dataFechamento){
+      const dias = (r.dataFechamento - r.dataConversao)/DIA;
+      if (isFinite(dias) && dias >= 0) oppToGanho.push(dias);
+    }
+  });
+  const resumo = arr => ({
+    mediaDias:   arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null,
+    medianaDias: _mediana(arr),
+    n:           arr.length
+  });
+  return { leadToOpp: resumo(leadToOpp), oppToGanho: resumo(oppToGanho) };
+}
+
+// qualifPorSegmento(): taxa de qualificação por dimensão (arquitetura §3.7). PURA — não toca o DOM.
+// `dimensaoFn(c)`: recebe o array de colunas do lead (r.c) e devolve o rótulo do bucket — o chamador
+// compõe com as funções norm* (ex: c=>normCanal(c[15]?.v,c[14]?.v,c[10]?.v) ou c=>normPorte(c[7]?.v)),
+// que têm assinaturas diferentes, por isso o accessor recebe o array de colunas. Qualificado = c[24]
+// contém "qualificado" (mesmo critério de renderLeads). Retorna [{label,total,qualificados,taxa}];
+// taxa é % (0 se total=0 — nunca NaN).
+function qualifPorSegmento(leads, dimensaoFn){
+  const acc = {};
+  (leads||[]).forEach(r=>{
+    const c = r.c || [];
+    const label = dimensaoFn(c);
+    if (!acc[label]) acc[label] = { label, total:0, qualificados:0 };
+    acc[label].total++;
+    if ((c[24]?.v||'').toLowerCase().includes('qualificado')) acc[label].qualificados++;
+  });
+  return Object.values(acc).map(o=>({ ...o, taxa: o.total>0 ? o.qualificados/o.total*100 : 0 }));
+}
+
+// agruparPorPeriodo(): série temporal por bucket de data (arquitetura §3.6/§6.1). PURA — não toca o DOM.
+// `dateAccessor(row)`: devolve um Date (ou null/inválido) da linha. `granularidade`: 'dia' | 'semana' |
+// 'auto'. 'auto' (padrão): 'dia' se a amplitude do período for <=31 dias, senão 'semana' (evita gráfico
+// ilegível em 90d). 'semana' agrupa pela segunda-feira da semana. Ignora linhas sem data válida.
+// Retorna [{bucket:'YYYY-MM-DD', valor:n}] ordenado por data.
+function agruparPorPeriodo(rows, dateAccessor, granularidade){
+  const datas = [];
+  (rows||[]).forEach(row=>{
+    const d = dateAccessor(row);
+    if (d instanceof Date && !isNaN(d)) datas.push(d);
+  });
+  if (!datas.length) return [];
+  let gran = granularidade;
+  if (!gran || gran === 'auto'){
+    const tempos = datas.map(d=>d.getTime());
+    const amplitudeDias = (Math.max(...tempos) - Math.min(...tempos))/86400000;
+    gran = amplitudeDias <= 31 ? 'dia' : 'semana';
+  }
+  const fmtKey = d => {
+    const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (gran === 'semana'){ const dow = (dd.getDay()+6)%7; dd.setDate(dd.getDate()-dow); } // 0=segunda
+    const y = dd.getFullYear();
+    const m = String(dd.getMonth()+1).padStart(2,'0');
+    const day = String(dd.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
+  const acc = {};
+  datas.forEach(d=>{ const k = fmtKey(d); acc[k] = (acc[k]||0)+1; });
+  return Object.keys(acc).sort().map(bucket=>({ bucket, valor: acc[bucket] }));
+}
+
+function trendHTML(cur, prev, invert){
+  if (prev===null || prev===undefined || prev===0) return '<span style="color:var(--muted)">sem período anterior</span>';
+  const diff = ((cur-prev)/Math.abs(prev))*100;
+  const flat = Math.abs(diff) < 0.5;
+  const up = diff >= 0;
+  const good = invert ? !up : up;
+  const color = flat ? 'var(--muted)' : (good ? 'var(--green)' : 'var(--red)');
+  const arrow = flat ? '—' : (up ? '▲' : '▼');
+  return `<span style="color:${color};font-weight:600">${arrow} ${Math.abs(diff).toFixed(1)}%</span> <span style="color:var(--muted)">vs período anterior</span>`;
+}
+function setKpi(prefix, value, trendInner){
+  const v = document.getElementById(prefix+'-value'); if (v) v.textContent = value;
+  const t = document.getElementById(prefix+'-trend'); if (t) t.innerHTML = trendInner;
+}
+
+async function loadOverview(){
+  const p = period(), pp = prevPeriod();
+  // Garante _allSalesforce carregado — o Overview agora mostra Receita/ROAS (financeSummary, arquitetura §4.1).
+  // Mesmo padrão de loadMeta com loadLeads: só busca se ainda não populado (carregarTudo já roda loadSalesforce antes).
+  if (!(_allSalesforce && _allSalesforce.length)) {
+    try { await loadSalesforce(); } catch(e){ console.warn('Salesforce (overview) falhou:', e); }
+  }
+  const [cur, prev] = await Promise.all([
+    fetchAdsData(),
+    fetchAdsDataPrev().catch(e=>{ console.warn('período anterior (ads) falhou:', e); return null; })
+  ]);
+
+  // Superfície de erro de canal também no Overview (arquitetura §8.2): se algum canal do backend
+  // voltou status:"error", o Overview mostra o banner consolidado em vez de exibir zeros silenciosos.
+  showOverviewErrors(cur);
+
+  const curLeads  = leadsInRange(p.startDate, p.endDate);
+  const prevLeads = prev ? leadsInRange(pp.startDate, pp.endDate) : [];
+  const curLQ  = curLeads.filter(r=>(r.c[24]?.v||'').toLowerCase().includes('qualificado')).length;
+  const prevLQ = prevLeads.filter(r=>(r.c[24]?.v||'').toLowerCase().includes('qualificado')).length;
+
+  const gA = cur.googleAds?.totals||{}, mA = cur.metaAds?.totals||{}, lA = cur.linkedIn?.totals||{};
+  const gAp = prev?.googleAds?.totals, mAp = prev?.metaAds?.totals, lAp = prev?.linkedIn?.totals;
+
+  const spend     = (gA.spend||0)+(mA.spend||0)+(lA.spend||0);
+  const spendPrev = prev ? (gAp?.spend||0)+(mAp?.spend||0)+(lAp?.spend||0) : null;
+
+  const cpl     = curLeads.length>0 ? spend/curLeads.length : 0;
+  const cplPrev = (prev && prevLeads.length>0) ? spendPrev/prevLeads.length : null;
+
+  const taxaQualif     = curLeads.length>0 ? curLQ/curLeads.length*100 : 0;
+  const taxaQualifPrev = (prev && prevLeads.length>0) ? prevLQ/prevLeads.length*100 : null;
+
+  const ga4     = ga4ForActiveProp(cur);
+  const ga4Prev = prev ? ga4ForActiveProp(prev) : null;
+  const sessions     = ga4?.totals?.sessions||0;
+  const sessionsPrev = ga4Prev ? (ga4Prev.totals?.sessions ?? null) : null;
+  const bounce     = (ga4?.totals?.bounceRate||0)*100;
+  const bouncePrev = ga4Prev ? (ga4Prev.totals?.bounceRate*100 ?? null) : null;
+
+  // ── Financeiro (Receita / ROAS blended) — regra de ouro: ROAS usa receita marketing-atribuída (§3.1) ──
+  const sfRows = salesforceInRange(p.startDate, p.endDate);
+  const fin = financeSummary(sfRows, spend);
+  const roas = fin.roasRealizado; // null quando não há spend → KPI mostra "—"
+  const pctMkt = fin.receitaGanhaTotal>0 ? (fin.receitaGanhaMkt/fin.receitaGanhaTotal*100) : null;
+
+  setKpi('ovx-spend', brl(spend), trendHTML(spend, spendPrev, true));
+  setKpi('ovx-leads', fmt(curLeads.length), trendHTML(curLeads.length, prevLeads.length));
+
+  const receitaEl = document.getElementById('ovx-receita-value');
+  if (receitaEl) receitaEl.textContent = fin.receitaGanhaTotal>0 ? brl(fin.receitaGanhaTotal) : '—';
+  const receitaFoot = document.getElementById('ovx-receita-foot');
+  if (receitaFoot) receitaFoot.innerHTML = pctMkt!=null
+    ? `<span style="color:var(--muted)">${pctMkt.toFixed(0)}% atribuído a marketing</span>` : '';
+
+  const roasMeta = metaHTML(roas, 'roasBlended', v=>Number(v).toFixed(2)+'x');
+  setKpi('ovx-roas', roas!=null ? roas.toFixed(2)+'x' : '—', roasMeta);
+
+  const cplMeta = cpl>0 ? metaHTML(cpl, 'cplBlended', v=>brl(v)) : '';
+  setKpi('ovx-cpl', cpl>0?brl(cpl):'—', trendHTML(cpl, cplPrev, true) + (cplMeta?`<div>${cplMeta}</div>`:''));
+  const qualifMeta = metaHTML(taxaQualif, 'taxaQualif', v=>Number(v).toFixed(0)+'%');
+  setKpi('ovx-qualif', taxaQualif.toFixed(1)+'%', trendHTML(taxaQualif, taxaQualifPrev) + (qualifMeta?`<div>${qualifMeta}</div>`:''));
+  setKpi('ovx-sessions', fmt(sessions), trendHTML(sessions, sessionsPrev));
+  setKpi('ovx-bounce', bounce.toFixed(1)+'%', trendHTML(bounce, bouncePrev, true));
+
+  // ── Funil de aquisição (TOFU → MOFU → BOFU) ──
+  const maxFunil = Math.max(sessions, curLeads.length, curLQ, 1);
+  const funilRows = [
+    { label:'Sessões', v:sessions, color:CORES[0] },
+    { label:'Leads', v:curLeads.length, color:CORES[2] },
+    { label:'Leads qualificados', v:curLQ, color:CORES[1] }
+  ];
+  const funilEl = document.getElementById('ovx-funnel');
+  if (funilEl) {
+    funilEl.innerHTML = funilRows.map((r,i)=>{
+      const w = maxFunil>0 ? Math.round(r.v/maxFunil*100) : 0;
+      const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
+      return `<div class="bar-row"><div class="bar-label" style="width:150px">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${r.color}"></div></div><div class="bar-val" style="width:150px;text-align:right">${fmt(r.v)} <span style="color:var(--muted);font-size:10px">${conv}</span></div></div>`;
+    }).join('');
+  }
+
+  // ── Comparação de canais pagos ──
+  const rowsChannels = [
+    { label:'Google ADS', spend:gA.spend||0, impr:gA.impr||0, clicks:gA.clicks||0, ctr:gA.ctr||0, results:gA.conv||0, cpl:gA.cpa||0, color:CORES[0] },
+    { label:'Meta ADS', spend:mA.spend||0, impr:mA.impr||0, clicks:mA.clicks||0, ctr:mA.ctr||0, results:mA.results||0, cpl:mA.cpl||0, color:CORES[3] },
+    { label:'LinkedIn ADS', spend:lA.spend||0, impr:lA.impr||0, clicks:lA.clicks||0, ctr:lA.ctr||0, results:lA.conv||0, cpl:lA.cpl||0, color:CORES[5] }
+  ];
+  const totalSpendAll = rowsChannels.reduce((s,r)=>s+r.spend,0) || 1;
+  const navByLabel = { 'Google ADS':'gads', 'Meta ADS':'meta', 'LinkedIn ADS':'linkedin' };
+  // Regra de ouro (arquitetura §4.1/§5): a coluna "Leads reais" vem da Central de Leads (leadsReaisPorCanal),
+  // não do 'results'/'conv' auto-reportado; "CPL real" = investimento do canal ÷ leads reais do canal.
+  const leadsReaisMap = leadsReaisPorCanal(curLeads);
+  const chBody = document.getElementById('ovx-channel-body');
+  if (chBody) {
+    chBody.innerHTML = rowsChannels.map(r=>{
+      const share = Math.round(r.spend/totalSpendAll*100);
+      const leadsReais = leadsReaisMap[r.label]||0;
+      const cplReal = leadsReais>0 ? r.spend/leadsReais : null;
+      return `<tr data-nav role="button" tabindex="0" data-action="showView" data-arg="${esc(navByLabel[r.label]||'')}" data-arg2="true">
+      <td><div class="t-name">${esc(r.label)}</div></td>
+      <td style="font-family:var(--mono);font-weight:500">${brl(r.spend)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td>${r.ctr.toFixed(2)}%</td>
+      <td style="font-weight:500">${fmt(leadsReais)}</td>
+      <td style="font-family:var(--mono)">${cplReal!=null?brl(cplReal):'—'}</td>
+      <td><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div class="bar-track" style="width:50px"><div class="bar-fill" style="width:${share}%;background:${r.color}"></div></div><span style="width:32px">${share}%</span></div></td>
+    </tr>`;
+    }).join('');
+  }
+
+  mkLeg(document.getElementById('ovx-spend-leg'), rowsChannels.map(r=>r.label));
+  mkChart('c-ovx-spend','doughnut', rowsChannels.map(r=>r.label), [{data:rowsChannels.map(r=>r.spend), backgroundColor:rowsChannels.map(r=>r.color), borderWidth:0}], {
+    cutout:'62%',
+    onClick:(evt,els)=>{ if(!els.length)return; const label=rowsChannels[els[0].index].label; showView(navByLabel[label], true); }
+  });
+
+  const chLabs = (ga4?.channels||[]).map(c=>c.channel);
+  const chData = (ga4?.channels||[]).map(c=>c.sessions);
+  mkLeg(document.getElementById('ovx-sess-leg'), chLabs);
+  mkChart('c-ovx-canal','bar', chLabs, [{label:'Sessões',data:chData,backgroundColor:CORES.slice(0,chLabs.length),borderWidth:0,borderRadius:4}], {
+    scales:scOpts(),
+    onClick:(evt,els)=>{ if(!els.length)return; activeChannel=chLabs[els[0].index]; showView('ga4', true); loadGA4(); }
+  });
+
+  // ── Sessões × Leads por canal (cruzamento GA4 + RD Station) ──
+  // Agrega os canais do GA4 pelo mesmo agrupamento usado nos leads (evita contar o mesmo
+  // lead mais de uma vez quando vários canais do GA4 caem no mesmo grupo, ex: Direct/Unassigned/Cross-network → Direto)
+  const leadsByBucket = {};
+  curLeads.forEach(r=>{ const b = normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v); leadsByBucket[b]=(leadsByBucket[b]||0)+1; });
+  const crossBody = document.getElementById('ovx-cross-body');
+  if (crossBody) {
+    const bucketAgg = {};
+    (ga4?.channels||[]).forEach(c=>{
+      const bucket = ga4ToLeadBucket(c.channel);
+      if (!bucketAgg[bucket]) bucketAgg[bucket] = { sessions:0, _bw:0, channels:[] };
+      bucketAgg[bucket].sessions += c.sessions;
+      bucketAgg[bucket]._bw += c.sessions * c.bounceRate;
+      bucketAgg[bucket].channels.push(c.channel);
+    });
+    const bucketOrder = ['Google ADS','Meta ADS','Orgânico','E-mail','Direto'];
+    // Mostra o bucket se houver sessões OU leads — um bucket com leads e 0 sessões no GA4
+    // é um sinal real de gap de rastreamento (ex: UTM medium não reconhecido pelo GA4), não deve ser escondido.
+    const crossRows = bucketOrder.filter(b=>bucketAgg[b] || leadsByBucket[b]).map(b=>{
+      const agg = bucketAgg[b] || { sessions:0, _bw:0, channels:[] };
+      const leads = leadsByBucket[b]||0;
+      return { bucket:b, sessions:agg.sessions, leads, convRate: agg.sessions>0 ? leads/agg.sessions*100 : 0, bounceRate: agg.sessions>0 ? agg._bw/agg.sessions : 0, subChannels: agg.channels };
+    });
+    crossBody.innerHTML = crossRows.length ? crossRows.map(r=>{
+      const onlyChannel = r.subChannels.length===1 ? r.subChannels[0] : '';
+      const semRastreio = r.sessions===0 && r.leads>0;
+      const convCell = semRastreio
+        ? `<span style="color:var(--amber)" title="Há leads atribuídos a este canal, mas o GA4 não registrou sessões correspondentes — provável UTM medium não reconhecido pelo agrupamento padrão de canal.">sem rastreio</span>`
+        : `${r.convRate.toFixed(2)}%`;
+      return `<tr data-nav role="button" tabindex="0" data-action="filtrarGA4Canal" data-arg="${esc(onlyChannel)}">
+      <td><div class="t-name">${esc(r.bucket)}</div><div class="t-sub">${esc(r.subChannels.join(', '))||'—'}</div></td>
+      <td>${fmt(r.sessions)}</td>
+      <td style="font-weight:500">${fmt(r.leads)}</td>
+      <td>${convCell}</td>
+      <td class="${r.bounceRate*100<40?'rej-ok':r.bounceRate*100<65?'rej-warn':'rej-bad'}">${r.sessions>0?(r.bounceRate*100).toFixed(1)+'%':'—'}</td>
+    </tr>`;
+    }).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
+  }
+
+  // ── Leads recentes ──
+  const badge2 = document.getElementById('leads-badge2'); if (badge2) badge2.textContent = curLeads.length + ' leads no período';
+  const bodyEl = document.getElementById('ovx-leads-body');
+  if (bodyEl) {
+    bodyEl.innerHTML = curLeads.slice(-8).reverse().map(r=>{
+      const c = r.c||[]; const bc = (c[24]?.v||'').toLowerCase().includes('qualificado')?'lq':'lead';
+      return `<tr>
+        <td><div class="t-name">${esc(c[3]?.v)||'—'}</div><div class="t-sub">${esc(c[5]?.v)||'—'}</div></td>
+        <td style="color:var(--muted);font-size:12px">${esc(normCargo(c[6]?.v))}</td>
+        <td>${pill(normCanal(c[15]?.v,c[14]?.v,c[10]?.v))}</td>
+        <td><span class="badge ${bc}">${esc(c[24]?.v)||'Lead'}</span></td>
+        <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${(c[26]?.v||c[0]?.v||'').toString().slice(0,10)}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+function ga4ForActiveProp(d) {
+  if (!d || !d.ga4) return { channels: [], campaigns: [], landingPages: [], totals: { sessions: 0, users: 0, conversions: 0, bounceRate: 0 } };
+  return activeProp === 'all' ? d.ga4.merged : (d.ga4.byProperty?.[activeProp] || d.ga4.merged);
+}
+
+// Mostra/esconde o banner de erro de um canal com base no status devolvido pelo
+// backend n8n (status:"error" quando a chamada à API do canal falhou — token
+// expirado, rate limit etc — evita mostrar "0" como se fosse um período sem dados).
+function showChannelError(prefix, channelData) {
+  const banner = document.getElementById(prefix + '-error-banner');
+  const msg = document.getElementById(prefix + '-error-msg');
+  if (!banner) return;
+  const hasError = channelData && channelData.status === 'error';
+  banner.style.display = hasError ? 'block' : 'none';
+  if (hasError && msg) msg.textContent = channelData.error || 'erro desconhecido';
+}
+
+// Estende a mesma UX de banner de erro ao Overview: consolida os canais que voltaram
+// status:"error" numa única faixa (mesmo padrão do *-error-banner por canal). No-op se o
+// banner não existir no DOM (mesma guarda de showChannelError).
+function showOverviewErrors(cur) {
+  const banner = document.getElementById('ovx-error-banner');
+  const msg = document.getElementById('ovx-error-msg');
+  if (!banner) return;
+  const canais = { 'Google Ads': cur?.googleAds, 'Meta Ads': cur?.metaAds, 'LinkedIn Ads': cur?.linkedIn, 'GA4': cur?.ga4 };
+  const falhas = Object.entries(canais).filter(([, d]) => d && d.status === 'error').map(([n]) => n);
+  banner.style.display = falhas.length ? 'block' : 'none';
+  if (falhas.length && msg) msg.textContent = falhas.join(', ');
+}
+
+// Presentation helper (v2): célula de taxa de conversão com semáforo de meta (ux-spec §2.3/§2.5).
+// `rate` = número (%) ou null → "—". `metaKey` (opcional) colore: verde ≥ alvo, âmbar dentro de 15%, muted abaixo.
+// Não é função pura de CALC (devolve HTML) — o cálculo em si vem de convRate().
+function convCellHTML(rate, metaKey){
+  if (rate == null) return '<span style="color:var(--muted)">—</span>';
+  let color = 'var(--text)';
+  const meta = metaKey ? METAS[metaKey] : null;
+  if (meta && meta.alvo != null){
+    const ratio = rate/meta.alvo;
+    color = ratio>=1 ? 'var(--green)' : ratio>=0.85 ? 'var(--amber)' : 'var(--muted)';
+  }
+  return `<span style="font-family:var(--mono);font-weight:600;color:${color}">${rate.toFixed(2)}%</span>`;
+}
+
+async function loadGA4(){
+  const d = await fetchAdsData();
+  showChannelError('ga4', d.ga4);
+  const ga = ga4ForActiveProp(d);
+  const sc = { scales: scOpts() };
+
+  const channels = ga.channels || [];
+  const t = ga.totals || {};
+
+  document.getElementById('ga-sess').textContent   = fmt(t.sessions||0);
+  document.getElementById('ga-users').textContent  = fmt(t.users||0);
+  document.getElementById('ga-conv').textContent   = fmt(t.conversions||0);
+  document.getElementById('ga-bounce').textContent = ((t.bounceRate||0)*100).toFixed(1)+'%';
+  // Taxa de conversão total (GA4) no rodapé do KPI Conversões + selo de meta ga4Conversion (ux-spec §2.3).
+  const convTotal = convRate(t.conversions||0, t.sessions||0);
+  const convFoot = document.getElementById('ga-conv-foot');
+  if (convFoot) convFoot.innerHTML = convTotal!=null
+    ? `<span style="color:var(--muted)">Taxa: ${convTotal.toFixed(2)}%</span>` + (metaHTML(convTotal,'ga4Conversion',v=>Number(v).toFixed(0)+'%')?`<div>${metaHTML(convTotal,'ga4Conversion',v=>Number(v).toFixed(0)+'%')}</div>`:'')
+    : '';
+
+  // ── Popular o seletor de canal (mantém seleção atual se ainda existir) ──
+  const selCanal = document.getElementById('f-canal');
+  if (selCanal) {
+    const cur = activeChannel;
+    selCanal.innerHTML = '<option value="">Todos os canais</option>' +
+      channels.map(c=>`<option value="${esc(c.channel)}"${c.channel===cur?' selected':''}>${esc(c.channel)}</option>`).join('');
+    if (cur && !channels.some(c=>c.channel===cur)) activeChannel = '';
+  }
+
+  const labs = channels.map(c=>c.channel);
+  const dS   = channels.map(c=>c.sessions);
+  mkLeg(document.getElementById('ga-leg'), labs);
+  mkChart('c-ga-canal','bar',labs,[{label:'Sessões',data:dS,backgroundColor:labs.map((l,i)=>!activeChannel||l===activeChannel?CORES[i%CORES.length]:'rgba(255,255,255,0.08)'),borderWidth:0,borderRadius:4}],{
+    ...sc,
+    onClick:(evt,els)=>{ if(!els.length)return; const i=els[0].index; const val=labs[i]===activeChannel?'':labs[i]; activeChannel=val; if(selCanal) selCanal.value=val; loadGA4(); }
+  });
+
+  const channelsFiltered = activeChannel ? channels.filter(c=>c.channel===activeChannel) : channels;
+  document.getElementById('ga-body').innerHTML = channelsFiltered.length ? channelsFiltered.map((c)=>{
+    const i = channels.indexOf(c);
+    return `<tr>
+    <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${CORES[i%CORES.length]};margin-right:8px;vertical-align:middle"></span>${esc(c.channel)}</td>
+    <td>${fmt(c.sessions)}</td><td>${fmt(c.users)}</td><td>${fmt(c.conversions)}</td>
+    <td>${convCellHTML(convRate(c.conversions, c.sessions), 'ga4Conversion')}</td>
+    <td class="${c.bounceRate*100<40?'rej-ok':c.bounceRate*100<65?'rej-warn':'rej-bad'}">${(c.bounceRate*100).toFixed(1)}%</td>
+  </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Sem dados no período</td></tr>';
+
+  const campaigns = ga.campaigns || [];
+  const campaignsFiltered = activeChannel ? campaigns.filter(c=>c.channel===activeChannel) : campaigns;
+  document.getElementById('utm-body').innerHTML = campaignsFiltered.length ? campaignsFiltered.map(c=>`<tr>
+    <td><div class="t-name">${esc(c.campaign)||'(sem nome)'}</div><div class="t-sub">${esc(c.channel)||''}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${esc(c.source)} / ${esc(c.medium)}</td>
+    <td>${fmt(c.sessions)}</td><td>${fmt(c.conversions)}</td>
+    <td>${convCellHTML(convRate(c.conversions, c.sessions), 'ga4Conversion')}</td>
+    <td class="${c.bounceRate*100<40?'rej-ok':c.bounceRate*100<65?'rej-warn':'rej-bad'}">${(c.bounceRate*100).toFixed(1)}%</td>
+  </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhuma campanha UTM no período (ou nenhuma no canal filtrado)</td></tr>';
+
+  const landingPages = ga.landingPages || [];
+  document.getElementById('lp-body').innerHTML = landingPages.length ? landingPages.map(r=>{
+    const u = r.page;
+    return `<tr><td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u)}">${esc(u.length>60?'…'+u.slice(-58):u)}</td>
+    <td>${fmt(r.sessions)}</td><td>${fmt(r.conversions)}</td>
+    <td>${convCellHTML(convRate(r.conversions, r.sessions), 'lpConversion')}</td>
+    <td class="${r.bounceRate*100<40?'rej-ok':r.bounceRate*100<65?'rej-warn':'rej-bad'}">${(r.bounceRate*100).toFixed(1)}%</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
+  // Indicador de meta lpConversion sobre a taxa de conversão agregada das LPs (ux-spec §5.2).
+  const lpSess = landingPages.reduce((s,r)=>s+(r.sessions||0),0);
+  const lpConv = landingPages.reduce((s,r)=>s+(r.conversions||0),0);
+  const lpRate = convRate(lpConv, lpSess);
+  const lpHint = document.getElementById('lp-conv-hint');
+  if (lpHint) {
+    const base = 'Ordenado por volume de sessões. A LP mais eficiente é a de maior taxa de conversão, não a de mais sessões.';
+    const pill = lpRate!=null ? metaHTML(lpRate, 'lpConversion', v=>Number(v).toFixed(0)+'%') : '';
+    lpHint.innerHTML = `${base}${lpRate!=null?` Taxa média: ${lpRate.toFixed(2)}%.`:''}` + (pill?` ${pill}`:'');
+  }
+}
+
+function switchMetaTab(tab) {
+  document.querySelectorAll('.meta-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.meta-tab-content').forEach(c => c.style.display = 'none');
+  document.querySelector(`.meta-tab[onclick*="${tab}"]`).classList.add('active');
+  document.getElementById(`meta-tab-${tab}`).style.display = 'block';
+  const counts = { camps: _metaData.camps.length, adsets: _metaData.adsets.length, ads: _metaData.ads.length };
+  document.getElementById('m-tab-badge').textContent = counts[tab] + ' ' + (tab === 'camps' ? 'campanhas' : tab === 'adsets' ? 'conjuntos' : 'anúncios');
+}
+
+let _metaData = { camps: [], adsets: [], ads: [] };
+
+async function loadMeta(){
+  const d = await fetchAdsData();
+  showChannelError('m', d.metaAds);
+  await loadLeads(); // garante _allLeads pronto p/ CPL real, independente da ordem do Promise.allSettled em carregarTudo
+  const m = d.metaAds || {};
+  const camps  = (m.campaigns || []).map(c => ({ ...c, resultType: c.resultType || '—' }));
+  const adsets = (m.adsets || []).map(a => ({ ...a, resultType: a.resultType || '—' }));
+  const ads    = (m.ads || []).map(a => ({ ...a, resultType: a.resultType || '—' }));
+
+  _metaData = { camps, adsets, ads };
+
+  // ── KPIs TOTAIS (soma das campanhas) ──
+  const totSpend  = camps.reduce((s,c) => s+c.spend, 0);
+  const totImpr   = camps.reduce((s,c) => s+c.impr, 0);
+  const totClicks = camps.reduce((s,c) => s+c.clicks, 0);
+  const totReach  = camps.reduce((s,c) => s+c.reach, 0);
+  const totResults= camps.reduce((s,c) => s+c.results, 0);
+  const ctrGeral  = totImpr > 0 ? (totClicks/totImpr*100) : 0;
+  // CPL real: investimento / leads reais da Central de Leads (NÃO o "resultado" auto-reportado
+  // pela Meta, que mistura leads de site com leads nativos do formulário e mascara o custo real —
+  // ver print do usuário: campanha reportando "Leads: 124 = 35 no site + 89 na Meta").
+  const leadsPorCampanha = leadsReaisPorCampanha();
+  const totalLeadsReais = camps.reduce((s,c) => s + (leadsPorCampanha[standardizeCampanha(c.name) || c.name] || 0), 0);
+  const cplGeral  = totalLeadsReais > 0 ? totSpend/totalLeadsReais : 0;
+
+  document.getElementById('m-spend').textContent  = brl(totSpend);
+  document.getElementById('m-impr').textContent   = fmt(totImpr);
+  document.getElementById('m-clicks').textContent = fmt(totClicks);
+  document.getElementById('m-ctr').textContent    = ctrGeral.toFixed(2)+'%';
+  document.getElementById('m-reach').textContent  = fmt(totReach);
+  document.getElementById('m-cpl').textContent    = cplGeral > 0 ? brl(cplGeral) : '—';
+  const mCplFooter = document.getElementById('m-cpl-footer');
+  if (mCplFooter) mCplFooter.textContent = `${fmt(totalLeadsReais)} leads reais (Meta reportou ${fmt(totResults)})`;
+
+  // Trend período-a-período do gasto (Média #9, §6.2) — reusa fetchAdsDataPrev (já cacheado) + trendHTML.
+  try {
+    const dPrev = await fetchAdsDataPrev();
+    const mp = dPrev && dPrev.metaAds;
+    const spendPrev = mp ? ((mp.campaigns||[]).reduce((s,c)=>s+(c.spend||0),0) || (mp.totals?.spend||0)) : null;
+    const el = document.getElementById('m-spend-trend');
+    if (el) el.innerHTML = trendHTML(totSpend, spendPrev, true);
+  } catch(e){ console.warn('período anterior (Meta spend trend) falhou:', e); }
+
+  // ── TABELA CAMPANHAS ──
+  document.getElementById('m-camps-body').innerHTML = camps.length ? camps.map(c => `<tr>
+    <td><div class="t-name">${esc(c.name)}</div></td>
+    <td>${statusChip(c.status)}</td>
+    <td style="font-weight:500">${c.results > 0 ? fmt(c.results) : '—'}<div class="t-sub">${esc(c.resultType)}</div></td>
+    <td>${fmt(c.reach)}</td>
+    <td>${c.freq > 0 ? c.freq.toFixed(2) : '—'}</td>
+    <td style="font-family:var(--mono)">${c.costPerResult > 0 ? brl(c.costPerResult) : '—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(c.spend)}</td>
+    <td>${fmt(c.clicks)}</td>
+    <td class="${c.ctr>2?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
+    <td style="font-family:var(--mono)">${c.cpc > 0 ? brl(c.cpc) : '—'}</td>
+  </tr>`).join('') : '<tr><td colspan="10" class="empty">Nenhuma campanha no período</td></tr>';
+
+  // ── TABELA CONJUNTOS ──
+  document.getElementById('m-adsets-body').innerHTML = adsets.length ? adsets.map(a => `<tr>
+    <td><div class="t-name">${esc(a.name)}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${esc(a.campaign)}</td>
+    <td>${statusChip(a.status)}</td>
+    <td style="font-weight:500">${a.results > 0 ? fmt(a.results) : '—'}<div class="t-sub">${esc(a.resultType)}</div></td>
+    <td>${fmt(a.reach)}</td>
+    <td style="font-family:var(--mono)">${a.costPerResult > 0 ? brl(a.costPerResult) : '—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(a.spend)}</td>
+    <td>${fmt(a.clicks)}</td>
+    <td class="${a.ctr>2?'rej-ok':a.ctr>1?'rej-warn':'rej-bad'}">${a.ctr.toFixed(2)}%</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhum conjunto no período</td></tr>';
+
+  // ── TABELA ANÚNCIOS ──
+  document.getElementById('m-ads-body').innerHTML = ads.length ? ads.map(a => `<tr>
+    <td><div class="t-name">${esc(a.name)}</div></td>
+    <td style="font-size:11px;color:var(--muted)">${esc(a.adset)}</td>
+    <td>${statusChip(a.status)}</td>
+    <td style="font-weight:500">${a.results > 0 ? fmt(a.results) : '—'}<div class="t-sub">${esc(a.resultType)}</div></td>
+    <td>${fmt(a.reach)}</td>
+    <td style="font-family:var(--mono)">${a.costPerResult > 0 ? brl(a.costPerResult) : '—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(a.spend)}</td>
+    <td>${fmt(a.clicks)}</td>
+    <td class="${a.ctr>2?'rej-ok':a.ctr>1?'rej-warn':'rej-bad'}">${a.ctr.toFixed(2)}%</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhum anúncio no período</td></tr>';
+
+  // Badge da tab ativa
+  document.getElementById('m-tab-badge').textContent = camps.length + ' campanhas';
+
+  // ── GRÁFICOS ──
+  const spendRows = [...camps].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
+  mkBars(document.getElementById('m-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], CORES[3]);
+
+  const resultRows = [...camps].sort((a,b)=>b.results-a.results).slice(0,6);
+  mkLeg(document.getElementById('m-click-leg'), resultRows.map(c=>c.name.slice(0,18)));
+  mkChart('c-meta-clicks','doughnut', resultRows.map(c=>c.name.slice(0,18)),
+    [{data:resultRows.map(c=>c.results||c.clicks),backgroundColor:CORES.slice(0,resultRows.length),borderWidth:0}],{cutout:'62%'});
+}
+
+// ── MAIN ─────────────────────────────────────────────────────
+// Busca dados agregados de LinkedIn Ads + Google Ads via webhook do n8n.
+// O n8n guarda as credenciais e faz as chamadas às APIs; esta página nunca vê tokens.
+const _adsCacheStore = {};
+async function fetchAdsDataForRange(startDate, endDate){
+  const key = startDate + '_' + endDate;
+  if (_adsCacheStore[key]) return _adsCacheStore[key];
+  const r = await fetch(`${ADS_API_URL}?start=${startDate}&end=${endDate}`);
+  if (!r.ok) throw new Error('Ads API: HTTP ' + r.status);
+  const d = await r.json();
+  _adsCacheStore[key] = d;
+  return d;
+}
+async function fetchAdsData(){
+  const p = period();
+  return fetchAdsDataForRange(p.startDate, p.endDate);
+}
+function prevPeriod(){
+  const p = period();
+  const start = new Date(p.startDate+'T00:00:00'), end = new Date(p.endDate+'T00:00:00');
+  const days = Math.round((end-start)/86400000)+1;
+  const prevEnd = new Date(start.getTime()-86400000);
+  const prevStart = new Date(prevEnd.getTime()-(days-1)*86400000);
+  const f = x=>x.toISOString().slice(0,10);
+  return { startDate: f(prevStart), endDate: f(prevEnd) };
+}
+async function fetchAdsDataPrev(){
+  const pp = prevPeriod();
+  return fetchAdsDataForRange(pp.startDate, pp.endDate);
+}
+
+async function loadLinkedIn(){
+  const d = await fetchAdsData();
+  showChannelError('li', d.linkedIn);
+  const li = d.linkedIn || {};
+  const campRows = li.campaigns || [];
+  const t = li.totals || {};
+
+  document.getElementById('li-spend').textContent  = brl(t.spend||0);
+  document.getElementById('li-impr').textContent   = fmt(t.impr||0);
+  document.getElementById('li-clicks').textContent = fmt(t.clicks||0);
+  document.getElementById('li-ctr').textContent    = (t.ctr||0).toFixed(2)+'%';
+  document.getElementById('li-conv').textContent   = fmt(t.conv||0);
+  document.getElementById('li-cpl').textContent    = t.cpl>0 ? brl(t.cpl) : '—';
+
+  // CPL real (regra de ouro §3.8): investimento ÷ leads reais do canal LinkedIn na Central de Leads.
+  // Fica "—" quando não há leads reais atribuídos ao bucket 'LinkedIn ADS' no período (não inventa dado).
+  if (!(_allLeads && _allLeads.length)) { try { await loadLeads(); } catch(e){ console.warn('leads (LinkedIn CPL real) falhou:', e); } }
+  const pLi = period();
+  const liLeads = leadsInRange(pLi.startDate, pLi.endDate);
+  const liLeadsReais = leadsReaisPorCanal(liLeads)['LinkedIn ADS'] || 0;
+  const liCplReal = cplRealPorCanal('LinkedIn ADS', liLeads, { 'LinkedIn ADS': t.spend||0 });
+  const liCplRealEl = document.getElementById('li-cpl-real');
+  if (liCplRealEl) liCplRealEl.textContent = liCplReal!=null ? brl(liCplReal) : '—';
+  const liCplRealFoot = document.getElementById('li-cpl-real-foot');
+  if (liCplRealFoot) liCplRealFoot.textContent = `${fmt(liLeadsReais)} leads reais`;
+
+  // Trend período-a-período do gasto (Média #9, §6.2).
+  try {
+    const dPrev = await fetchAdsDataPrev();
+    const spendPrev = dPrev && dPrev.linkedIn ? (dPrev.linkedIn.totals?.spend ?? null) : null;
+    const el = document.getElementById('li-spend-trend');
+    if (el) el.innerHTML = trendHTML(t.spend||0, spendPrev, true);
+  } catch(e){ console.warn('período anterior (LinkedIn spend trend) falhou:', e); }
+
+  document.getElementById('li-camps-badge').textContent = campRows.length + ' campanhas';
+  document.getElementById('li-camps-body').innerHTML = campRows.length ? campRows.map(c=>`<tr>
+    <td><div class="t-name">${esc(c.name)}</div></td>
+    <td>${statusChip(c.status)}</td>
+    <td style="font-family:var(--mono)">${brl(c.spend)}</td>
+    <td>${fmt(c.impr)}</td>
+    <td>${fmt(c.clicks)}</td>
+    <td class="${c.ctr>2?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
+    <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
+    <td style="font-weight:500">${fmt(c.conv)}</td>
+    <td style="font-family:var(--mono);font-weight:500">${c.cpl>0?brl(c.cpl):'—'}</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Sem dados no período</td></tr>';
+
+  const spendRows = [...campRows].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
+  mkBars(document.getElementById('li-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], '#0A66C2');
+
+  const clickRows = [...campRows].sort((a,b)=>b.clicks-a.clicks).slice(0,6);
+  mkLeg(document.getElementById('li-click-leg'), clickRows.map(c=>c.name.slice(0,20)));
+  mkChart('c-li-clicks','doughnut', clickRows.map(c=>c.name.slice(0,20)), [{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
+}
+
+function switchGadsTab(tab) {
+  document.querySelectorAll('#view-gads .meta-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#view-gads .meta-tab-content').forEach(c => c.style.display = 'none');
+  document.querySelector(`#view-gads .meta-tab[onclick*="${tab}"]`).classList.add('active');
+  document.getElementById(`gads-tab-${tab}`).style.display = 'block';
+}
+
+async function loadGoogleAds() {
+  const d = await fetchAdsData();
+  showChannelError('gads', d.googleAds);
+  const ga = d.googleAds || {};
+  const camps = ga.campaigns || [];
+  const t = ga.totals || {};
+
+  document.getElementById('ga-spend').textContent   = brl(t.spend||0);
+  document.getElementById('ga-impr').textContent    = fmt(t.impr||0);
+  document.getElementById('ga-clicks').textContent  = fmt(t.clicks||0);
+  document.getElementById('ga-ctr').textContent     = (t.ctr||0).toFixed(2)+'%';
+  document.getElementById('ga-conv-ads').textContent= fmt(Math.round(t.conv||0));
+  document.getElementById('ga-cpa').textContent     = t.cpa>0 ? brl(t.cpa) : '—';
+
+  // CPL real (regra de ouro §3.8): investimento ÷ leads reais do canal Google ADS na Central de Leads.
+  if (!(_allLeads && _allLeads.length)) { try { await loadLeads(); } catch(e){ console.warn('leads (Google CPL real) falhou:', e); } }
+  const pGa = period();
+  const gaLeads = leadsInRange(pGa.startDate, pGa.endDate);
+  const gaLeadsReais = leadsReaisPorCanal(gaLeads)['Google ADS'] || 0;
+  const gaCplReal = cplRealPorCanal('Google ADS', gaLeads, { 'Google ADS': t.spend||0 });
+  const gaCplRealEl = document.getElementById('ga-cpl-real');
+  if (gaCplRealEl) gaCplRealEl.textContent = gaCplReal!=null ? brl(gaCplReal) : '—';
+  const gaCplRealFoot = document.getElementById('ga-cpl-real-foot');
+  if (gaCplRealFoot) gaCplRealFoot.textContent = `${fmt(gaLeadsReais)} leads reais`;
+
+  // Trend período-a-período do gasto (Média #9, §6.2).
+  try {
+    const dPrev = await fetchAdsDataPrev();
+    const spendPrev = dPrev && dPrev.googleAds ? (dPrev.googleAds.totals?.spend ?? null) : null;
+    const el = document.getElementById('ga-spend-trend');
+    if (el) el.innerHTML = trendHTML(t.spend||0, spendPrev, true);
+  } catch(e){ console.warn('período anterior (Google spend trend) falhou:', e); }
+
+  document.getElementById('ga-camps-body').innerHTML = camps.length ? camps.map(c=>`<tr>
+    <td><div class="t-name">${esc(c.name)}</div></td>
+    <td>${statusChip(c.status==='ENABLED'?'ACTIVE':c.status)}</td>
+    <td>${fmt(c.impr)}</td>
+    <td>${fmt(c.clicks)}</td>
+    <td class="${c.ctr>3?'rej-ok':c.ctr>1?'rej-warn':'rej-bad'}">${c.ctr.toFixed(2)}%</td>
+    <td style="font-family:var(--mono)">${c.cpc>0?brl(c.cpc):'—'}</td>
+    <td style="font-family:var(--mono);font-weight:500">${brl(c.spend)}</td>
+    <td style="font-weight:500">${fmt(Math.round(c.conv))}</td>
+    <td style="font-family:var(--mono)">${c.cpa>0?brl(c.cpa):'—'}</td>
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhuma campanha no período</td></tr>';
+
+  document.getElementById('ga-tab-badge').textContent = camps.length + ' campanhas';
+
+  const groupsRows = ga.adGroups || [];
+  document.getElementById('ga-groups-body').innerHTML = groupsRows.length ? groupsRows.map(r=>`<tr>
+      <td><div class="t-name">${esc(r.name)}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.campaign)}</td>
+      <td>${statusChip(r.status==='ENABLED'?'ACTIVE':r.status)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td class="${r.ctr>3?'rej-ok':r.ctr>1?'rej-warn':'rej-bad'}">${r.ctr.toFixed(2)}%</td>
+      <td style="font-family:var(--mono)">${r.cpc>0?brl(r.cpc):'—'}</td>
+      <td style="font-family:var(--mono)">${brl(r.spend)}</td>
+      <td>${fmt(Math.round(r.conv))}</td>
+    </tr>`).join('') : '<tr><td colspan="9" class="empty">Nenhum grupo no período</td></tr>';
+
+  const kwRows = ga.keywords || [];
+  document.getElementById('ga-keywords-body').innerHTML = kwRows.length ? kwRows.map(r=>{
+    const qs = r.qualityScore;
+    const qsColor = qs>=7?'rej-ok':qs>=4?'rej-warn':'rej-bad';
+    return `<tr>
+      <td><div class="t-name">${esc(r.text)||'—'}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.adGroup)}</td>
+      <td>${statusChip(r.status==='ENABLED'?'ACTIVE':r.status)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td class="${r.ctr>3?'rej-ok':r.ctr>1?'rej-warn':'rej-bad'}">${r.ctr.toFixed(2)}%</td>
+      <td style="font-family:var(--mono)">${r.cpc>0?brl(r.cpc):'—'}</td>
+      <td style="font-family:var(--mono)">${brl(r.spend)}</td>
+      <td class="${qsColor}">${esc(qs)||'—'}/10</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="9" class="empty">Nenhuma palavra-chave no período</td></tr>';
+
+  const adsRows = ga.ads || [];
+  document.getElementById('ga-ads-body').innerHTML = adsRows.length ? adsRows.map(r=>`<tr>
+      <td><div class="t-name">${esc(r.name)||'—'}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.adGroup)}</td>
+      <td>${statusChip(r.status==='ENABLED'?'ACTIVE':r.status)}</td>
+      <td>${fmt(r.impr)}</td>
+      <td>${fmt(r.clicks)}</td>
+      <td class="${r.ctr>3?'rej-ok':r.ctr>1?'rej-warn':'rej-bad'}">${r.ctr.toFixed(2)}%</td>
+      <td style="font-family:var(--mono)">${brl(r.spend)}</td>
+      <td>${fmt(Math.round(r.conv))}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Nenhum anúncio no período</td></tr>';
+
+  const spendRows = [...camps].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
+  mkBars(document.getElementById('gads-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], CORES[0]);
+
+  const clickRows = [...camps].sort((a,b)=>b.clicks-a.clicks).slice(0,6);
+  mkLeg(document.getElementById('gads-click-leg'), clickRows.map(c=>c.name.slice(0,18)));
+  mkChart('c-gads-clicks','doughnut', clickRows.map(c=>c.name.slice(0,18)),
+    [{data:clickRows.map(c=>c.clicks),backgroundColor:CORES.slice(0,clickRows.length),borderWidth:0}],{cutout:'62%'});
+}
+
+async function loadRDStation(){
+  // Contagens de funil vêm do backend seguro do n8n (segmentações padrão do RD Station Marketing).
+  // Importante: são o estado ATUAL da base inteira, não filtradas pelo período selecionado no topo —
+  // a API de segmentações do RD Station não aceita filtro de data.
+  const d = await fetchAdsData();
+  const rd = d.rdStation || {};
+
+  if (rd.total == null) {
+    ['rd-total','rd-leads','rd-mql','rd-opp','rd-clients'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+    document.getElementById('rd-funil-bars').innerHTML =
+      '<div style="color:var(--muted);font-size:13px;padding:12px 0">Não foi possível carregar os dados do RD Station Marketing (verifique a credencial OAuth2 no n8n).</div>';
+    document.getElementById('rd-automations-list').innerHTML = '<div style="color:var(--muted);font-size:13px">—</div>';
+    document.getElementById('rd-lps-body').innerHTML = '<tr><td colspan="5" class="empty">—</td></tr>';
+    return;
+  }
+
+  const total   = rd.total || 0;
+  const leads   = rd.leads || 0;
+  const mql     = rd.mql || 0;
+  const opp     = rd.opportunities || 0;
+  const clients = rd.customers || 0;
+
+  // KPIs
+  document.getElementById('rd-total').textContent   = fmt(total);
+  document.getElementById('rd-leads').textContent   = fmt(leads);
+  document.getElementById('rd-mql').textContent     = fmt(mql);
+  document.getElementById('rd-opp').textContent     = fmt(opp);
+  document.getElementById('rd-clients').textContent = fmt(clients);
+
+  // Funil visual
+  const maxFunil = Math.max(leads, mql, opp, clients, 1);
+  const funilItems = [
+    {label: 'Leads',         v: leads,   color: CORES[0]},
+    {label: 'MQL',           v: mql,     color: CORES[2]},
+    {label: 'Oportunidades', v: opp,     color: CORES[3]},
+    {label: 'Clientes',      v: clients, color: CORES[1]}
+  ];
+  document.getElementById('rd-funil-bars').innerHTML = funilItems.map(item => `
+    <div class="bar-row">
+      <div class="bar-label">${item.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(item.v/maxFunil*100)}%;background:${item.color}"></div></div>
+      <div class="bar-val">${fmt(item.v)}</div>
+    </div>`).join('');
+
+  // Taxas de conversão
+  const taxas = [
+    {label: 'Lead → MQL',    v: leads > 0 ? (mql/leads*100).toFixed(1)+'%'    : '—'},
+    {label: 'MQL → Opp',     v: mql   > 0 ? (opp/mql*100).toFixed(1)+'%'      : '—'},
+    {label: 'Opp → Cliente', v: opp   > 0 ? (clients/opp*100).toFixed(1)+'%'  : '—'}
+  ];
+  document.getElementById('rd-taxas').innerHTML = taxas.map(t => `
+    <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${t.label}</div>
+      <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--green)">${t.v}</div>
+    </div>`).join('');
+
+  // Automações e Landing Pages: a API pública do RD Station Marketing não expõe status de
+  // fluxos de automação nem métricas agregadas de LP/formulário — não é uma questão de configuração.
+  document.getElementById('rd-auto-badge').textContent = 'indisponível na API';
+  document.getElementById('rd-automations-list').innerHTML =
+    '<div style="color:var(--muted);font-size:12px;line-height:1.7">A API pública do RD Station Marketing não expõe o status de fluxos de automação. Esse dado só está disponível pela interface do RD Station.</div>';
+  document.getElementById('rd-lp-badge').textContent = 'indisponível na API';
+  document.getElementById('rd-lps-body').innerHTML =
+    '<tr><td colspan="5" class="empty">A API pública do RD Station Marketing não expõe métricas agregadas por Landing Page/formulário. Use a aba "Landing Pages" (dados do GA4) para sessões e conversões por página.</td></tr>';
+}
+
+// ── OPORTUNIDADES (cruza planilha Leads Salesforce/CRM com Central de Leads) ──
+const SHEET_SF = '1xSC6e91_uHYRPkzD0idX3jJcb-GmhL-BCY4BMsZQuYc';
+let _allSalesforce = [];
+let _leadEmailMap = {};
+
+// Mesma regra usada para padronizar o Evento na Central de Leads (2026-07-07): aplicada
+// aqui também em cima da origem crua do CRM, para leads que ainda não bateram por e-mail
+// (ex: "[CP07][LOGMEIN][FUNDO][LEAD]" no CRM deve virar LOGMEIN_RESCUE-LICENCA-ECO_07-26
+// mesmo sem correspondência na Central de Leads).
+function standardizeCampanha(v) {
+  if (!v) return v;
+  const s = v.toLowerCase();
+  if (s.includes('rescue') || s.includes('logmein')) return 'LOGMEIN_RESCUE-LICENCA-ECO_07-26';
+  if (s.includes('goto') || s.includes('linkedin')) {
+    if (s.includes('webinar')) return 'GOTO_WEBINAR_07-26';
+    if (s.includes('saude')) return 'GOTO_SAUDE_06-26';
+    return 'GOTO_INSTITUCIONAL_07-26';
+  }
+  return v;
+}
+
+// Fallback de canal para leads antigos que não passaram pela automação (não têm e-mail
+// correspondente na Central de Leads) — inferido a partir do texto de origem do CRM.
+function inferCanalOrigem(origem) {
+  const s = (origem || '').toLowerCase();
+  if (s.includes('busca paga') || s.includes('google')) return 'Google ADS';
+  if (s.includes('facebook ads') || s.includes('-fb') || s.includes('_fb') || s.includes('fb+') || s.includes('fb ') || s.includes('meta') || s.includes('insta')) return 'Meta ADS';
+  if (s.includes('rd_station') || s.includes('contatos_rd')) return 'Base RD Station';
+  if (s.includes('chat')) return 'Chat';
+  if (s.includes('contato') || s.includes('novo formulário') || s.includes('novo formulario')) return 'Direto';
+  return 'Não identificado';
+}
+
+function buildLeadEmailMap() {
+  const map = {};
+  (_allLeads || []).forEach(r => {
+    const email = (r.c[2]?.v || '').toString().trim().toLowerCase();
+    if (!email) return;
+    // Evento já vem padronizado da Central de Leads (LOGMEIN_RESCUE-LICENCA-ECO_07-26,
+    // GOTO_INSTITUCIONAL_07-26, GOTO_WEBINAR_07-26, GOTO_SAUDE_06-26 — padrão definido em 2026-07-07,
+    // mês do GoTo Saúde corrigido para 06-26 em 2026-07-08).
+    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '' };
+  });
+  return map;
+}
+
+async function loadSalesforce() {
+  await loadLeads(); // garante _allLeads carregado, necessário para cruzar o canal por e-mail
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_SF}/gviz/tq?tqx=out:json&gid=0`;
+  const r = await fetch(url);
+  const txt = await r.text();
+  const start = txt.indexOf('{');
+  const end = txt.lastIndexOf('}') + 1;
+  const d = JSON.parse(txt.slice(start, end));
+  const rows = (d.table.rows || []).filter(row => row.c && row.c[4]?.v);
+
+  _leadEmailMap = buildLeadEmailMap();
+
+  _allSalesforce = rows.map(row => {
+    const c = row.c || [];
+    const v = i => (c[i] ? c[i].v : null);
+    const origem = v(0) || 'Não informado';
+    const email = (v(4) || '').toString().trim().toLowerCase();
+    const nomeOpp = v(10);
+    const fase = v(12);
+    const motivoPerda = v(13);
+    const valorNF = v(15);
+    const isOpportunity = !!nomeOpp;
+    const isLost = fase === 'Perdido';
+    const isWon = !!valorNF && !isLost;
+    const isOpen = isOpportunity && !isLost && !isWon;
+    const info = _leadEmailMap[email];
+    const isMarketing = !!info;
+    // Leads de Marketing usam a nomenclatura padronizada da Central de Leads (o e-mail bateu
+    // com um lead que veio pela automação de anúncios); leads só do Comercial mantêm a origem
+    // como foi digitada no CRM (não passaram pelo rastreio de mídia paga).
+    const origemBase = isMarketing ? (info.campanha || origem) : origem;
+    // Padroniza sempre, tenha vindo da Central de Leads (marketing) ou cru do CRM (comercial) —
+    // não muda nada em quem já está padronizado, mas corrige quem só existe no Salesforce.
+    const origemPadronizada = standardizeCampanha(origemBase);
+    const canal = (info && info.canal) ? info.canal : inferCanalOrigem(origem);
+    return {
+      origem: origemPadronizada, origemCRM: origem, dataConversao: parseDataLead(v(2)), nome: v(3) || '—', email,
+      empresa: v(5) || '—', dataCriacao: parseDataLead(v(6)), status: v(7) || 'Não informado',
+      motivoRejeicao: v(8), nomeOpp, produto: v(11), fase, motivoPerda,
+      valorOpp: v(14) || 0, valorNF: valorNF || 0, dataFechamento: parseDataLead(v(16)),
+      isOpportunity, isLost, isWon, isOpen, canal, isMarketing
+    };
+  });
+
+  const origens = [...new Set(_allSalesforce.map(row => row.origem))].sort();
+  const selOrigem = document.getElementById('o-origem');
+  if (selOrigem) {
+    const cur = selOrigem.value;
+    selOrigem.innerHTML = '<option value="">Toda origem/campanha</option>' +
+      origens.map(o => `<option value="${esc(o)}"${o===cur?' selected':''}>${esc(o)}</option>`).join('');
+  }
+  const canais = [...new Set(_allSalesforce.map(row => row.canal))].sort();
+  const selCanal = document.getElementById('o-canal');
+  if (selCanal) {
+    const cur = selCanal.value;
+    selCanal.innerHTML = '<option value="">Todos os canais</option>' +
+      canais.map(cn => `<option value="${esc(cn)}"${cn===cur?' selected':''}>${esc(cn)}</option>`).join('');
+  }
+  const motivos = [...new Set(_allSalesforce.map(row => row.motivoPerda).filter(Boolean))].sort();
+  const selMotivo = document.getElementById('o-motivo');
+  if (selMotivo) {
+    const cur = selMotivo.value;
+    selMotivo.innerHTML = '<option value="">Todos os motivos de perda</option>' +
+      motivos.map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+  }
+
+  aplicarFiltrosOpp();
+}
+
+function salesforceInRange(startDate, endDate) {
+  const s = new Date(startDate+'T00:00:00'), e = new Date(endDate+'T23:59:59');
+  return (_allSalesforce||[]).filter(row => {
+    const d = row.dataConversao || row.dataCriacao;
+    if (!d) return true;
+    return d >= s && d <= e;
+  });
+}
+
+function aplicarFiltrosOpp() {
+  const fOrigem   = document.getElementById('o-origem')?.value   || '';
+  const fCanal    = document.getElementById('o-canal')?.value    || '';
+  const fFase     = document.getElementById('o-fase')?.value     || '';
+  const fMotivo   = document.getElementById('o-motivo')?.value   || '';
+  const fSegmento = document.getElementById('o-segmento')?.value || '';
+
+  const p = period();
+  let rows = salesforceInRange(p.startDate, p.endDate);
+
+  if (fSegmento === 'marketing') rows = rows.filter(row => row.isMarketing);
+  else if (fSegmento === 'comercial') rows = rows.filter(row => !row.isMarketing);
+  if (fOrigem) rows = rows.filter(row => row.origem === fOrigem);
+  if (fCanal)  rows = rows.filter(row => row.canal === fCanal);
+  if (fMotivo) rows = rows.filter(row => row.motivoPerda === fMotivo);
+  if (fFase) {
+    rows = rows.filter(row => {
+      const statusLower = (row.status||'').toLowerCase();
+      switch (fFase) {
+        case 'cadencia': return statusLower.startsWith('contato dia');
+        case 'qualificado': return statusLower === 'qualificado' && !row.isOpportunity;
+        case 'oportunidade': return row.isOpportunity;
+        case 'aberta': return row.isOpen;
+        case 'perdida': return row.isLost;
+        case 'rejeitado': return statusLower === 'rejeitado';
+        default: return true;
+      }
+    });
+  }
+
+  renderOportunidades(rows);
+
+  const hasFilter = fOrigem || fCanal || fFase || fMotivo || fSegmento;
+  const cnt = document.getElementById('o-filter-count');
+  if (cnt) cnt.textContent = hasFilter ? `${rows.length} resultado${rows.length!==1?'s':''}` : '';
+}
+
+function limparFiltrosOpp() {
+  ['o-origem','o-canal','o-fase','o-motivo','o-segmento'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
+  aplicarFiltrosOpp();
+}
+
+function filtrarPorOrigemOpp(origem) {
+  const sel = document.getElementById('o-origem');
+  if (sel) sel.value = origem;
+  aplicarFiltrosOpp();
+}
+function filtrarPorCanalOpp(canal) {
+  const sel = document.getElementById('o-canal');
+  if (sel) sel.value = canal;
+  aplicarFiltrosOpp();
+}
+
+function renderOportunidades(rows) {
+  const total = rows.length;
+  const cadencia = rows.filter(row => (row.status||'').toLowerCase().startsWith('contato dia')).length;
+  const qualificados = rows.filter(row => (row.status||'').toLowerCase() === 'qualificado').length;
+  const rejeitados = rows.filter(row => (row.status||'').toLowerCase() === 'rejeitado').length;
+  const oportunidades = rows.filter(row => row.isOpportunity).length;
+  const abertas = rows.filter(row => row.isOpen);
+  const perdidas = rows.filter(row => row.isLost);
+  const ganhas = rows.filter(row => row.isWon);
+  const taxaOpp = total > 0 ? (oportunidades/total*100) : 0;
+  const valorPipeline = abertas.reduce((s,row)=>s+(row.valorOpp||0),0);
+  const valoresOpp = rows.filter(row=>row.isOpportunity && row.valorOpp>0).map(row=>row.valorOpp);
+  const ticketMedio = valoresOpp.length ? valoresOpp.reduce((a,b)=>a+b,0)/valoresOpp.length : 0;
+
+  const nMarketing = rows.filter(row => row.isMarketing).length;
+  const nComercial = total - nMarketing;
+
+  document.getElementById('o-total').textContent = fmt(total);
+  const segSplitEl = document.getElementById('o-segmento-split');
+  if (segSplitEl) segSplitEl.textContent = `${fmt(nMarketing)} Marketing · ${fmt(nComercial)} Comercial`;
+  document.getElementById('o-cadencia').textContent = fmt(cadencia);
+  document.getElementById('o-qualificados').textContent = fmt(qualificados);
+  document.getElementById('o-oportunidades').textContent = fmt(oportunidades);
+  document.getElementById('o-taxa').textContent = total ? taxaOpp.toFixed(1)+'%' : '—';
+  document.getElementById('o-pipeline').textContent = brl(valorPipeline);
+  document.getElementById('o-abertas').textContent = fmt(abertas.length);
+  document.getElementById('o-perdidas').textContent = fmt(perdidas.length);
+  document.getElementById('o-ticket').textContent = ticketMedio>0 ? brl(ticketMedio) : '—';
+  document.getElementById('o-qualificados-rej').textContent = fmt(rejeitados);
+
+  // ── Receita ganha + Win rate (financeSummary, §4.6). spend por canal p/ CAC/ROAS na tabela abaixo. ──
+  // Lê o spend do cache de ads já populado pelos loaders de canal (mesma chave range de fetchAdsDataForRange).
+  // Se o cache ainda não tiver o range (render antes dos ads resolverem), spend=0 → CAC/ROAS mostram "—".
+  const p = period();
+  const cur = _adsCacheStore[`${p.startDate}_${p.endDate}`] || null;
+  const gAt = cur?.googleAds?.totals||{}, mAt = cur?.metaAds?.totals||{}, lAt = cur?.linkedIn?.totals||{};
+  const spendPorCanalMap = { 'Google ADS': gAt.spend||0, 'Meta ADS': mAt.spend||0, 'LinkedIn ADS': lAt.spend||0 };
+  const spendTotalOpp = (gAt.spend||0)+(mAt.spend||0)+(lAt.spend||0);
+  const finOpp = financeSummary(rows, spendTotalOpp);
+  const receitaEl = document.getElementById('o-receita');
+  if (receitaEl) receitaEl.textContent = finOpp.receitaGanhaTotal>0 ? brl(finOpp.receitaGanhaTotal) : '—';
+  const receitaFoot = document.getElementById('o-receita-foot');
+  const pctMktOpp = finOpp.receitaGanhaTotal>0 ? (finOpp.receitaGanhaMkt/finOpp.receitaGanhaTotal*100) : null;
+  if (receitaFoot) receitaFoot.innerHTML = pctMktOpp!=null ? `<span style="color:var(--muted)">${pctMktOpp.toFixed(0)}% atribuído a marketing</span>` : '';
+  const winEl = document.getElementById('o-winrate');
+  if (winEl) winEl.textContent = finOpp.winRate!=null ? finOpp.winRate.toFixed(1)+'%' : '—';
+  const winFoot = document.getElementById('o-winrate-foot');
+  if (winFoot) winFoot.innerHTML = metaHTML(finOpp.winRate, 'winRate', v=>Number(v).toFixed(0)+'%');
+  const cacCanalMap = cacPorCanal(rows, spendPorCanalMap);
+
+  // ── CAC por ganho + meta (Média #12, §11): usa financeSummary.cacPorGanho (spendTotal ÷ nº ganhos). ──
+  const cacGanhoEl = document.getElementById('o-cacganho');
+  if (cacGanhoEl) cacGanhoEl.textContent = finOpp.cacPorGanho!=null ? brl(finOpp.cacPorGanho) : '—';
+  const cacGanhoFoot = document.getElementById('o-cacganho-foot');
+  if (cacGanhoFoot) cacGanhoFoot.innerHTML = metaHTML(finOpp.cacPorGanho, 'cacPorGanho', v=>brl(v));
+
+  // ── Tempo de ciclo (Média #8, §3.5): mediana em destaque, média/n no rodapé. "—" se n===0. ──
+  const ciclo = tempoDeCiclo(rows);
+  const setCiclo = (prefix, seg) => {
+    const el = document.getElementById(prefix);
+    const foot = document.getElementById(prefix+'-foot');
+    if (el) el.textContent = (seg.n>0 && seg.medianaDias!=null) ? `${seg.medianaDias.toFixed(1)} dias` : '—';
+    if (foot) foot.innerHTML = (seg.n>0 && seg.mediaDias!=null)
+      ? `<span style="color:var(--muted)">média ${seg.mediaDias.toFixed(1)}d · n=${seg.n}</span>` : '';
+  };
+  setCiclo('o-ciclo-leadopp', ciclo.leadToOpp);
+  setCiclo('o-ciclo-oppganho', ciclo.oppToGanho);
+
+  // ── Trend período-a-período (Média #9, §6.2): período anterior via salesforceInRange(prevPeriod),
+  // não-filtrado (mesma disciplina do Overview/Leads). receita/ganho SEMPRE de valorNF em linhas isWon. ──
+  const ppO = prevPeriod();
+  const prevSf = salesforceInRange(ppO.startDate, ppO.endDate);
+  const prevOpp = prevSf.filter(r=>r.isOpportunity).length;
+  const prevReceita = prevSf.filter(r=>r.isWon).reduce((s,r)=>s+(r.valorNF||0),0);
+  const oOppTrend = document.getElementById('o-oportunidades-trend');
+  if (oOppTrend) oOppTrend.innerHTML = trendHTML(oportunidades, prevOpp);
+  const oRecTrend = document.getElementById('o-receita-trend');
+  if (oRecTrend) oRecTrend.innerHTML = trendHTML(finOpp.receitaGanhaTotal, prevReceita);
+
+  // ── Série temporal de oportunidades e ganhos (Média #7, §3.6/§6.1) — granularidade única para alinhar
+  // os buckets das duas séries (dia se período <=31d, senão semana). Datas do CRM por linha. ──
+  const granO = period().days<=31 ? 'dia' : 'semana';
+  const serieOpp = agruparPorPeriodo(rows.filter(r=>r.isOpportunity), r=>r.dataConversao||r.dataCriacao, granO);
+  const serieWon = agruparPorPeriodo(rows.filter(r=>r.isWon), r=>r.dataFechamento||r.dataConversao||r.dataCriacao, granO);
+  const bucketsO = [...new Set([...serieOpp.map(p=>p.bucket), ...serieWon.map(p=>p.bucket)])].sort();
+  const mapOpp = Object.fromEntries(serieOpp.map(p=>[p.bucket,p.valor]));
+  const mapWon = Object.fromEntries(serieWon.map(p=>[p.bucket,p.valor]));
+  const oSerieBadge = document.getElementById('o-serie-badge');
+  if (oSerieBadge) oSerieBadge.textContent = bucketsO.length ? `${bucketsO.length} ponto${bucketsO.length!==1?'s':''}` : 'sem dados no período';
+  mkChart('c-opp-serie','line', bucketsO, [
+    { label:'Oportunidades', data:bucketsO.map(b=>mapOpp[b]||0), borderColor:CORES[3], backgroundColor:'rgba(168,85,247,.10)', fill:true, tension:.3, pointRadius:2, borderWidth:2 },
+    { label:'Ganhos', data:bucketsO.map(b=>mapWon[b]||0), borderColor:CORES[1], backgroundColor:'rgba(34,197,94,.10)', fill:true, tension:.3, pointRadius:2, borderWidth:2 }
+  ], { scales:scOpts(), plugins:{legend:{display:true, labels:{color:'#7a7f8a',font:{size:11}}}} });
+
+  const maxFunil = Math.max(total, qualificados+oportunidades, oportunidades, ganhas.length, 1);
+  const funilRows = [
+    { label:'Leads recebidos', v: total, color: CORES[0] },
+    { label:'Qualificados (período/CRM)', v: qualificados + oportunidades, color: CORES[2] },
+    { label:'Oportunidades', v: oportunidades, color: CORES[3] },
+    { label:'Ganhas', v: ganhas.length, color: CORES[1] }
+  ];
+  const funilEl = document.getElementById('o-funil');
+  if (funilEl) {
+    funilEl.innerHTML = funilRows.map((r,i)=>{
+      const w = maxFunil>0 ? Math.round(r.v/maxFunil*100) : 0;
+      const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
+      return `<div class="bar-row"><div class="bar-label" style="width:150px">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${r.color}"></div></div><div class="bar-val" style="width:180px;text-align:right">${fmt(r.v)} <span style="color:var(--muted);font-size:10px">${conv}</span></div></div>`;
+    }).join('');
+  }
+
+  const byMotivoPerda = {};
+  perdidas.forEach(row => { const m = row.motivoPerda || 'Não informado'; byMotivoPerda[m] = (byMotivoPerda[m]||0)+1; });
+  const motivoPerdaRows = Object.entries(byMotivoPerda).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('o-motivo-perda'), motivoPerdaRows.length?motivoPerdaRows:[{label:'Sem perdas no período',v:0}], CORES[4]);
+
+  const byMotivoRej = {};
+  rows.filter(row=>(row.status||'').toLowerCase()==='rejeitado').forEach(row => { const m = row.motivoRejeicao || 'Não informado'; byMotivoRej[m] = (byMotivoRej[m]||0)+1; });
+  const motivoRejRows = Object.entries(byMotivoRej).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('o-motivo-rejeicao'), motivoRejRows.length?motivoRejRows:[{label:'Sem rejeições no período',v:0}], CORES[4]);
+
+  const byCanal = {};
+  rows.forEach(row => {
+    byCanal[row.canal] = byCanal[row.canal] || {leads:0,opp:0,perdidas:0,valor:0};
+    byCanal[row.canal].leads++;
+    if (row.isOpportunity) byCanal[row.canal].opp++;
+    if (row.isLost) byCanal[row.canal].perdidas++;
+    byCanal[row.canal].valor += (row.valorOpp||0);
+  });
+  const canalBody = document.getElementById('o-canal-body');
+  if (canalBody) {
+    const canalRowsArr = Object.entries(byCanal).sort((a,b)=>b[1].leads-a[1].leads);
+    canalBody.innerHTML = canalRowsArr.length ? canalRowsArr.map(([canal,agg])=>{
+      const cc = cacCanalMap[canal] || {};
+      return `<tr style="cursor:pointer" role="button" tabindex="0" data-action="filtrarPorCanalOpp" data-arg="${esc(canal)}">
+      <td><div class="t-name">${esc(canal)}</div></td>
+      <td>${fmt(agg.leads)}</td>
+      <td>${fmt(agg.opp)}</td>
+      <td>${fmt(agg.perdidas)}</td>
+      <td style="font-family:var(--mono)">${brl(agg.valor)}</td>
+      <td>${agg.leads>0?(agg.opp/agg.leads*100).toFixed(1)+'%':'—'}</td>
+      <td style="font-family:var(--mono)">${(cc.receita||0)>0?brl(cc.receita):'—'}</td>
+      <td style="font-family:var(--mono)">${cc.cacOpp!=null?brl(cc.cacOpp):'—'}</td>
+      <td style="font-family:var(--mono)">${cc.cacGanho!=null?brl(cc.cacGanho):'—'}</td>
+      <td style="font-family:var(--mono)">${cc.roas!=null?cc.roas.toFixed(2)+'x':'—'}</td>
+    </tr>`;}).join('') : '<tr><td colspan="10" class="empty">Sem dados no período</td></tr>';
+  }
+
+  const byOrigem = {};
+  rows.forEach(row => {
+    byOrigem[row.origem] = byOrigem[row.origem] || {leads:0,opp:0,perdidas:0,valor:0};
+    byOrigem[row.origem].leads++;
+    if (row.isOpportunity) byOrigem[row.origem].opp++;
+    if (row.isLost) byOrigem[row.origem].perdidas++;
+    byOrigem[row.origem].valor += (row.valorOpp||0);
+  });
+  const origemBody = document.getElementById('o-origem-body');
+  if (origemBody) {
+    const origemRowsArr = Object.entries(byOrigem).sort((a,b)=>b[1].leads-a[1].leads);
+    origemBody.innerHTML = origemRowsArr.length ? origemRowsArr.map(([origem,agg])=>`<tr style="cursor:pointer" role="button" tabindex="0" data-action="filtrarPorOrigemOpp" data-arg="${esc(origem)}">
+      <td><div class="t-name">${esc(origem)}</div></td>
+      <td>${fmt(agg.leads)}</td>
+      <td>${fmt(agg.opp)}</td>
+      <td>${fmt(agg.perdidas)}</td>
+      <td style="font-family:var(--mono)">${brl(agg.valor)}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
+  }
+
+  const allBody = document.getElementById('o-all');
+  if (allBody) {
+    const statusBadge = row => {
+      if (row.isWon) return `<span class="badge lq">Ganha</span>`;
+      if (row.isLost) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
+      if (row.isOpen) return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Em negociação</span>`;
+      const sl = (row.status||'').toLowerCase();
+      if (sl==='rejeitado') return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Rejeitado</span>`;
+      if (sl.startsWith('contato dia')) return `<span class="badge" style="background:var(--amber-dim);color:var(--amber)">${esc(row.status)}</span>`;
+      return `<span class="badge lead">${esc(row.status)||'—'}</span>`;
+    };
+    allBody.innerHTML = rows.length ? rows.slice().sort((a,b)=>(b.dataConversao||b.dataCriacao||0)-(a.dataConversao||a.dataCriacao||0)).map(row => `<tr>
+      <td><div class="t-name">${esc(row.nome)}</div><div class="t-sub">${esc(row.empresa)}</div></td>
+      <td>${row.isMarketing ? '<span class="badge lq">Marketing</span>' : '<span class="badge" style="background:var(--surface2);color:var(--muted)">Comercial</span>'}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(row.origem)}">${esc(row.origem)}</td>
+      <td>${pill(row.canal)}</td>
+      <td>${statusBadge(row)}</td>
+      <td style="font-size:12px;color:var(--muted)">${esc(row.motivoPerda || row.motivoRejeicao || '—')}</td>
+      <td style="font-family:var(--mono)">${row.valorOpp>0?brl(row.valorOpp):'—'}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${row.dataConversao ? row.dataConversao.toLocaleDateString('pt-BR') : (row.dataCriacao ? row.dataCriacao.toLocaleDateString('pt-BR') : '—')}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">Sem leads comerciais no período</td></tr>';
+  }
+}
+
+// ── CRIATIVOS (Ads x Central de Leads x CRM comercial) ──────────
+// Conta leads reais (Central de Leads) por campanha padronizada, no período selecionado.
+// Usado tanto pela aba Criativos quanto para corrigir o CPL da aba Meta Ads (que antes usava
+// o "resultado" auto-reportado pela Meta, misturando leads de site com leads nativos do
+// formulário — ver print do usuário: "Leads: 124 (Leads no site: 35, Leads na Meta: 89)").
+function leadsReaisPorCampanha(){
+  const p = period();
+  const dStart = new Date(p.startDate+'T00:00:00'), dEnd = new Date(p.endDate+'T23:59:59');
+  const counts = {};
+  (_allLeads||[]).forEach(r=>{
+    const c = r.c||[];
+    const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
+    if (d && (d<dStart || d>dEnd)) return;
+    const campanhaRaw = c[8]?.v || c[1]?.v || '';
+    const campanha = standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado';
+    counts[campanha] = (counts[campanha]||0)+1;
+  });
+  return counts;
+}
+
+function flattenAdsSpend(d){
+  const rows = [];
+  const metaAdsets = (d.metaAds && d.metaAds.adsets) || [];
+  const adsetToCampanha = {};
+  metaAdsets.forEach(as => { adsetToCampanha[as.name] = as.campaign; });
+  ((d.metaAds && d.metaAds.ads) || []).forEach(ad => {
+    const campanhaRaw = adsetToCampanha[ad.adset] || ad.adset || '';
+    rows.push({ plataforma:'Meta ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: ad.adset||'—', criativo: ad.name||'—', spend: ad.spend||0 });
+  });
+  // Google Ads não tem nome de anúncio de verdade via API/macro — usa a palavra-chave como
+  // "criativo" (granularidade real disponível) e o grupo de anúncios como "conjunto".
+  const gAdGroups = (d.googleAds && d.googleAds.adGroups) || [];
+  const grupoToCampanha = {};
+  gAdGroups.forEach(g => { grupoToCampanha[g.name] = g.campaign; });
+  ((d.googleAds && d.googleAds.keywords) || []).forEach(kw => {
+    const campanhaRaw = grupoToCampanha[kw.adGroup] || kw.adGroup || '';
+    rows.push({ plataforma:'Google ADS', campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado', conjunto: kw.adGroup||'—', criativo: kw.text||'—', spend: kw.spend||0 });
+  });
+  ((d.linkedIn && d.linkedIn.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'LinkedIn ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', conjunto:'—', criativo:'—', spend: c.spend||0 });
+  });
+  return rows;
+}
+
+// Totais por campanha vêm sempre da entidade de campanha da própria API (autoritativa),
+// nunca somados a partir de anúncio/palavra-chave — campanhas Display/PMax não têm palavra-chave
+// e ficariam sub-contadas se o total dependesse da soma do nível de criativo.
+function flattenCampanhaSpend(d){
+  const rows = [];
+  ((d.metaAds && d.metaAds.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'Meta ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', spend: c.spend||0 });
+  });
+  ((d.googleAds && d.googleAds.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'Google ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', spend: c.spend||0 });
+  });
+  ((d.linkedIn && d.linkedIn.campaigns) || []).forEach(c => {
+    rows.push({ plataforma:'LinkedIn ADS', campanha: standardizeCampanha(c.name) || c.name || 'Não identificado', spend: c.spend||0 });
+  });
+  return rows;
+}
+
+// Google Ads não tem macro de nome de campanha/anúncio (ValueTrack só dá IDs) e o LinkedIn só
+// devolve custo em nível de campanha — então leads dessas duas plataformas quase nunca têm
+// conjunto/criativo capturado. Sem isso, a tabela "Por conjunto/criativo" mostrava só Meta ADS,
+// dando a impressão errada de que só o Meta tinha investimento na campanha.
+function inferPlataformaLead(utmSource, convSource){
+  const s = (utmSource || convSource || '').toString().toLowerCase();
+  if (s.includes('linkedin')) return 'LinkedIn ADS';
+  if (s.includes('google')) return 'Google ADS';
+  if (['ig','fb','an','msg'].includes(s) || s.includes('meta') || s.includes('facebook') || s.includes('instagram') || s.startsWith('[cj')) return 'Meta ADS';
+  return null;
+}
+
+function buildCriativoData(adsData){
+  const adRows = flattenAdsSpend(adsData || {});
+  const p = period();
+  const dStart = new Date(p.startDate+'T00:00:00'), dEnd = new Date(p.endDate+'T23:59:59');
+  const leadRows = (_allLeads||[]).filter(r=>{
+    const c = r.c||[];
+    const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
+    if (!d) return true;
+    return d>=dStart && d<=dEnd;
+  }).map(r=>{
+    const c = r.c||[];
+    const campanhaRaw = c[8]?.v || c[1]?.v || '';
+    return {
+      email: (c[2]?.v||'').toLowerCase().trim(),
+      nome: c[3]?.v||'—', empresa: c[5]?.v||'—',
+      campanha: standardizeCampanha(campanhaRaw) || campanhaRaw || 'Não identificado',
+      conjunto: c[19]?.v || '—',
+      criativo: c[16]?.v || '—',
+      plataforma: inferPlataformaLead(c[15]?.v, c[10]?.v),
+      data: parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v)
+    };
+  });
+
+  const sfByEmail = {};
+  (_allSalesforce||[]).forEach(sf => { if (sf.email) sfByEmail[sf.email] = sf; });
+  const leadByEmailPrimeiro = {};
+  leadRows.forEach(l => { if (l.email && !leadByEmailPrimeiro[l.email]) leadByEmailPrimeiro[l.email] = l; });
+
+  const bucketKey = l => l.campanha+'|||'+l.conjunto+'|||'+l.criativo;
+  const buckets = {};
+  leadRows.forEach(l => {
+    const k = bucketKey(l);
+    if (!buckets[k]) buckets[k] = { campanha:l.campanha, conjunto:l.conjunto, criativo:l.criativo, leads:[], oportunidades:0, pipe:0, ganho:0 };
+    buckets[k].leads.push(l);
+  });
+
+  const sfRowsPeriodo = salesforceInRange(p.startDate, p.endDate);
+  sfRowsPeriodo.forEach(sf => {
+    const l = sf.email ? leadByEmailPrimeiro[sf.email] : null;
+    if (!l) return; // lead comercial sem rastreio de ads (isMarketing=false) nao entra no cruzamento de criativo
+    const k = bucketKey(l);
+    if (!buckets[k]) return;
+    if (sf.isOpportunity) buckets[k].oportunidades++;
+    if (sf.isOpen) buckets[k].pipe += (sf.valorOpp||0);
+    if (sf.isWon) buckets[k].ganho += (sf.valorNF||0);
+  });
+
+  const bucketList = Object.values(buckets).map(b => {
+    // Só tenta casar no nível de conjunto/criativo quando o lead realmente tem os dois capturados —
+    // evita que o placeholder "—" (usado pelo LinkedIn, que só tem nível de campanha) colida com
+    // leads sem UTM Term/Content e herde gasto de uma plataforma que não foi a origem real do lead.
+    const temConjuntoCriativo = b.conjunto !== '—' && b.criativo !== '—';
+    const exact = temConjuntoCriativo ? adRows.find(a => a.campanha===b.campanha && a.conjunto===b.conjunto && a.criativo===b.criativo) : null;
+    return { ...b, spend: exact ? exact.spend : null, plataforma: exact ? exact.plataforma : null };
+  });
+
+  const campanhaSpendRows = flattenCampanhaSpend(adsData || {});
+  const spendByCampanha = {};
+  const platformsByCampanha = {};
+  const spendByCampanhaPlataforma = {};
+  campanhaSpendRows.forEach(a => {
+    spendByCampanha[a.campanha] = (spendByCampanha[a.campanha]||0) + a.spend;
+    platformsByCampanha[a.campanha] = platformsByCampanha[a.campanha] || new Set();
+    platformsByCampanha[a.campanha].add(a.plataforma);
+    const kp = a.campanha+'|||'+a.plataforma;
+    spendByCampanhaPlataforma[kp] = (spendByCampanhaPlataforma[kp]||0) + a.spend;
+  });
+
+  // Linhas de fallback: plataformas com investimento real na campanha mas sem NENHUM criativo
+  // batendo com lead nenhum (típico de Google Ads e LinkedIn) — sem isso, o investimento delas
+  // some da visão "Por conjunto/criativo" e parece que só o Meta rodou a campanha.
+  const spendJaAtribuido = {};
+  bucketList.forEach(b => {
+    if (b.spend==null) return;
+    const kp = b.campanha+'|||'+b.plataforma;
+    spendJaAtribuido[kp] = (spendJaAtribuido[kp]||0) + b.spend;
+  });
+  const bucketKeysComMatch = new Set(bucketList.filter(b=>b.spend!=null).map(b=>bucketKey(b)));
+  const fallbackAgg = {};
+  leadRows.forEach(l => {
+    const k = bucketKey(l);
+    if (bucketKeysComMatch.has(k) || !l.plataforma) return;
+    const kp = l.campanha+'|||'+l.plataforma;
+    if (!spendByCampanhaPlataforma[kp]) return; // plataforma sem nenhum gasto registrado nessa campanha no período
+    if (!fallbackAgg[kp]) fallbackAgg[kp] = { campanha:l.campanha, conjunto:'—', criativo:'Sem detalhamento de criativo', plataforma:l.plataforma, leads:[] };
+    fallbackAgg[kp].leads.push(l);
+  });
+  const fallbackRows = Object.entries(fallbackAgg).map(([kp,f]) => ({
+    ...f,
+    spend: Math.max(0, (spendByCampanhaPlataforma[kp]||0) - (spendJaAtribuido[kp]||0))
+  }));
+  const criativoRows = bucketList.filter(b=>b.spend!=null).concat(fallbackRows).map(b => {
+    // Mesmos ROAS/Custo por opp em nível de criativo (arquitetura §3.4). Fallback rows não têm
+    // ganho/pipe/oportunidades → tratados como 0. Divisão protegida (spend/opp 0 → null → "—").
+    const spend = b.spend||0, ganho = b.ganho||0, pipe = b.pipe||0, opp = b.oportunidades||0;
+    return {
+      ...b,
+      roasRealizado: spend>0 ? ganho/spend : null,
+      roasProjetado: spend>0 ? (pipe+ganho)/spend : null,
+      custoPorOpp:   opp>0 ? spend/opp : null
+    };
+  });
+
+  const campanhaAgg = {};
+  bucketList.forEach(b => {
+    if (!campanhaAgg[b.campanha]) campanhaAgg[b.campanha] = { campanha:b.campanha, leads:0, oportunidades:0, pipe:0, ganho:0 };
+    campanhaAgg[b.campanha].leads += b.leads.length;
+    campanhaAgg[b.campanha].oportunidades += b.oportunidades;
+    campanhaAgg[b.campanha].pipe += b.pipe;
+    campanhaAgg[b.campanha].ganho += b.ganho;
+  });
+  const campanhaRows = Object.values(campanhaAgg).map(c => {
+    // ROAS/Custo por opp por campanha (arquitetura §3.4). Divisão protegida: spend/opp 0 → null (render "—").
+    const spend = spendByCampanha[c.campanha] || 0;
+    return {
+      ...c,
+      spend,
+      plataformas: platformsByCampanha[c.campanha] ? [...platformsByCampanha[c.campanha]] : [],
+      roasRealizado: spend>0 ? (c.ganho||0)/spend : null,
+      roasProjetado: spend>0 ? ((c.pipe||0)+(c.ganho||0))/spend : null,
+      custoPorOpp:   (c.oportunidades||0)>0 ? spend/c.oportunidades : null
+    };
+  });
+
+  return { bucketList, criativoRows, campanhaRows, leadRows, sfByEmail };
+}
+
+let _criativoData = null;
+let fCrCampanha='', fCrConjunto='', fCrCriativo='', fCrPlataforma='';
+
+async function loadCriativos(){
+  await loadSalesforce(); // garante _allLeads, _allSalesforce e _leadEmailMap prontos
+  const ads = await fetchAdsData();
+  _criativoData = buildCriativoData(ads);
+
+  const popularSelect = (id, valores, placeholder) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = el.value;
+    el.innerHTML = `<option value="">${esc(placeholder)}</option>` + valores.map(v=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`).join('');
+  };
+  popularSelect('cr-campanha', [...new Set(_criativoData.campanhaRows.map(c=>c.campanha))].sort(), 'Toda campanha');
+  popularSelect('cr-conjunto', [...new Set(_criativoData.bucketList.map(b=>b.conjunto).filter(x=>x&&x!=='—'))].sort(), 'Todo conjunto');
+  popularSelect('cr-criativo', [...new Set(_criativoData.bucketList.map(b=>b.criativo).filter(x=>x&&x!=='—'))].sort(), 'Todo criativo');
+  popularSelect('cr-plataforma', [...new Set(_criativoData.bucketList.map(b=>b.plataforma).filter(Boolean))].sort(), 'Todas as plataformas');
+
+  aplicarFiltrosCriativos();
+}
+
+function aplicarFiltrosCriativos(){
+  fCrCampanha   = document.getElementById('cr-campanha')?.value   || '';
+  fCrConjunto   = document.getElementById('cr-conjunto')?.value   || '';
+  fCrCriativo   = document.getElementById('cr-criativo')?.value   || '';
+  fCrPlataforma = document.getElementById('cr-plataforma')?.value || '';
+  renderCriativos();
+}
+function limparFiltrosCriativos(){
+  ['cr-campanha','cr-conjunto','cr-criativo','cr-plataforma'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  aplicarFiltrosCriativos();
+}
+function filtrarPorCampanhaCriativo(campanha){
+  const sel = document.getElementById('cr-campanha'); if (sel) sel.value = campanha;
+  aplicarFiltrosCriativos();
+}
+function filtrarPorConjuntoCriativo(conjunto){
+  const sel = document.getElementById('cr-conjunto'); if (sel) sel.value = conjunto;
+  aplicarFiltrosCriativos();
+}
+
+function renderCriativos(){
+  if (!_criativoData) return;
+  const { criativoRows, campanhaRows, leadRows, sfByEmail } = _criativoData;
+
+  let campRows = campanhaRows;
+  if (fCrCampanha)   campRows = campRows.filter(c=>c.campanha===fCrCampanha);
+  if (fCrPlataforma) campRows = campRows.filter(c=>c.plataformas.includes(fCrPlataforma));
+
+  let critRows = criativoRows;
+  if (fCrCampanha)   critRows = critRows.filter(b=>b.campanha===fCrCampanha);
+  if (fCrConjunto)   critRows = critRows.filter(b=>b.conjunto===fCrConjunto);
+  if (fCrCriativo)   critRows = critRows.filter(b=>b.criativo===fCrCriativo);
+  if (fCrPlataforma) critRows = critRows.filter(b=>b.plataforma===fCrPlataforma);
+
+  let leadsFiltrados = leadRows;
+  if (fCrCampanha) leadsFiltrados = leadsFiltrados.filter(l=>l.campanha===fCrCampanha);
+  if (fCrConjunto) leadsFiltrados = leadsFiltrados.filter(l=>l.conjunto===fCrConjunto);
+  if (fCrCriativo) leadsFiltrados = leadsFiltrados.filter(l=>l.criativo===fCrCriativo);
+
+  const usarNivelCriativo = !!(fCrConjunto || fCrCriativo);
+  const spendTotal = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.spend||0),0) : campRows.reduce((s,c)=>s+(c.spend||0),0);
+  const leadsTotal = leadsFiltrados.length;
+  const oppTotal   = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.oportunidades||0),0) : campRows.reduce((s,c)=>s+(c.oportunidades||0),0);
+  const pipeTotal  = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.pipe||0)+(b.ganho||0),0) : campRows.reduce((s,c)=>s+(c.pipe||0)+(c.ganho||0),0);
+  const ganhoTotal = usarNivelCriativo ? critRows.reduce((s,b)=>s+(b.ganho||0),0) : campRows.reduce((s,c)=>s+(c.ganho||0),0);
+  const cpl = leadsTotal>0 ? spendTotal/leadsTotal : 0;
+  const roasView = spendTotal>0 ? ganhoTotal/spendTotal : null; // ROAS realizado do recorte; sem spend → "—"
+
+  document.getElementById('cr-spend').textContent = brl(spendTotal);
+  document.getElementById('cr-leads').textContent  = fmt(leadsTotal);
+  document.getElementById('cr-cpl').textContent    = leadsTotal>0 ? brl(cpl) : '—';
+  document.getElementById('cr-pipe').textContent   = brl(pipeTotal);
+  const roasEl = document.getElementById('cr-roas');
+  if (roasEl) roasEl.textContent = roasView!=null ? roasView.toFixed(2)+'x' : '—';
+
+  const campBody = document.getElementById('cr-campanha-body');
+  if (campBody) {
+    const sorted = campRows.slice().sort((a,b)=>b.leads-a.leads);
+    campBody.innerHTML = sorted.length ? sorted.map(c => {
+      const cplC = c.leads>0 ? c.spend/c.leads : 0;
+      const taxa = c.leads>0 ? (c.oportunidades/c.leads*100).toFixed(1)+'%' : '—';
+      const plats = c.plataformas.map(p=>pill(p)).join(' ');
+      return `<tr style="cursor:pointer" role="button" tabindex="0" data-action="filtrarPorCampanhaCriativo" data-arg="${esc(c.campanha)}">
+        <td><div class="t-name">${esc(c.campanha)}</div></td>
+        <td>${plats||'—'}</td>
+        <td style="font-family:var(--mono)">${brl(c.spend)}</td>
+        <td>${fmt(c.leads)}</td>
+        <td style="font-family:var(--mono);font-weight:500">${c.leads>0?brl(cplC):'—'}</td>
+        <td>${fmt(c.oportunidades)}</td>
+        <td>${taxa}</td>
+        <td style="font-family:var(--mono)">${brl(c.pipe)}</td>
+        <td style="font-family:var(--mono)">${brl(c.ganho)}</td>
+        <td style="font-family:var(--mono);color:var(--green)">${c.roasRealizado!=null?c.roasRealizado.toFixed(2)+'x':'—'}</td>
+        <td style="font-family:var(--mono);color:var(--purple)">${c.roasProjetado!=null?c.roasProjetado.toFixed(2)+'x':'—'}</td>
+        <td style="font-family:var(--mono)">${c.custoPorOpp!=null?brl(c.custoPorOpp):'—'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="12" class="empty">Sem dados no período</td></tr>';
+  }
+
+  const critBody = document.getElementById('cr-criativo-body');
+  const semMapear = leadsFiltrados.length - critRows.reduce((s,b)=>s+b.leads.length,0);
+  const semMapearBadge = document.getElementById('cr-semmapear-badge');
+  if (semMapearBadge) semMapearBadge.textContent = semMapear>0 ? `${fmt(semMapear)} leads sem criativo mapeado` : '—';
+  if (critBody) {
+    const sorted = critRows.slice().sort((a,b)=>b.leads.length-a.leads.length);
+    critBody.innerHTML = sorted.length ? sorted.map(b => {
+      const cplB = b.leads.length>0 ? b.spend/b.leads.length : 0;
+      const clicavel = b.conjunto !== '—';
+      const attrs = clicavel ? `style="cursor:pointer" role="button" tabindex="0" data-action="filtrarPorConjuntoCriativo" data-arg="${esc(b.conjunto)}"` : '';
+      return `<tr ${attrs}>
+        <td style="font-size:11px">${esc(b.conjunto)}</td>
+        <td><div class="t-name" style="font-size:12px">${esc(b.criativo)}</div></td>
+        <td>${pill(b.plataforma)}</td>
+        <td style="font-family:var(--mono)">${brl(b.spend)}</td>
+        <td>${fmt(b.leads.length)}</td>
+        <td style="font-family:var(--mono);font-weight:500">${brl(cplB)}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" class="empty">Nenhum criativo com investimento e leads mapeados neste recorte</td></tr>';
+  }
+
+  const leadsBody = document.getElementById('cr-leads-body');
+  if (leadsBody) {
+    const statusBadge = sf => {
+      if (!sf) return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Sem CRM</span>`;
+      if (sf.isWon) return `<span class="badge lq">Ganha</span>`;
+      if (sf.isLost) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
+      if (sf.isOpen) return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Em negociação</span>`;
+      return `<span class="badge lead">${esc(sf.status)||'—'}</span>`;
+    };
+    leadsBody.innerHTML = leadsFiltrados.length ? leadsFiltrados.slice().sort((a,b)=>(b.data||0)-(a.data||0)).map(l => {
+      const sf = l.email ? sfByEmail[l.email] : null;
+      return `<tr>
+        <td><div class="t-name">${esc(l.nome)}</div><div class="t-sub">${esc(l.empresa)}</div></td>
+        <td style="font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.campanha)}">${esc(l.campanha)}</td>
+        <td style="font-size:11px;color:var(--muted)">${esc(l.conjunto)}</td>
+        <td style="font-size:11px;color:var(--muted)">${esc(l.criativo)}</td>
+        <td>${statusBadge(sf)}</td>
+        <td style="font-family:var(--mono)">${sf && sf.valorOpp>0 ? brl(sf.valorOpp) : '—'}</td>
+        <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${l.data ? l.data.toLocaleDateString('pt-BR') : '—'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" class="empty">Sem leads no período/recorte selecionado</td></tr>';
+  }
+}
+
+async function initDates(){
+  const h = new Date();
+  const f = x => x.toISOString().slice(0,10);
+  const ds = document.getElementById('date-start');
+  const de = document.getElementById('date-end');
+  if (ds && !ds.value) ds.value = f(new Date(h - 30*86400000));
+  if (de && !de.value) de.value = f(h);
+}
+
+async function carregarTudo(){
+  await initDates();
+  const pulse=document.getElementById('pulse');
+  const stxt=document.getElementById('stxt');
+  pulse.style.background='var(--amber)';
+  stxt.textContent='Atualizando...';
+  const results=await Promise.allSettled([loadLeads(),loadRDStation(),loadGA4(),loadMeta(),loadLinkedIn(),loadGoogleAds(),loadSalesforce(),loadCriativos()]);
+  const ovResult=await Promise.allSettled([loadOverview()]);
+  const errors=results.concat(ovResult).filter(r=>r.status==='rejected').map(r=>r.reason?.message||'Erro desconhecido');
+  if(errors.length){
+    pulse.style.background='var(--red)';
+    stxt.textContent='Parcial — '+errors[0];
+    console.error('Erros:',errors);
+  } else {
+    pulse.style.background='var(--green)';
+    stxt.textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+// ── REFRESH EFICIENTE (arquitetura §8.3, Opção A — a única aprovada) ──────────
+// Carga inicial, botão "Atualizar", onchange das datas e setPreset continuam chamando
+// carregarTudo() (reload completo). Só o auto-refresh periódico (setInterval) passa a
+// atualizar APENAS a view ativa. Ao fazê-lo, invalida o cache de ads do range atual —
+// sem isso o auto-refresh serviria o agregado cacheado indefinidamente para o mesmo
+// range e nunca buscaria dado novo (ponto de atenção explícito da arquitetura §8.3).
+// Pares confirmados no código: loadGA4 popula GA4+UTM+LP; loadSalesforce renderiza
+// Oportunidades; loadCriativos resolve suas dependências (loadSalesforce) internamente.
+const LOADERS = {
+  overview: loadOverview,
+  leads: loadLeads,
+  rdstation: loadRDStation,
+  ga4: loadGA4,
+  utm: loadGA4,
+  lp: loadGA4,
+  oportunidades: loadSalesforce,
+  criativos: loadCriativos,
+  meta: loadMeta,
+  linkedin: loadLinkedIn,
+  gads: loadGoogleAds
+};
+async function refreshViewAtiva(){
+  const pulse = document.getElementById('pulse');
+  const stxt  = document.getElementById('stxt');
+  const loader = LOADERS[viewAtiva];
+  if (!loader) return;
+  try {
+    // Fura o cache de ads do range atual (mesma chave de fetchAdsDataForRange) para
+    // que o auto-refresh realmente busque dado novo do webhook.
+    const p = period();
+    delete _adsCacheStore[`${p.startDate}_${p.endDate}`];
+    if (pulse) pulse.style.background = 'var(--amber)';
+    await loader();
+    if (pulse) pulse.style.background = 'var(--green)';
+    if (stxt)  stxt.textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  } catch (e) {
+    // Não quebra o app nem interrompe o próximo tick do setInterval (padrão §8.2).
+    console.warn('Refresh da view ativa ('+viewAtiva+') falhou:', e);
+  }
+}
+
+carregarTudo();
+setInterval(refreshViewAtiva,5*60*1000);
+</script>
+</body>
+</html>
