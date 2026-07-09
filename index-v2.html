@@ -456,15 +456,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- OPORTUNIDADES (CRM Comercial) -->
   <div class="view" id="view-oportunidades">
     <div class="chart-click-hint" style="margin-bottom:12px">Cruza a planilha Leads Salesforce (CRM comercial) com a Central de Leads (canal/origem pago) por e-mail. Filtrado pelo período selecionado no topo (Data da conversão).</div>
-    <div class="kpi-grid-8">
+    <div class="kpi-grid-6">
       <div class="kpi blue"><div class="kpi-label" title="Total de leads recebidos pelo comercial no período.">Leads recebidos</div><div class="kpi-value" id="o-total">—</div><div class="kpi-footer" id="o-segmento-split"></div></div>
       <div class="kpi amber"><div class="kpi-label" title="Leads em sequência de tentativas de contato (status 'Contato dia N').">Em cadência</div><div class="kpi-value" id="o-cadencia">—</div></div>
       <div class="kpi green"><div class="kpi-label" title="Leads marcados como Qualificado no CRM/Salesforce dentro do período selecionado (escopo do CRM, não do RD Station — fontes distintas).">Qualificados (período/CRM)</div><div class="kpi-value" id="o-qualificados">—</div></div>
-      <div class="kpi purple"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div><div class="kpi-footer" id="o-oportunidades-trend"></div></div>
-      <div class="kpi purple"><div class="kpi-label" title="% de leads do período que viraram oportunidade.">Taxa Lead → Opp</div><div class="kpi-value" id="o-taxa">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div><div class="kpi-footer" id="o-oportunidades-trend"></div><div class="kpi-footer" id="o-taxas-tags" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div></div>
       <div class="kpi green"><div class="kpi-label" title="Soma do valor das oportunidades ainda em negociação (não ganhas nem perdidas).">Valor em pipeline</div><div class="kpi-value" id="o-pipeline" style="font-size:18px">—</div></div>
       <div class="kpi green"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período. O rodapé mostra quanto é atribuível a marketing (lead rastreado por e-mail).">Receita ganha</div><div class="kpi-value" id="o-receita" style="font-size:18px">—</div><div class="kpi-footer" id="o-receita-foot"></div><div class="kpi-footer" id="o-receita-trend"></div></div>
-      <div class="kpi green"><div class="kpi-label" title="Win rate = oportunidades ganhas ÷ total de oportunidades. Termômetro da qualidade da oportunidade e da execução comercial.">Win rate</div><div class="kpi-value" id="o-winrate">—</div><div class="kpi-footer" id="o-winrate-foot"></div></div>
     </div>
     <div class="kpi-grid-4">
       <div class="kpi purple"><div class="kpi-label" title="Oportunidades ainda em negociação (proposta enviada, POC, demonstração, etc).">Em negociação</div><div class="kpi-value" id="o-abertas">—</div></div>
@@ -2264,7 +2262,6 @@ function renderOportunidades(rows) {
   document.getElementById('o-cadencia').textContent = fmt(cadencia);
   document.getElementById('o-qualificados').textContent = fmt(qualificados);
   document.getElementById('o-oportunidades').textContent = fmt(oportunidades);
-  document.getElementById('o-taxa').textContent = total ? taxaOpp.toFixed(1)+'%' : '—';
   document.getElementById('o-pipeline').textContent = brl(valorPipeline);
   document.getElementById('o-abertas').textContent = fmt(abertas.length);
   document.getElementById('o-perdidas').textContent = fmt(perdidas.length);
@@ -2285,10 +2282,16 @@ function renderOportunidades(rows) {
   const receitaFoot = document.getElementById('o-receita-foot');
   const pctMktOpp = finOpp.receitaGanhaTotal>0 ? (finOpp.receitaGanhaMkt/finOpp.receitaGanhaTotal*100) : null;
   if (receitaFoot) receitaFoot.innerHTML = pctMktOpp!=null ? `<span style="color:var(--muted)">${pctMktOpp.toFixed(0)}% atribuído a marketing</span>` : '';
-  const winEl = document.getElementById('o-winrate');
-  if (winEl) winEl.textContent = finOpp.winRate!=null ? finOpp.winRate.toFixed(1)+'%' : '—';
-  const winFoot = document.getElementById('o-winrate-foot');
-  if (winFoot) winFoot.innerHTML = metaHTML(finOpp.winRate, 'winRate', v=>Number(v).toFixed(0)+'%');
+  // Taxa Lead→Opp e Win rate viraram tags compactas dentro do card "Oportunidades" (em vez de
+  // cards inteiros) — mesmo dado, menos espaço. Ver #o-taxas-tags no HTML.
+  const taxasTagsEl = document.getElementById('o-taxas-tags');
+  if (taxasTagsEl) {
+    const taxaTag = `<span class="meta-pill" style="background:var(--purple-dim);color:var(--purple)" title="Taxa Lead → Opp: % de leads do período que viraram oportunidade.">${total?taxaOpp.toFixed(1):'—'}% lead→opp</span>`;
+    const winTag = finOpp.winRate!=null
+      ? `<span class="meta-pill" style="background:var(--green-dim);color:var(--green)" title="Win rate: oportunidades ganhas ÷ total de oportunidades.">${finOpp.winRate.toFixed(1)}% win rate</span>`
+      : '';
+    taxasTagsEl.innerHTML = taxaTag + winTag + metaHTML(finOpp.winRate, 'winRate', v=>Number(v).toFixed(0)+'%');
+  }
   const cacCanalMap = cacPorCanal(rows, spendPorCanalMap);
 
   // ── CAC por ganho + meta (Média #12, §11): usa financeSummary.cacPorGanho (spendTotal ÷ nº ganhos). ──
@@ -2344,11 +2347,44 @@ function renderOportunidades(rows) {
   ];
   const funilEl = document.getElementById('o-funil');
   if (funilEl) {
-    funilEl.innerHTML = funilRows.map((r,i)=>{
-      const w = maxFunil>0 ? Math.round(r.v/maxFunil*100) : 0;
+    // Funil visual real: um único SVG com 4 trapézios empilhados que afunilam de
+    // estágio pra estágio (largura da base de cada trapézio = largura do topo do
+    // próximo, então encaixam sem emenda). Largura proporcional a r.v/maxFunil.
+    const VW = 640, SH = 58, CX = VW/2, MAXW = 600, MINW = 34;
+    const VH = SH * funilRows.length;
+    const widths = funilRows.map(r => Math.max(Math.round((maxFunil>0 ? r.v/maxFunil : 0) * MAXW), MINW));
+    const segs = funilRows.map((r,i)=>{
+      const topW = widths[i];
+      const botW = (i < funilRows.length-1) ? widths[i+1] : widths[i];
+      const y0 = i*SH, y1 = y0+SH, cy = y0 + SH/2;
+      const pts = [
+        [CX-topW/2, y0], [CX+topW/2, y0],
+        [CX+botW/2, y1], [CX-botW/2, y1]
+      ].map(p => `${p[0]},${p[1]}`).join(' ');
       const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
-      return `<div class="bar-row"><div class="bar-label" style="width:150px">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${r.color}"></div></div><div class="bar-val" style="width:180px;text-align:right">${fmt(r.v)} <span style="color:var(--muted);font-size:10px">${conv}</span></div></div>`;
+      const line2 = fmt(r.v) + (conv ? '  ·  ' + conv : '');
+      const aria = `${r.label}: ${fmt(r.v)}${conv ? ', ' + conv : ''}`;
+      const tip = `${r.label}\n${fmt(r.v)}${conv ? '\n' + conv : ''}`;
+      return `<g class="funnel-seg" role="img" aria-label="${aria}">`
+        + `<title>${tip}</title>`
+        + `<polygon points="${pts}" fill="${r.color}"></polygon>`
+        + `<text x="${CX}" y="${cy-1}" text-anchor="middle" class="fnl-name">${r.label}</text>`
+        + `<text x="${CX}" y="${cy+14}" text-anchor="middle" class="fnl-val">${line2}</text>`
+        + `</g>`;
     }).join('');
+    funilEl.innerHTML = `<svg viewBox="0 0 ${VW} ${VH}" width="100%" role="group" aria-label="Funil comercial: leads recebidos, qualificados, oportunidades e ganhas" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:100%;height:auto;overflow:visible">`
+      + `<style>`
+      + `.funnel-seg{cursor:default;transition:opacity .15s ease}`
+      + `.funnel-seg polygon{transition:filter .15s ease, stroke .15s ease;stroke:transparent;stroke-width:1.5}`
+      + `.funnel-seg text{pointer-events:none;paint-order:stroke;stroke:rgba(10,12,15,.55);stroke-width:2px;fill:#fff;font-family:'Inter',sans-serif}`
+      + `.funnel-seg .fnl-name{font-size:14px;font-weight:700}`
+      + `.funnel-seg .fnl-val{font-size:11px;font-weight:500;opacity:.92}`
+      + `svg:hover .funnel-seg{opacity:.42}`
+      + `svg:hover .funnel-seg:hover{opacity:1}`
+      + `.funnel-seg:hover polygon{filter:brightness(1.16);stroke:rgba(255,255,255,.85)}`
+      + `</style>`
+      + segs
+      + `</svg>`;
   }
 
   const byMotivoPerda = {};
