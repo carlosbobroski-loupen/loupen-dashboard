@@ -416,3 +416,9 @@ Como não há framework de teste no single-file, a rede de segurança é **funç
 - **Backward-compat:** `index-v2.html` é arquivo novo; `index.html` permanece intocado como rollback imediato. Todos os IDs de elemento e nomes de função preservados exceto onde há adição — reduz risco de quebrar integrações externas que dependam do DOM.
 - **Capacidade preservada (gold standard):** nenhuma métrica/segmentação existente é removida; a v2 é aditiva (exceto a redefinição consciente de "Resultados/CPL" dos canais, que é correção de erro apontada e aprovada no diagnóstico).
 ```
+
+---
+
+## 14. Registro de deploy
+
+- **2026-07-09:** `index-v2.html` publicado via push aditivo à `main` (commit `8a804bc`), sem alterar `index.html`. Motivo: o webhook de Ads (`n8n.loupenapps.com.br`) restringe CORS ao domínio de produção (`https://carlosbobroski-loupen.github.io`), então o teste completo (com dados de Ads) só é possível a partir desse domínio — testar `index-v2.html` localmente (`file://`) mostra corretamente Leads/Salesforce, mas Ads/Criativos ficam em branco por essa restrição, não por bug do arquivo.
