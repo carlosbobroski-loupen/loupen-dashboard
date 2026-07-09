@@ -458,11 +458,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <div class="chart-click-hint" style="margin-bottom:12px">Cruza a planilha Leads Salesforce (CRM comercial) com a Central de Leads (canal/origem pago) por e-mail. Filtrado pelo período selecionado no topo (Data da conversão).</div>
     <div class="kpi-grid-6">
       <div class="kpi blue"><div class="kpi-label" title="Total de leads recebidos pelo comercial no período.">Leads recebidos</div><div class="kpi-value" id="o-total">—</div><div class="kpi-footer" id="o-segmento-split"></div></div>
-      <div class="kpi amber"><div class="kpi-label" title="Leads em sequência de tentativas de contato (status 'Contato dia N').">Em cadência</div><div class="kpi-value" id="o-cadencia">—</div></div>
-      <div class="kpi green"><div class="kpi-label" title="Leads marcados como Qualificado no CRM/Salesforce dentro do período selecionado (escopo do CRM, não do RD Station — fontes distintas).">Qualificados (período/CRM)</div><div class="kpi-value" id="o-qualificados">—</div></div>
-      <div class="kpi purple"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div><div class="kpi-footer" id="o-oportunidades-trend"></div><div class="kpi-footer" id="o-taxas-tags" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div></div>
+      <div class="kpi amber" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="cadencia" aria-label="Ver os leads em cadência"><div class="kpi-label" title="Leads em sequência de tentativas de contato (status 'Contato dia N').">Em cadência</div><div class="kpi-value" id="o-cadencia">—</div><div class="kpi-footer" id="o-cadencia-pct"></div><div class="kpi-footer" id="o-cadencia-trend"></div></div>
+      <div class="kpi green" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="qualificados" aria-label="Ver os leads qualificados"><div class="kpi-label" title="Leads marcados como Qualificado no CRM/Salesforce dentro do período selecionado (escopo do CRM, não do RD Station — fontes distintas).">Qualificados (período/CRM)</div><div class="kpi-value" id="o-qualificados">—</div><div class="kpi-footer" id="o-qualificados-pct"></div><div class="kpi-footer" id="o-qualificados-trend"></div></div>
+      <div class="kpi purple" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="oportunidades" aria-label="Ver as oportunidades"><div class="kpi-label" title="Leads que viraram oportunidade registrada no CRM.">Oportunidades</div><div class="kpi-value" id="o-oportunidades">—</div><div class="kpi-footer" id="o-oportunidades-trend"></div><div class="kpi-footer" id="o-taxas-tags" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div></div>
       <div class="kpi green"><div class="kpi-label" title="Soma do valor das oportunidades ainda em negociação (não ganhas nem perdidas).">Valor em pipeline</div><div class="kpi-value" id="o-pipeline" style="font-size:18px">—</div></div>
-      <div class="kpi green"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período. O rodapé mostra quanto é atribuível a marketing (lead rastreado por e-mail).">Receita ganha</div><div class="kpi-value" id="o-receita" style="font-size:18px">—</div><div class="kpi-footer" id="o-receita-foot"></div><div class="kpi-footer" id="o-receita-trend"></div></div>
+      <div class="kpi green" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="receita" aria-label="Ver os leads da receita ganha"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período. O rodapé mostra quanto é atribuível a marketing (lead rastreado por e-mail).">Receita ganha</div><div class="kpi-value" id="o-receita" style="font-size:18px">—</div><div class="kpi-footer" id="o-receita-foot"></div><div class="kpi-footer" id="o-receita-winrate" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div><div class="kpi-footer" id="o-receita-trend"></div></div>
     </div>
     <div class="kpi-grid-4">
       <div class="kpi purple"><div class="kpi-label" title="Oportunidades ainda em negociação (proposta enviada, POC, demonstração, etc).">Em negociação</div><div class="kpi-value" id="o-abertas">—</div></div>
@@ -516,11 +516,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
 
     <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-package"></i>Oportunidades por produto</div><div class="section-badge">contagem de oportunidades · receita ganha</div></div>
+      <div id="o-produto"></div>
+    </div>
+
+    <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Todos os leads comerciais</div></div>
       <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>Nome / Empresa</th><th>Segmento</th><th>Origem</th><th>Canal</th><th>Status</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead>
         <tbody id="o-all"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: detalhe dos leads que compõem um KPI do funil comercial (drill de card) -->
+  <div id="lead-detail-modal" style="display:none;position:fixed;inset:0;z-index:9999;align-items:flex-start;justify-content:center;padding:48px 20px;overflow-y:auto">
+    <div data-action="fecharDetalheCard" data-arg="overlay" aria-hidden="true" style="position:fixed;inset:0;background:rgba(5,7,10,.72)"></div>
+    <div role="dialog" aria-modal="true" aria-labelledby="lead-detail-title" class="card" style="position:relative;z-index:1;max-width:920px;width:100%;margin:0;max-height:calc(100vh - 96px);display:flex;flex-direction:column;overflow:hidden">
+      <div class="section-row" style="margin-bottom:14px">
+        <div class="section-title"><i class="ti ti-users"></i><span id="lead-detail-title">Detalhe</span></div>
+        <button type="button" id="lead-detail-close" data-action="fecharDetalheCard" data-arg="btn" aria-label="Fechar" class="filter-clear" style="padding:4px 8px"><i class="ti ti-x"></i></button>
+      </div>
+      <div style="overflow-y:auto;overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Nome</th><th>Empresa</th><th>Canal</th><th>Status</th><th>Data</th><th>Valor</th></tr></thead>
+        <tbody id="lead-detail-body"></tbody>
       </table>
       </div>
     </div>
@@ -898,6 +920,8 @@ const DELEGATED_ACTIONS = {
   filtrarPorCampanhaCriativo: (a)    => filtrarPorCampanhaCriativo(a),
   filtrarPorConjuntoCriativo: (a)    => filtrarPorConjuntoCriativo(a),
   filtrarGA4Canal:            (a)    => filtrarGA4Canal(a),
+  abrirDetalheCard:           (a)    => abrirDetalheCard(a),
+  fecharDetalheCard:          ()     => fecharDetalheCard(),
   scrollToCard:               (a)    => scrollToCard(a),
   showView:                   (a, b) => showView(a, b === 'true')
 };
@@ -2239,7 +2263,77 @@ function filtrarPorCanalOpp(canal) {
   aplicarFiltrosOpp();
 }
 
+// ── MODAL DE DETALHE POR CARD (drill dos KPIs Em cadência / Qualificados / Oportunidades / Receita) ──
+// Guarda o `rows` já filtrado (período/canal/origem/motivo) do último render de Oportunidades para
+// o modal listar os leads que compõem cada KPI, mesmo sendo aberto por clique posterior ao render.
+let _oppRowsAtuais = [];
+
+// Filtro de cada card = mesmo critério usado no cálculo do KPI dentro de renderOportunidades.
+const DETALHE_CARD_DEFS = {
+  cadencia:      { titulo: 'Em cadência',   filtro: r => (r.status||'').toLowerCase().startsWith('contato dia') },
+  qualificados:  { titulo: 'Qualificados',  filtro: r => (r.status||'').toLowerCase() === 'qualificado' },
+  oportunidades: { titulo: 'Oportunidades', filtro: r => r.isOpportunity },
+  receita:       { titulo: 'Receita ganha', filtro: r => r.isWon }
+};
+
+// Badge de status — extraído para função nomeada e reusado na tabela "Todos os leads comerciais"
+// e no modal de detalhe (mesmo padrão visual, fonte única de verdade).
+function statusBadgeHTML(row){
+  if (row.isWon) return `<span class="badge lq">Ganha</span>`;
+  if (row.isLost) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
+  if (row.isOpen) return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Em negociação</span>`;
+  const sl = (row.status||'').toLowerCase();
+  if (sl==='rejeitado') return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Rejeitado</span>`;
+  if (sl.startsWith('contato dia')) return `<span class="badge" style="background:var(--amber-dim);color:var(--amber)">${esc(row.status)}</span>`;
+  return `<span class="badge lead">${esc(row.status)||'—'}</span>`;
+}
+
+function abrirDetalheCard(tipo){
+  const def = DETALHE_CARD_DEFS[tipo];
+  const modal = document.getElementById('lead-detail-modal');
+  if (!def || !modal) return;
+  const leads = (_oppRowsAtuais||[]).filter(def.filtro);
+  const titleEl = document.getElementById('lead-detail-title');
+  if (titleEl) titleEl.textContent = `${def.titulo} — ${fmt(leads.length)} lead${leads.length!==1?'s':''}`;
+  const body = document.getElementById('lead-detail-body');
+  if (body){
+    const ordenados = leads.slice().sort((a,b)=>(
+      (b.dataFechamento||b.dataConversao||b.dataCriacao||0) - (a.dataFechamento||a.dataConversao||a.dataCriacao||0)
+    ));
+    body.innerHTML = ordenados.length ? ordenados.map(row => {
+      const d = row.dataFechamento || row.dataConversao || row.dataCriacao;
+      const dataTxt = d ? d.toLocaleDateString('pt-BR') : '—';
+      const valorTxt = row.valorNF>0 ? brl(row.valorNF) : (row.valorOpp>0 ? brl(row.valorOpp) : '—');
+      return `<tr>
+        <td><div class="t-name">${esc(row.nome)}</div></td>
+        <td>${esc(row.empresa)}</td>
+        <td>${pill(row.canal)}</td>
+        <td>${statusBadgeHTML(row)}</td>
+        <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${dataTxt}</td>
+        <td style="font-family:var(--mono)">${valorTxt}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="6" class="empty">Nenhum lead neste recorte</td></tr>`;
+  }
+  modal.style.display = 'flex';
+  const closeBtn = document.getElementById('lead-detail-close');
+  if (closeBtn) closeBtn.focus();
+}
+
+function fecharDetalheCard(){
+  const modal = document.getElementById('lead-detail-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// Fechar com Escape (só quando o modal está visível). Overlay (clique fora) e botão X usam a
+// delegação de eventos já existente via data-action="fecharDetalheCard".
+document.addEventListener('keydown', (e)=>{
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('lead-detail-modal');
+  if (modal && modal.style.display === 'flex') fecharDetalheCard();
+});
+
 function renderOportunidades(rows) {
+  _oppRowsAtuais = rows;
   const total = rows.length;
   const cadencia = rows.filter(row => (row.status||'').toLowerCase().startsWith('contato dia')).length;
   const qualificados = rows.filter(row => (row.status||'').toLowerCase() === 'qualificado').length;
@@ -2282,15 +2376,18 @@ function renderOportunidades(rows) {
   const receitaFoot = document.getElementById('o-receita-foot');
   const pctMktOpp = finOpp.receitaGanhaTotal>0 ? (finOpp.receitaGanhaMkt/finOpp.receitaGanhaTotal*100) : null;
   if (receitaFoot) receitaFoot.innerHTML = pctMktOpp!=null ? `<span style="color:var(--muted)">${pctMktOpp.toFixed(0)}% atribuído a marketing</span>` : '';
-  // Taxa Lead→Opp e Win rate viraram tags compactas dentro do card "Oportunidades" (em vez de
-  // cards inteiros) — mesmo dado, menos espaço. Ver #o-taxas-tags no HTML.
+  // Taxa Lead→Opp fica como tag compacta no card "Oportunidades". Win rate + meta migraram para o
+  // card "Receita ganha" (#o-receita-winrate) — o desfecho vencedor mora junto da receita.
   const taxasTagsEl = document.getElementById('o-taxas-tags');
   if (taxasTagsEl) {
-    const taxaTag = `<span class="meta-pill" style="background:var(--purple-dim);color:var(--purple)" title="Taxa Lead → Opp: % de leads do período que viraram oportunidade.">${total?taxaOpp.toFixed(1):'—'}% lead→opp</span>`;
-    const winTag = finOpp.winRate!=null
+    taxasTagsEl.innerHTML = `<span class="meta-pill" style="background:var(--purple-dim);color:var(--purple)" title="Taxa Lead → Opp: % de leads do período que viraram oportunidade.">${total?taxaOpp.toFixed(1):'—'}% lead→opp</span>`;
+  }
+  const winrateEl = document.getElementById('o-receita-winrate');
+  if (winrateEl) {
+    winrateEl.innerHTML = finOpp.winRate!=null
       ? `<span class="meta-pill" style="background:var(--green-dim);color:var(--green)" title="Win rate: oportunidades ganhas ÷ total de oportunidades.">${finOpp.winRate.toFixed(1)}% win rate</span>`
+        + metaHTML(finOpp.winRate, 'winRate', v=>Number(v).toFixed(0)+'%')
       : '';
-    taxasTagsEl.innerHTML = taxaTag + winTag + metaHTML(finOpp.winRate, 'winRate', v=>Number(v).toFixed(0)+'%');
   }
   const cacCanalMap = cacPorCanal(rows, spendPorCanalMap);
 
@@ -2323,6 +2420,20 @@ function renderOportunidades(rows) {
   const oRecTrend = document.getElementById('o-receita-trend');
   if (oRecTrend) oRecTrend.innerHTML = trendHTML(finOpp.receitaGanhaTotal, prevReceita);
 
+  // ── Tags de % (dos leads recebidos) + trend p/ Em cadência e Qualificados (mesmo padrão dos demais
+  // cards). Qualificados usa `qualificados` puro — NÃO qualificados+oportunidades (isso é o cumulativo
+  // do funil, não o KPI do card). "—" quando total===0 (nunca NaN). ──
+  const prevCadencia = prevSf.filter(row => (row.status||'').toLowerCase().startsWith('contato dia')).length;
+  const prevQualificados = prevSf.filter(row => (row.status||'').toLowerCase() === 'qualificado').length;
+  const oCadPct = document.getElementById('o-cadencia-pct');
+  if (oCadPct) oCadPct.innerHTML = `<span class="meta-pill" style="background:var(--amber-dim);color:var(--amber)" title="% dos leads recebidos no período que estão em cadência de contato.">${total?((cadencia/total)*100).toFixed(1):'—'}% dos leads</span>`;
+  const oQuaPct = document.getElementById('o-qualificados-pct');
+  if (oQuaPct) oQuaPct.innerHTML = `<span class="meta-pill" style="background:var(--green-dim);color:var(--green)" title="% dos leads recebidos no período marcados como qualificados no CRM.">${total?((qualificados/total)*100).toFixed(1):'—'}% dos leads</span>`;
+  const oCadTrend = document.getElementById('o-cadencia-trend');
+  if (oCadTrend) oCadTrend.innerHTML = trendHTML(cadencia, prevCadencia);
+  const oQuaTrend = document.getElementById('o-qualificados-trend');
+  if (oQuaTrend) oQuaTrend.innerHTML = trendHTML(qualificados, prevQualificados);
+
   // ── Série temporal de oportunidades e ganhos (Média #7, §3.6/§6.1) — granularidade única para alinhar
   // os buckets das duas séries (dia se período <=31d, senão semana). Datas do CRM por linha. ──
   const granO = period().days<=31 ? 'dia' : 'semana';
@@ -2347,9 +2458,12 @@ function renderOportunidades(rows) {
   ];
   const funilEl = document.getElementById('o-funil');
   if (funilEl) {
-    // Funil visual real: um único SVG com 4 trapézios empilhados que afunilam de
-    // estágio pra estágio (largura da base de cada trapézio = largura do topo do
-    // próximo, então encaixam sem emenda). Largura proporcional a r.v/maxFunil.
+    // Funil visual real: um SVG com 4 segmentos empilhados que afunilam de estágio pra estágio.
+    // Cada segmento é um <path> cujas bordas esquerda/direita são curvas Bézier cúbicas (não linhas
+    // retas), dando uma silhueta orgânica tipo ampulheta/funil suave. Como a base de um segmento tem
+    // a mesma largura do topo do próximo (botW == topW seguinte) E as curvas chegam ao ponto de
+    // encontro com tangente vertical (pontos de controle na altura média), as bordas adjacentes se
+    // emendam sem quina — a transição entre estágios parece contínua. Largura ∝ r.v/maxFunil.
     const VW = 640, SH = 58, CX = VW/2, MAXW = 600, MINW = 34;
     const VH = SH * funilRows.length;
     const widths = funilRows.map(r => Math.max(Math.round((maxFunil>0 ? r.v/maxFunil : 0) * MAXW), MINW));
@@ -2357,17 +2471,17 @@ function renderOportunidades(rows) {
       const topW = widths[i];
       const botW = (i < funilRows.length-1) ? widths[i+1] : widths[i];
       const y0 = i*SH, y1 = y0+SH, cy = y0 + SH/2;
-      const pts = [
-        [CX-topW/2, y0], [CX+topW/2, y0],
-        [CX+botW/2, y1], [CX-botW/2, y1]
-      ].map(p => `${p[0]},${p[1]}`).join(' ');
+      // Extremos das bordas + altura média (pontos de controle) para o S-curve ease-in-out.
+      const tl = CX-topW/2, tr = CX+topW/2, bl = CX-botW/2, br = CX+botW/2, cym = y0 + SH/2;
+      // Borda esquerda desce em curva (tl→bl), reta na base até br, borda direita sobe em curva (br→tr).
+      const d = `M ${tl},${y0} C ${tl},${cym} ${bl},${cym} ${bl},${y1} L ${br},${y1} C ${br},${cym} ${tr},${cym} ${tr},${y0} Z`;
       const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
       const line2 = fmt(r.v) + (conv ? '  ·  ' + conv : '');
       const aria = `${r.label}: ${fmt(r.v)}${conv ? ', ' + conv : ''}`;
       const tip = `${r.label}\n${fmt(r.v)}${conv ? '\n' + conv : ''}`;
       return `<g class="funnel-seg" role="img" aria-label="${aria}">`
         + `<title>${tip}</title>`
-        + `<polygon points="${pts}" fill="${r.color}"></polygon>`
+        + `<path d="${d}" fill="${r.color}"></path>`
         + `<text x="${CX}" y="${cy-1}" text-anchor="middle" class="fnl-name">${r.label}</text>`
         + `<text x="${CX}" y="${cy+14}" text-anchor="middle" class="fnl-val">${line2}</text>`
         + `</g>`;
@@ -2375,13 +2489,13 @@ function renderOportunidades(rows) {
     funilEl.innerHTML = `<svg viewBox="0 0 ${VW} ${VH}" width="100%" role="group" aria-label="Funil comercial: leads recebidos, qualificados, oportunidades e ganhas" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:100%;height:auto;overflow:visible">`
       + `<style>`
       + `.funnel-seg{cursor:default;transition:opacity .15s ease}`
-      + `.funnel-seg polygon{transition:filter .15s ease, stroke .15s ease;stroke:transparent;stroke-width:1.5}`
+      + `.funnel-seg path{transition:filter .15s ease, stroke .15s ease;stroke:transparent;stroke-width:1.5}`
       + `.funnel-seg text{pointer-events:none;paint-order:stroke;stroke:rgba(10,12,15,.55);stroke-width:2px;fill:#fff;font-family:'Inter',sans-serif}`
       + `.funnel-seg .fnl-name{font-size:14px;font-weight:700}`
       + `.funnel-seg .fnl-val{font-size:11px;font-weight:500;opacity:.92}`
       + `svg:hover .funnel-seg{opacity:.42}`
       + `svg:hover .funnel-seg:hover{opacity:1}`
-      + `.funnel-seg:hover polygon{filter:brightness(1.16);stroke:rgba(255,255,255,.85)}`
+      + `.funnel-seg:hover path{filter:brightness(1.16);stroke:rgba(255,255,255,.85)}`
       + `</style>`
       + segs
       + `</svg>`;
@@ -2444,23 +2558,29 @@ function renderOportunidades(rows) {
     </tr>`).join('') : '<tr><td colspan="5" class="empty">Sem dados no período</td></tr>';
   }
 
+  // ── Oportunidades por produto (dado real de row.produto; a maioria das linhas vem vazia → cai em
+  // "Não informado", o que é esperado). Barras: contagem de oportunidades (isOpportunity), com a
+  // receita ganha (Σ valorNF em isWon — faturado, nunca valorOpp) no valor da barra. ──
+  const byProduto = {};
+  rows.forEach(row => {
+    const prod = row.produto || 'Não informado';
+    byProduto[prod] = byProduto[prod] || { opp:0, receita:0 };
+    if (row.isOpportunity) byProduto[prod].opp++;
+    if (row.isWon) byProduto[prod].receita += (row.valorNF||0);
+  });
+  const produtoRows = Object.entries(byProduto)
+    .sort((a,b)=>b[1].opp-a[1].opp)
+    .map(([label,agg])=>({ label: `${label} · ${fmt(agg.opp)} opp`, v: agg.opp, fmt: agg.receita>0 ? brl(agg.receita) : '—' }));
+  mkBars(document.getElementById('o-produto'), produtoRows.length?produtoRows:[{label:'Sem dados no período',v:0}], CORES[3]);
+
   const allBody = document.getElementById('o-all');
   if (allBody) {
-    const statusBadge = row => {
-      if (row.isWon) return `<span class="badge lq">Ganha</span>`;
-      if (row.isLost) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
-      if (row.isOpen) return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Em negociação</span>`;
-      const sl = (row.status||'').toLowerCase();
-      if (sl==='rejeitado') return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Rejeitado</span>`;
-      if (sl.startsWith('contato dia')) return `<span class="badge" style="background:var(--amber-dim);color:var(--amber)">${esc(row.status)}</span>`;
-      return `<span class="badge lead">${esc(row.status)||'—'}</span>`;
-    };
     allBody.innerHTML = rows.length ? rows.slice().sort((a,b)=>(b.dataConversao||b.dataCriacao||0)-(a.dataConversao||a.dataCriacao||0)).map(row => `<tr>
       <td><div class="t-name">${esc(row.nome)}</div><div class="t-sub">${esc(row.empresa)}</div></td>
       <td>${row.isMarketing ? '<span class="badge lq">Marketing</span>' : '<span class="badge" style="background:var(--surface2);color:var(--muted)">Comercial</span>'}</td>
       <td style="font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(row.origem)}">${esc(row.origem)}</td>
       <td>${pill(row.canal)}</td>
-      <td>${statusBadge(row)}</td>
+      <td>${statusBadgeHTML(row)}</td>
       <td style="font-size:12px;color:var(--muted)">${esc(row.motivoPerda || row.motivoRejeicao || '—')}</td>
       <td style="font-family:var(--mono)">${row.valorOpp>0?brl(row.valorOpp):'—'}</td>
       <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${row.dataConversao ? row.dataConversao.toLocaleDateString('pt-BR') : (row.dataCriacao ? row.dataCriacao.toLocaleDateString('pt-BR') : '—')}</td>
