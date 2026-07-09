@@ -12,8 +12,30 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;min-height:100vh}
 .shell{display:flex;min-height:100vh}
-.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;overflow-y:auto}
-.main{margin-left:220px;flex:1;padding:28px 32px;max-width:1300px}
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;overflow-y:auto;overflow-x:hidden;transition:width .2s ease}
+.main{margin-left:220px;width:calc(100% - 220px);padding:28px 32px;transition:margin-left .2s ease, width .2s ease}
+.main-inner{max-width:1300px;margin:0 auto}
+/* Sidebar recolhível — font-size:0 colapsa o nó de texto puro dentro dos .nav-item (o rótulo),
+   preservando o ícone <i> que tem font-size próprio. margin-left/width do .main acompanham. */
+.shell.sidebar-collapsed .sidebar{width:64px}
+.shell.sidebar-collapsed .main{margin-left:64px;width:calc(100% - 64px)}
+.shell.sidebar-collapsed .nav-item{font-size:0;gap:0;justify-content:center;padding:8px 0}
+.shell.sidebar-collapsed .nav-item i{font-size:18px}
+.shell.sidebar-collapsed .nav-label{display:none}
+.shell.sidebar-collapsed .logo{padding:20px 8px 16px;text-align:center}
+.shell.sidebar-collapsed .logo-sub{display:none}
+.shell.sidebar-collapsed .logo-name{font-size:0}
+.shell.sidebar-collapsed .logo-name::first-letter{font-size:18px}
+.shell.sidebar-collapsed .last-update span{display:none}
+.shell.sidebar-collapsed .last-update{justify-content:center}
+.sidebar-toggle{background:var(--surface);border:1px solid var(--border2);color:var(--muted);width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .15s;flex-shrink:0}
+.sidebar-toggle:hover{color:var(--text);background:var(--surface2)}
+/* Tooltip customizado do funil comercial (substitui o <title> nativo) + animação de entrada dos segmentos */
+#funil-tooltip{position:fixed;z-index:9998;pointer-events:none;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 11px;font-size:12px;color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.45);opacity:0;transition:opacity .12s ease;max-width:240px;line-height:1.45}
+#funil-tooltip.show{opacity:1}
+#funil-tooltip .ft-title{font-weight:700;margin-bottom:2px}
+#funil-tooltip .ft-val{font-family:var(--mono);color:var(--muted)}
+@keyframes funnelIn{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
 .logo{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
 .logo-name{font-size:15px;font-weight:600;letter-spacing:-.2px}
 .logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
@@ -162,8 +184,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 </aside>
 
 <main class="main">
+<div class="main-inner">
   <div class="topbar">
-    <div class="page-title" id="page-title">Visão geral</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button type="button" id="sidebar-toggle" class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Recolher ou expandir o menu lateral"><i class="ti ti-menu-2"></i></button>
+      <div class="page-title" id="page-title">Visão geral</div>
+    </div>
     <div class="topbar-right">
       <div class="date-range-wrap">
         <i class="ti ti-calendar" style="color:var(--muted);font-size:15px"></i>
@@ -531,6 +557,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
   </div>
 
+  <!-- Tooltip customizado do funil (posicionado via JS no hover dos segmentos) -->
+  <div id="funil-tooltip" role="status" aria-hidden="true"></div>
+
   <!-- MODAL: detalhe dos leads que compõem um KPI do funil comercial (drill de card) -->
   <div id="lead-detail-modal" style="display:none;position:fixed;inset:0;z-index:9999;align-items:flex-start;justify-content:center;padding:48px 20px;overflow-y:auto">
     <div data-action="fecharDetalheCard" data-arg="overlay" aria-hidden="true" style="position:fixed;inset:0;background:rgba(5,7,10,.72)"></div>
@@ -541,7 +570,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       </div>
       <div style="overflow-y:auto;overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Nome</th><th>Empresa</th><th>Canal</th><th>Status</th><th>Data</th><th>Valor</th></tr></thead>
+        <thead id="lead-detail-thead"></thead>
         <tbody id="lead-detail-body"></tbody>
       </table>
       </div>
@@ -763,9 +792,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       </div>
     </div>
   </div>
+</div>
 </main>
 </div>
 
+<script>
+// Aplica o estado salvo da sidebar o quanto antes (shell já está no DOM) para reduzir flash visual.
+(function(){
+  try { if (localStorage.getItem('sidebarCollapsed') === '1') document.querySelector('.shell').classList.add('sidebar-collapsed'); } catch(e){}
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ── CONFIG ──────────────────────────────────────────────────
@@ -2127,7 +2163,8 @@ function buildLeadEmailMap() {
     // Evento já vem padronizado da Central de Leads (LOGMEIN_RESCUE-LICENCA-ECO_07-26,
     // GOTO_INSTITUCIONAL_07-26, GOTO_WEBINAR_07-26, GOTO_SAUDE_06-26 — padrão definido em 2026-07-07,
     // mês do GoTo Saúde corrigido para 06-26 em 2026-07-08).
-    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '' };
+    // c[3] = "Nome" na Central de Leads — usado como fallback quando o CRM/Salesforce não traz o nome.
+    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '', nome: r.c[3]?.v || '' };
   });
   return map;
 }
@@ -2269,14 +2306,23 @@ function filtrarPorCanalOpp(canal) {
 let _oppRowsAtuais = [];
 
 // Filtro de cada card = mesmo critério usado no cálculo do KPI dentro de renderOportunidades.
+// `mostrarProduto: true` adiciona a coluna "Produto" no modal — só faz sentido para recortes de
+// oportunidades (aberta/perdida/oportunidade), onde o produto do CRM está preenchido.
+// As chaves *-funil são acionadas pelos estágios do funil (item de funil). Os estágios "Oportunidades"
+// e "Ganhas" reusam `oportunidades`/`receita` (mesmo filtro/significado) — não há chaves duplicadas.
 const DETALHE_CARD_DEFS = {
-  cadencia:      { titulo: 'Em cadência',   filtro: r => (r.status||'').toLowerCase().startsWith('contato dia') },
-  qualificados:  { titulo: 'Qualificados',  filtro: r => (r.status||'').toLowerCase() === 'qualificado' },
-  oportunidades: { titulo: 'Oportunidades', filtro: r => r.isOpportunity },
-  receita:       { titulo: 'Receita ganha', filtro: r => r.isWon },
-  abertas:       { titulo: 'Em negociação', filtro: r => r.isOpen },
-  perdidas:      { titulo: 'Perdidas',      filtro: r => r.isLost },
-  rejeitados:    { titulo: 'Rejeitados',    filtro: r => (r.status||'').toLowerCase() === 'rejeitado' }
+  cadencia:            { titulo: 'Em cadência',   filtro: r => (r.status||'').toLowerCase().startsWith('contato dia') },
+  qualificados:        { titulo: 'Qualificados',  filtro: r => (r.status||'').toLowerCase() === 'qualificado' },
+  oportunidades:       { titulo: 'Oportunidades', filtro: r => r.isOpportunity, mostrarProduto: true },
+  receita:             { titulo: 'Receita ganha', filtro: r => r.isWon },
+  abertas:             { titulo: 'Em negociação', filtro: r => r.isOpen, mostrarProduto: true },
+  perdidas:            { titulo: 'Perdidas',      filtro: r => r.isLost, mostrarProduto: true },
+  rejeitados:          { titulo: 'Rejeitados',    filtro: r => (r.status||'').toLowerCase() === 'rejeitado' },
+  // Estágio "Leads recebidos" do funil = todos os leads do período (bate com `total`).
+  'leads-funil':       { titulo: 'Leads recebidos', filtro: r => true },
+  // Estágio "Qualificados" do funil = valor cumulativo (qualificados + oportunidades). É DIFERENTE
+  // da chave `qualificados` acima (que é só status==='qualificado' puro) — propositalmente distinta.
+  'qualificados-funil':{ titulo: 'Qualificados (cumulativo do funil)', filtro: r => (r.status||'').toLowerCase() === 'qualificado' || r.isOpportunity }
 };
 
 // Badge de status — extraído para função nomeada e reusado na tabela "Todos os leads comerciais"
@@ -2298,8 +2344,14 @@ function abrirDetalheCard(tipo){
   const leads = (_oppRowsAtuais||[]).filter(def.filtro);
   const titleEl = document.getElementById('lead-detail-title');
   if (titleEl) titleEl.textContent = `${def.titulo} — ${fmt(leads.length)} lead${leads.length!==1?'s':''}`;
+  const mostrarProduto = !!def.mostrarProduto;
+  const thead = document.getElementById('lead-detail-thead');
+  if (thead){
+    thead.innerHTML = `<tr><th>Nome</th><th>Empresa</th><th>Canal</th><th>Status</th><th>Data</th><th>Valor</th>${mostrarProduto ? '<th>Produto</th>' : ''}</tr>`;
+  }
   const body = document.getElementById('lead-detail-body');
   if (body){
+    const nCols = mostrarProduto ? 7 : 6;
     const ordenados = leads.slice().sort((a,b)=>(
       (b.dataFechamento||b.dataConversao||b.dataCriacao||0) - (a.dataFechamento||a.dataConversao||a.dataCriacao||0)
     ));
@@ -2307,15 +2359,21 @@ function abrirDetalheCard(tipo){
       const d = row.dataFechamento || row.dataConversao || row.dataCriacao;
       const dataTxt = d ? d.toLocaleDateString('pt-BR') : '—';
       const valorTxt = row.valorNF>0 ? brl(row.valorNF) : (row.valorOpp>0 ? brl(row.valorOpp) : '—');
+      // Nome: usa o do CRM; se vier vazio (marcado como '—' na carga do Salesforce), tenta o nome
+      // da Central de Leads pelo mesmo e-mail; se nenhum tiver, mostra '—'. Sempre escapado.
+      const nomeSF = (row.nome && row.nome !== '—') ? row.nome : '';
+      const nomeFinal = nomeSF || (_leadEmailMap[row.email] && _leadEmailMap[row.email].nome) || '—';
+      const produtoTd = mostrarProduto ? `<td>${esc(row.produto) || '—'}</td>` : '';
       return `<tr>
-        <td><div class="t-name">${esc(row.nome)}</div></td>
+        <td><div class="t-name">${esc(nomeFinal)}</div></td>
         <td>${esc(row.empresa)}</td>
         <td>${pill(row.canal)}</td>
         <td>${statusBadgeHTML(row)}</td>
         <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${dataTxt}</td>
         <td style="font-family:var(--mono)">${valorTxt}</td>
+        ${produtoTd}
       </tr>`;
-    }).join('') : `<tr><td colspan="6" class="empty">Nenhum lead neste recorte</td></tr>`;
+    }).join('') : `<tr><td colspan="${nCols}" class="empty">Nenhum lead neste recorte</td></tr>`;
   }
   modal.style.display = 'flex';
   const closeBtn = document.getElementById('lead-detail-close');
@@ -2334,6 +2392,51 @@ document.addEventListener('keydown', (e)=>{
   const modal = document.getElementById('lead-detail-modal');
   if (modal && modal.style.display === 'flex') fecharDetalheCard();
 });
+
+// Tooltip customizado do funil: liga listeners locais de hover em cada segmento (não passa pela
+// delegação global de clique — hover é comportamento local do funil). Reusa o #funil-tooltip único.
+// Chamado a cada render do funil; como innerHTML recria os <g>, listeners antigos somem junto (sem leak).
+function setupFunilTooltip(container){
+  const tip = document.getElementById('funil-tooltip');
+  if (!tip || !container) return;
+  const place = (e)=>{
+    const pad = 14, tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + tw > window.innerWidth - 8) x = e.clientX - tw - pad;
+    if (y + th > window.innerHeight - 8) y = e.clientY - th - pad;
+    tip.style.left = Math.max(8, x) + 'px';
+    tip.style.top  = Math.max(8, y) + 'px';
+  };
+  container.querySelectorAll('.funnel-seg').forEach(g=>{
+    g.addEventListener('mouseenter', (e)=>{
+      // getAttribute retorna os valores já decodificados; usa textContent para evitar qualquer injeção.
+      const label = g.getAttribute('data-fnl-label') || '';
+      const val   = g.getAttribute('data-fnl-val') || '';
+      const conv  = g.getAttribute('data-fnl-conv') || '';
+      tip.innerHTML = '';
+      const t = document.createElement('div'); t.className = 'ft-title'; t.textContent = label;
+      const v = document.createElement('div'); v.className = 'ft-val';   v.textContent = val + (conv ? ' · ' + conv : '');
+      tip.appendChild(t); tip.appendChild(v);
+      tip.classList.add('show');
+      tip.setAttribute('aria-hidden', 'false');
+      place(e);
+    });
+    g.addEventListener('mousemove', place);
+    g.addEventListener('mouseleave', ()=>{
+      tip.classList.remove('show');
+      tip.setAttribute('aria-hidden', 'true');
+    });
+  });
+}
+
+// Recolhe/expande a sidebar (classe no .shell controla largura da sidebar E margin/width do .main via
+// CSS). Estado persistido em localStorage para lembrar entre recarregamentos.
+function toggleSidebar(){
+  const shell = document.querySelector('.shell');
+  if (!shell) return;
+  const collapsed = shell.classList.toggle('sidebar-collapsed');
+  try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch(e){}
+}
 
 function renderOportunidades(rows) {
   _oppRowsAtuais = rows;
@@ -2452,10 +2555,17 @@ function renderOportunidades(rows) {
     { label:'Ganhos', data:bucketsO.map(b=>mapWon[b]||0), borderColor:CORES[1], backgroundColor:'rgba(34,197,94,.10)', fill:true, tension:.3, pointRadius:2, borderWidth:2 }
   ], { scales:scOpts(), plugins:{legend:{display:true, labels:{color:'#7a7f8a',font:{size:11}}}} });
 
-  const maxFunil = Math.max(total, qualificados+oportunidades, oportunidades, ganhas.length, 1);
+  // Cumulativo "qualificado OU oportunidade" sem duplicar: toda oportunidade já nasce com status
+  // "Qualificado" no CRM (confirmado nos dados reais — as 14 linhas isOpportunity também são as 14
+  // com status==='qualificado'), então a soma antiga `qualificados+oportunidades` contava essas linhas
+  // duas vezes (37 em vez dos 23 reais). Bug corrigido: usar união (mesmo filtro da chave
+  // 'qualificados-funil' do modal), não soma aritmética — evita o funil mostrar um número diferente
+  // do que o pop-up de detalhe realmente lista.
+  const qualificadosCumulativo = rows.filter(row => (row.status||'').toLowerCase()==='qualificado' || row.isOpportunity).length;
+  const maxFunil = Math.max(total, qualificadosCumulativo, oportunidades, ganhas.length, 1);
   const funilRows = [
     { label:'Leads recebidos', v: total, color: CORES[0] },
-    { label:'Qualificados (período/CRM)', v: qualificados + oportunidades, color: CORES[2] },
+    { label:'Qualificados (período/CRM)', v: qualificadosCumulativo, color: CORES[2] },
     { label:'Oportunidades', v: oportunidades, color: CORES[3] },
     { label:'Ganhas', v: ganhas.length, color: CORES[1] }
   ];
@@ -2467,9 +2577,30 @@ function renderOportunidades(rows) {
     // a mesma largura do topo do próximo (botW == topW seguinte) E as curvas chegam ao ponto de
     // encontro com tangente vertical (pontos de controle na altura média), as bordas adjacentes se
     // emendam sem quina — a transição entre estágios parece contínua. Largura ∝ r.v/maxFunil.
+    // Acabamento: gradiente vertical sutil por estágio (topo ~18% mais claro), tooltip HTML customizado
+    // (substitui o <title> nativo) e animação de entrada escalonada. Cada estágio é clicável (role=button
+    // + data-action) e abre o modal de detalhe via a delegação de eventos global.
     const VW = 640, SH = 58, CX = VW/2, MAXW = 600, MINW = 34;
     const VH = SH * funilRows.length;
     const widths = funilRows.map(r => Math.max(Math.round((maxFunil>0 ? r.v/maxFunil : 0) * MAXW), MINW));
+    // Chave do modal por estágio (mesma ordem de funilRows). "Oportunidades" e "Ganhas" reusam as
+    // chaves existentes `oportunidades`/`receita`; os dois primeiros usam as chaves novas *-funil.
+    const funilKeys = ['leads-funil','qualificados-funil','oportunidades','receita'];
+    // Clareia um hex misturando com branco (amt=0..1) para o topo do gradiente de cada segmento.
+    const lighten = (hex, amt) => {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+      if (!m) return hex;
+      const n = parseInt(m[1], 16);
+      const mix = ch => Math.min(255, Math.round(ch + (255 - ch) * amt));
+      const r = mix((n>>16)&255), g = mix((n>>8)&255), b = mix(n&255);
+      return '#' + ((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1);
+    };
+    const defs = funilRows.map((r,i)=>
+      `<linearGradient id="fnl-grad-${i}" x1="0" y1="0" x2="0" y2="1">`
+      + `<stop offset="0" stop-color="${lighten(r.color,.18)}"></stop>`
+      + `<stop offset="1" stop-color="${r.color}"></stop>`
+      + `</linearGradient>`
+    ).join('');
     const segs = funilRows.map((r,i)=>{
       const topW = widths[i];
       const botW = (i < funilRows.length-1) ? widths[i+1] : widths[i];
@@ -2480,18 +2611,19 @@ function renderOportunidades(rows) {
       const d = `M ${tl},${y0} C ${tl},${cym} ${bl},${cym} ${bl},${y1} L ${br},${y1} C ${br},${cym} ${tr},${cym} ${tr},${y0} Z`;
       const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
       const line2 = fmt(r.v) + (conv ? '  ·  ' + conv : '');
-      const aria = `${r.label}: ${fmt(r.v)}${conv ? ', ' + conv : ''}`;
-      const tip = `${r.label}\n${fmt(r.v)}${conv ? '\n' + conv : ''}`;
-      return `<g class="funnel-seg" role="img" aria-label="${aria}">`
-        + `<title>${tip}</title>`
-        + `<path d="${d}" fill="${r.color}"></path>`
-        + `<text x="${CX}" y="${cy-1}" text-anchor="middle" class="fnl-name">${r.label}</text>`
-        + `<text x="${CX}" y="${cy+14}" text-anchor="middle" class="fnl-val">${line2}</text>`
+      const aria = `${r.label}: ${fmt(r.v)}${conv ? ', ' + conv : ''}. Clique para ver os leads.`;
+      return `<g class="funnel-seg" role="button" tabindex="0" aria-label="${esc(aria)}" `
+        + `data-action="abrirDetalheCard" data-arg="${funilKeys[i]}" `
+        + `data-fnl-label="${esc(r.label)}" data-fnl-val="${esc(fmt(r.v))}" data-fnl-conv="${esc(conv)}" `
+        + `style="animation-delay:${i*70}ms">`
+        + `<path d="${d}" fill="url(#fnl-grad-${i})"></path>`
+        + `<text x="${CX}" y="${cy-1}" text-anchor="middle" class="fnl-name">${esc(r.label)}</text>`
+        + `<text x="${CX}" y="${cy+14}" text-anchor="middle" class="fnl-val">${esc(line2)}</text>`
         + `</g>`;
     }).join('');
     funilEl.innerHTML = `<svg viewBox="0 0 ${VW} ${VH}" width="100%" role="group" aria-label="Funil comercial: leads recebidos, qualificados, oportunidades e ganhas" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:100%;height:auto;overflow:visible">`
       + `<style>`
-      + `.funnel-seg{cursor:default;transition:opacity .15s ease}`
+      + `.funnel-seg{cursor:pointer;transition:opacity .15s ease;animation:funnelIn .4s ease backwards;transform-box:fill-box;transform-origin:center}`
       + `.funnel-seg path{transition:filter .15s ease, stroke .15s ease;stroke:transparent;stroke-width:1.5}`
       + `.funnel-seg text{pointer-events:none;paint-order:stroke;stroke:rgba(10,12,15,.55);stroke-width:2px;fill:#fff;font-family:'Inter',sans-serif}`
       + `.funnel-seg .fnl-name{font-size:14px;font-weight:700}`
@@ -2499,9 +2631,13 @@ function renderOportunidades(rows) {
       + `svg:hover .funnel-seg{opacity:.42}`
       + `svg:hover .funnel-seg:hover{opacity:1}`
       + `.funnel-seg:hover path{filter:brightness(1.16);stroke:rgba(255,255,255,.85)}`
+      + `.funnel-seg:focus{outline:none}`
+      + `.funnel-seg:focus-visible path{stroke:var(--blue);stroke-width:2.5}`
       + `</style>`
+      + `<defs>${defs}</defs>`
       + segs
       + `</svg>`;
+    setupFunilTooltip(funilEl);
   }
 
   const byMotivoPerda = {};
