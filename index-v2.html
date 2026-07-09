@@ -465,10 +465,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="kpi green" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="receita" aria-label="Ver os leads da receita ganha"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período. O rodapé mostra quanto é atribuível a marketing (lead rastreado por e-mail).">Receita ganha</div><div class="kpi-value" id="o-receita" style="font-size:18px">—</div><div class="kpi-footer" id="o-receita-foot"></div><div class="kpi-footer" id="o-receita-winrate" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div><div class="kpi-footer" id="o-receita-trend"></div></div>
     </div>
     <div class="kpi-grid-4">
-      <div class="kpi purple"><div class="kpi-label" title="Oportunidades ainda em negociação (proposta enviada, POC, demonstração, etc).">Em negociação</div><div class="kpi-value" id="o-abertas">—</div></div>
-      <div class="kpi red"><div class="kpi-label" title="Oportunidades marcadas como Perdido no CRM.">Perdidas</div><div class="kpi-value" id="o-perdidas">—</div></div>
+      <div class="kpi purple" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="abertas" aria-label="Ver as oportunidades em negociação"><div class="kpi-label" title="Oportunidades ainda em negociação (proposta enviada, POC, demonstração, etc).">Em negociação</div><div class="kpi-value" id="o-abertas">—</div></div>
+      <div class="kpi red" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="perdidas" aria-label="Ver as oportunidades perdidas"><div class="kpi-label" title="Oportunidades marcadas como Perdido no CRM.">Perdidas</div><div class="kpi-value" id="o-perdidas">—</div></div>
       <div class="kpi blue"><div class="kpi-label" title="Ticket médio de oportunidade = valor médio (valorOpp) das oportunidades geradas no período — não é o valor médio dos ganhos.">Ticket médio de oportunidade</div><div class="kpi-value" id="o-ticket" style="font-size:18px">—</div></div>
-      <div class="kpi amber"><div class="kpi-label" title="Leads rejeitados no período (dados inválidos, sem orçamento, sem interesse etc).">Rejeitados</div><div class="kpi-value" id="o-qualificados-rej">—</div></div>
+      <div class="kpi amber" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="rejeitados" aria-label="Ver os leads rejeitados"><div class="kpi-label" title="Leads rejeitados no período (dados inválidos, sem orçamento, sem interesse etc).">Rejeitados</div><div class="kpi-value" id="o-qualificados-rej">—</div></div>
       <div class="kpi purple"><div class="kpi-label" title="Tempo mediano do lead virar oportunidade (data de criação → data de conversão no CRM). Mediana é robusta a outliers; o rodapé mostra a média e o nº de casos.">Tempo lead→opp</div><div class="kpi-value" id="o-ciclo-leadopp" style="font-size:18px">—</div><div class="kpi-footer" id="o-ciclo-leadopp-foot"></div></div>
       <div class="kpi green"><div class="kpi-label" title="Tempo mediano da oportunidade virar ganho (data de conversão → data de fechamento no CRM). Mediana é robusta a outliers; o rodapé mostra a média e o nº de casos.">Tempo opp→ganho</div><div class="kpi-value" id="o-ciclo-oppganho" style="font-size:18px">—</div><div class="kpi-footer" id="o-ciclo-oppganho-foot"></div></div>
       <div class="kpi amber"><div class="kpi-label" title="CAC por ganho = investimento total em mídia paga ÷ nº de negócios ganhos no período. Fica — quando não há investimento no período.">CAC por ganho</div><div class="kpi-value" id="o-cacganho" style="font-size:18px">—</div><div class="kpi-footer" id="o-cacganho-foot"></div></div>
@@ -2273,7 +2273,10 @@ const DETALHE_CARD_DEFS = {
   cadencia:      { titulo: 'Em cadência',   filtro: r => (r.status||'').toLowerCase().startsWith('contato dia') },
   qualificados:  { titulo: 'Qualificados',  filtro: r => (r.status||'').toLowerCase() === 'qualificado' },
   oportunidades: { titulo: 'Oportunidades', filtro: r => r.isOpportunity },
-  receita:       { titulo: 'Receita ganha', filtro: r => r.isWon }
+  receita:       { titulo: 'Receita ganha', filtro: r => r.isWon },
+  abertas:       { titulo: 'Em negociação', filtro: r => r.isOpen },
+  perdidas:      { titulo: 'Perdidas',      filtro: r => r.isLost },
+  rejeitados:    { titulo: 'Rejeitados',    filtro: r => (r.status||'').toLowerCase() === 'rejeitado' }
 };
 
 // Badge de status — extraído para função nomeada e reusado na tabela "Todos os leads comerciais"
