@@ -172,6 +172,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
     <div class="nav-label">Comercial</div>
     <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
+    <button class="nav-item" onclick="showView('campanhas')"><i class="ti ti-speakerphone"></i>Campanhas</button>
     <button class="nav-item" onclick="showView('criativos')"><i class="ti ti-photo"></i>Criativos</button>
     <div class="nav-label">Anúncios</div>
     <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
@@ -574,6 +575,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
         <tbody id="lead-detail-body"></tbody>
       </table>
       </div>
+      <div id="lead-detail-footer" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>
     </div>
   </div>
 
@@ -615,6 +617,40 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <table class="tbl">
         <thead><tr><th>Nome / Empresa</th><th>Campanha</th><th>Conjunto</th><th>Criativo</th><th>Estágio (CRM)</th><th>Valor</th><th>Data</th></tr></thead>
         <tbody id="cr-leads-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMPANHAS (visão consolidada cross-canal por campanha-mestre) -->
+  <div class="view" id="view-campanhas">
+    <div class="chart-click-hint" style="margin-bottom:12px">Uma linha por <strong style="color:var(--text)">campanha-mestre</strong> (nome padronizado), somando o investimento de todos os canais (Meta, Google e LinkedIn Ads) e cruzando com os <strong style="color:var(--text)">leads reais da Central de Leads</strong> e o estágio no CRM. A saúde é um semáforo de "onde focar agora" — clique numa linha para ver os leads reais por trás dela.</div>
+    <div class="kpi-grid-6">
+      <div class="kpi blue"><div class="kpi-label" title="Campanhas-mestre com pelo menos um canal ativo (status composto ≠ Pausada).">Campanhas ativas</div><div class="kpi-value" id="cp-ativas">—</div><div class="kpi-footer" id="cp-ativas-foot"></div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Investimento somado de todas as campanhas no período (todos os canais).">Investimento total</div><div class="kpi-value" id="cp-invest" style="font-size:18px">—</div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Contagem real de leads da Central de Leads atribuídos às campanhas no período — nunca o 'resultado' auto-reportado das plataformas.">Leads reais</div><div class="kpi-value" id="cp-leads">—</div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Investimento total ÷ leads reais.">CPL real</div><div class="kpi-value" id="cp-cpl">—</div><div class="kpi-footer" id="cp-cpl-foot"></div></div>
+      <div class="kpi green"><div class="kpi-label" title="Soma de pipeline em aberto + receita já ganha, atribuída às campanhas. O rodapé mostra o ROAS projetado agregado.">Pipe + Ganho</div><div class="kpi-value" id="cp-pipe" style="font-size:18px">—</div><div class="kpi-footer" id="cp-pipe-foot"></div></div>
+      <div class="kpi red" style="cursor:pointer" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-campanhas-tabela" aria-label="Ir para a tabela de campanhas em alerta"><div class="kpi-label" title="Campanhas com saúde 🔴 (crítica) ou 🟡 (atenção).">Em alerta</div><div class="kpi-value" id="cp-alerta">—</div><div class="kpi-footer" id="cp-alerta-foot"></div></div>
+    </div>
+
+    <div class="card" id="card-campanhas-tabela">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas em atividade</div><div class="section-badge">clique numa linha para ver os leads reais</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Campanha</th><th>Status</th><th>Canais</th><th title="Semáforo de prioridade: 🔴 crítica, 🟡 atenção, 🟢 saudável, ⚪ neutra/inativa.">Saúde</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th><th>Oportunidades</th><th>Pipe + Ganho</th><th title="ROAS projetado = (pipeline em aberto + receita ganha) ÷ investimento. Inclui negócios não fechados — é projeção.">ROAS proj.</th></tr></thead>
+        <tbody id="cp-tabela-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card" id="card-campanhas-forapadrao" style="display:none">
+      <div class="section-row"><div class="section-title"><i class="ti ti-alert-triangle"></i>Fora do padrão</div><div class="section-badge" id="cp-forapadrao-badge">—</div></div>
+      <div class="chart-click-hint" style="margin-bottom:10px">Campanhas com investimento ou leads reais que a padronização de nomes não conseguiu mapear para uma das campanhas-mestre conhecidas. Não são descartadas — ficam aqui para não esconder investimento/lead real ainda não categorizado.</div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Campanha (nome cru)</th><th>Status</th><th>Canais</th><th>Saúde</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th><th>Oportunidades</th><th>Pipe + Ganho</th><th>ROAS proj.</th></tr></thead>
+        <tbody id="cp-forapadrao-body"></tbody>
       </table>
       </div>
     </div>
@@ -821,7 +857,7 @@ const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff
 // GA4 agora é buscado pelo mesmo backend seguro do n8n (ver fetchAdsData/loadGA4) —
 // removida a assinatura JWT client-side com chave privada (era um risco de segurança).
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
 // ── v2: SEGURANÇA, METAS/BENCHMARKS E HELPERS DE RENDER ──────
@@ -927,6 +963,9 @@ function showView(id, fromDrill){
   // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
   const bc = document.getElementById('drill-breadcrumb');
   if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
+  // Popula o painel Campanhas sob demanda (reusa _criativoData/cache quando quente) — não deixa
+  // a view em branco na primeira visita.
+  if (id==='campanhas') loadCampanhas();
 }
 function scrollToCard(id){
   const el = document.getElementById(id);
@@ -949,6 +988,13 @@ function filtrarGA4Canal(canal){
   showView('ga4', true);
   loadGA4();
 }
+// Complemento ao pop-up de campanha: fecha o modal e leva ao detalhe granular (conjunto/criativo/ROAS)
+// da campanha na aba Criativos, reusando o filtro que já existe lá. Registrado no allowlist.
+function verCampanhaNoCriativos(campanha){
+  fecharDetalheCard();
+  showView('criativos', true);
+  filtrarPorCampanhaCriativo(campanha);
+}
 const DELEGATED_ACTIONS = {
   filtrarPorCanalLead:        (a)    => filtrarPorCanalLead(a),
   filtrarPorCanalOpp:         (a)    => filtrarPorCanalOpp(a),
@@ -957,6 +1003,7 @@ const DELEGATED_ACTIONS = {
   filtrarPorConjuntoCriativo: (a)    => filtrarPorConjuntoCriativo(a),
   filtrarGA4Canal:            (a)    => filtrarGA4Canal(a),
   abrirDetalheCard:           (a)    => abrirDetalheCard(a),
+  verCampanhaNoCriativos:     (a)    => verCampanhaNoCriativos(a),
   fecharDetalheCard:          ()     => fecharDetalheCard(),
   scrollToCard:               (a)    => scrollToCard(a),
   showView:                   (a, b) => showView(a, b === 'true')
@@ -2135,8 +2182,10 @@ function standardizeCampanha(v) {
   if (!v) return v;
   const s = v.toLowerCase();
   if (s.includes('rescue') || s.includes('logmein')) return 'LOGMEIN_RESCUE-LICENCA-ECO_07-26';
+  // "webinar" mapeia para a campanha de webinar mesmo sem "goto"/"linkedin" no nome
+  // (ex: "[SB] ANUNCIO_WEBINAR" é a mesma campanha, mas não traz nenhum dos dois termos).
+  if (s.includes('webinar')) return 'GOTO_WEBINAR_07-26';
   if (s.includes('goto') || s.includes('linkedin')) {
-    if (s.includes('webinar')) return 'GOTO_WEBINAR_07-26';
     if (s.includes('saude')) return 'GOTO_SAUDE_06-26';
     return 'GOTO_INSTITUCIONAL_07-26';
   }
@@ -2337,10 +2386,65 @@ function statusBadgeHTML(row){
   return `<span class="badge lead">${esc(row.status)||'—'}</span>`;
 }
 
+// Uma linha do modal de detalhe (Nome/Empresa/Canal/Status/Data/Valor [+Produto]). Extraída para
+// ser reusada tanto pelos drills de card/funil (DETALHE_CARD_DEFS) quanto pelo tipo "campanha:".
+// Guarda contra o sentinel '—' do nome do Salesforce antes de cair no nome da Central de Leads.
+function _detalheLeadRowHTML(row, mostrarProduto){
+  const d = row.dataFechamento || row.dataConversao || row.dataCriacao;
+  const dataTxt = d ? d.toLocaleDateString('pt-BR') : '—';
+  const valorTxt = row.valorNF>0 ? brl(row.valorNF) : (row.valorOpp>0 ? brl(row.valorOpp) : '—');
+  const nomeSF = (row.nome && row.nome !== '—') ? row.nome : '';
+  const nomeFinal = nomeSF || (_leadEmailMap[row.email] && _leadEmailMap[row.email].nome) || '—';
+  const produtoTd = mostrarProduto ? `<td>${esc(row.produto) || '—'}</td>` : '';
+  return `<tr>
+    <td><div class="t-name">${esc(nomeFinal)}</div></td>
+    <td>${esc(row.empresa)}</td>
+    <td>${pill(row.canal)}</td>
+    <td>${statusBadgeHTML(row)}</td>
+    <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${dataTxt}</td>
+    <td style="font-family:var(--mono)">${valorTxt}</td>
+    ${produtoTd}
+  </tr>`;
+}
+
 function abrirDetalheCard(tipo){
-  const def = DETALHE_CARD_DEFS[tipo];
   const modal = document.getElementById('lead-detail-modal');
-  if (!def || !modal) return;
+  if (!modal) return;
+  const footer = document.getElementById('lead-detail-footer');
+
+  // Tipo especial "campanha:<nome-mestre>" — reusa ESTE MESMO modal para listar os leads reais
+  // atribuídos a uma campanha-mestre (Salesforce filtrado por origem === nome, dentro do período
+  // via salesforceInRange, escopo do painel Campanhas — não _oppRowsAtuais, que é de Oportunidades).
+  // Convenção de prefixo evita registrar uma entrada por campanha em DETALHE_CARD_DEFS (dinâmico/infinito).
+  if (typeof tipo === 'string' && tipo.startsWith('campanha:')) {
+    const nome = tipo.slice('campanha:'.length);
+    const p = period();
+    const leads = salesforceInRange(p.startDate, p.endDate).filter(r => r.origem === nome);
+    const titleEl = document.getElementById('lead-detail-title');
+    if (titleEl) titleEl.textContent = `${nome} — ${fmt(leads.length)} lead${leads.length!==1?'s':''}`;
+    const thead = document.getElementById('lead-detail-thead');
+    if (thead) thead.innerHTML = `<tr><th>Nome</th><th>Empresa</th><th>Canal</th><th>Status</th><th>Data</th><th>Valor</th></tr>`;
+    const body = document.getElementById('lead-detail-body');
+    if (body){
+      const ordenados = leads.slice().sort((a,b)=>(
+        (b.dataFechamento||b.dataConversao||b.dataCriacao||0) - (a.dataFechamento||a.dataConversao||a.dataCriacao||0)
+      ));
+      body.innerHTML = ordenados.length ? ordenados.map(r=>_detalheLeadRowHTML(r,false)).join('')
+        : `<tr><td colspan="6" class="empty">Nenhum lead atribuído a esta campanha no período</td></tr>`;
+    }
+    if (footer){
+      footer.style.display = 'block';
+      footer.innerHTML = `<button type="button" class="filter-clear" style="cursor:pointer" data-action="verCampanhaNoCriativos" data-arg="${esc(nome)}">Ver detalhe completo em Criativos <i class="ti ti-arrow-right"></i></button>`;
+    }
+    modal.style.display = 'flex';
+    const closeBtn = document.getElementById('lead-detail-close');
+    if (closeBtn) closeBtn.focus();
+    return;
+  }
+
+  const def = DETALHE_CARD_DEFS[tipo];
+  if (!def) return;
+  if (footer){ footer.style.display = 'none'; footer.innerHTML = ''; }
   const leads = (_oppRowsAtuais||[]).filter(def.filtro);
   const titleEl = document.getElementById('lead-detail-title');
   if (titleEl) titleEl.textContent = `${def.titulo} — ${fmt(leads.length)} lead${leads.length!==1?'s':''}`;
@@ -2355,25 +2459,8 @@ function abrirDetalheCard(tipo){
     const ordenados = leads.slice().sort((a,b)=>(
       (b.dataFechamento||b.dataConversao||b.dataCriacao||0) - (a.dataFechamento||a.dataConversao||a.dataCriacao||0)
     ));
-    body.innerHTML = ordenados.length ? ordenados.map(row => {
-      const d = row.dataFechamento || row.dataConversao || row.dataCriacao;
-      const dataTxt = d ? d.toLocaleDateString('pt-BR') : '—';
-      const valorTxt = row.valorNF>0 ? brl(row.valorNF) : (row.valorOpp>0 ? brl(row.valorOpp) : '—');
-      // Nome: usa o do CRM; se vier vazio (marcado como '—' na carga do Salesforce), tenta o nome
-      // da Central de Leads pelo mesmo e-mail; se nenhum tiver, mostra '—'. Sempre escapado.
-      const nomeSF = (row.nome && row.nome !== '—') ? row.nome : '';
-      const nomeFinal = nomeSF || (_leadEmailMap[row.email] && _leadEmailMap[row.email].nome) || '—';
-      const produtoTd = mostrarProduto ? `<td>${esc(row.produto) || '—'}</td>` : '';
-      return `<tr>
-        <td><div class="t-name">${esc(nomeFinal)}</div></td>
-        <td>${esc(row.empresa)}</td>
-        <td>${pill(row.canal)}</td>
-        <td>${statusBadgeHTML(row)}</td>
-        <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${dataTxt}</td>
-        <td style="font-family:var(--mono)">${valorTxt}</td>
-        ${produtoTd}
-      </tr>`;
-    }).join('') : `<tr><td colspan="${nCols}" class="empty">Nenhum lead neste recorte</td></tr>`;
+    body.innerHTML = ordenados.length ? ordenados.map(row => _detalheLeadRowHTML(row, mostrarProduto)).join('')
+      : `<tr><td colspan="${nCols}" class="empty">Nenhum lead neste recorte</td></tr>`;
   }
   modal.style.display = 'flex';
   const closeBtn = document.getElementById('lead-detail-close');
@@ -3073,6 +3160,197 @@ function renderCriativos(){
   }
 }
 
+// ── CAMPANHAS (visão consolidada por campanha-mestre, cross-canal) ────────────
+// Nomes-mestre canônicos que standardizeCampanha() produz. Uma campanha com investimento/leads
+// cujo nome padronizado NÃO está aqui é "fora do padrão" (não mapeada) — vira seção separada em
+// vez de sumir silenciosamente. Não inventa regra de separação; só torna o não-mapeado visível.
+const CAMPANHAS_MESTRE = new Set([
+  'LOGMEIN_RESCUE-LICENCA-ECO_07-26',
+  'GOTO_WEBINAR_07-26',
+  'GOTO_SAUDE_06-26',
+  'GOTO_INSTITUCIONAL_07-26'
+]);
+
+// Status real por canal da campanha-mestre. Casa as campanhas cruas de cada plataforma por
+// standardizeCampanha(c.name) === campanha. Cada plataforma → Set de status (ACTIVE/PAUSED/DRAFT).
+function statusPorCanalCampanha(campanha, ads){
+  const canais = {};
+  const add = (plataforma, campaigns) => {
+    (campaigns||[]).forEach(c => {
+      if ((standardizeCampanha(c.name) || c.name) !== campanha) return;
+      const st = (c.status||'').toUpperCase();
+      (canais[plataforma] = canais[plataforma] || new Set()).add(st);
+    });
+  };
+  add('Meta ADS',     ads && ads.metaAds  && ads.metaAds.campaigns);
+  add('Google ADS',   ads && ads.googleAds && ads.googleAds.campaigns);
+  add('LinkedIn ADS', ads && ads.linkedIn && ads.linkedIn.campaigns);
+  return canais;
+}
+
+// Status composto: "Ativa" (≥1 ACTIVE, nenhum PAUSED), "Parcial" (mix), "Pausada" (todos PAUSED
+// ou sem sinal). DRAFT do LinkedIn é ignorado (rascunho não conta como ativa nem pausada).
+function statusCompostoDe(statusPorCanal){
+  let hasActive=false, hasPaused=false;
+  Object.values(statusPorCanal).forEach(set => set.forEach(st => {
+    if (st==='DRAFT' || !st) return;
+    if (st==='ACTIVE') hasActive=true;
+    else hasPaused=true; // PAUSED ou qualquer status não-ativo conhecido → conservador: pausado
+  }));
+  if (hasActive && hasPaused) return 'Parcial';
+  if (hasActive) return 'Ativa';
+  return 'Pausada'; // só pausado, só draft, ou sem campanha de ads casada (ex: leads históricos)
+}
+
+function statusCompostoBadge(sc){
+  if (sc==='Ativa')   return `<span class="badge lq">Ativa</span>`;
+  if (sc==='Parcial') return `<span class="badge" style="background:var(--amber-dim);color:var(--amber)">Parcial</span>`;
+  return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Pausada</span>`;
+}
+
+function statusPorCanalTitle(statusPorCanal){
+  const parts = Object.entries(statusPorCanal).map(([canal,set]) => {
+    const sts = [...set].map(s => s==='ACTIVE'?'ativo':s==='PAUSED'?'pausado':s==='DRAFT'?'rascunho':(s||'?').toLowerCase()).join('/');
+    return `${canal}: ${sts}`;
+  });
+  return parts.length ? parts.join(' · ') : 'Sem campanha de anúncio casada (só leads históricos)';
+}
+
+// Semáforo de saúde — primeira regra que casa vence (thresholds de METAS). `row.pipe` já é o
+// consolidado Pipe+Ganho; usado na regra 6 como sinal de "há pipeline ou receita".
+function saudeCampanha(row){
+  const alvo = METAS.cplBlended.alvo;
+  const cpl = row.leads>0 ? row.spend/row.leads : null;
+  const roas = row.roasProjetado;
+  if (row.spend>0 && row.leads===0)
+    return { sev:0, icon:'🔴', label:'Sem retorno', motivo:`Investiu ${brl(row.spend)} e não gerou lead real no período` };
+  if (row.leads>0 && cpl>alvo*1.5)
+    return { sev:0, icon:'🔴', label:'CPL crítico', motivo:`CPL ${brl(cpl)} · meta ${brl(alvo)} · ${(cpl/alvo).toFixed(1)}× acima da meta` };
+  if (row.statusComposto==='Ativa' && row.spend===0)
+    return { sev:1, icon:'🟡', label:'Ativa sem entrega', motivo:'Campanha ativa mas sem investimento registrado no período' };
+  if (row.statusComposto==='Pausada' && row.leads>0)
+    return { sev:1, icon:'🟡', label:'Delay de atribuição', motivo:`Pausada, mas ainda ${fmt(row.leads)} lead(s) atribuído(s) no período` };
+  if (row.leads>0 && cpl>alvo)
+    return { sev:1, icon:'🟡', label:'CPL acima da meta', motivo:`CPL ${brl(cpl)} · meta ${brl(alvo)} · ${(cpl/alvo).toFixed(1)}× acima da meta` };
+  if (row.leads>0 && cpl<=alvo && ((roas!=null && roas>=METAS.roasBlended.alvo) || row.pipe>0))
+    return { sev:3, icon:'🟢', label:'Saudável', motivo:`CPL ${brl(cpl)} dentro da meta${roas!=null?` · ROAS proj. ${roas.toFixed(2)}x`:''}` };
+  if (row.statusComposto==='Pausada' && row.spend===0 && row.leads===0)
+    return { sev:2, icon:'⚪', label:'Inativa', motivo:'Pausada, sem investimento e sem leads no período' };
+  return { sev:2, icon:'⚪', label:'Neutra', motivo:'Sem sinal claro de alerta nem de performance destacada' };
+}
+
+// Monta o array enriquecido de campanhas-mestre a partir de _criativoData (leads-based) + spend
+// autoritativo por campanha (inclui campanhas COM investimento e SEM lead, que não entram em
+// campanhaRows — sem isso a saúde 🔴 "Sem retorno" nunca apareceria).
+function buildCampanhasEnriquecidas(){
+  if (!_criativoData) return null;
+  const p = period();
+  const ads = _adsCacheStore[`${p.startDate}_${p.endDate}`] || {};
+  const byCampanha = {};
+  (_criativoData.campanhaRows||[]).forEach(c => {
+    byCampanha[c.campanha] = {
+      campanha: c.campanha,
+      spend: c.spend||0,
+      leads: c.leads||0,
+      oportunidades: c.oportunidades||0,
+      pipe: (c.pipe||0)+(c.ganho||0), // Pipe + Ganho consolidado (coluna e sinal de saúde)
+      ganho: c.ganho||0,
+      plataformas: (c.plataformas||[]).slice(),
+      roasProjetado: c.roasProjetado
+    };
+  });
+  const spendByCamp = {}, platsByCamp = {};
+  flattenCampanhaSpend(ads).forEach(a => {
+    spendByCamp[a.campanha] = (spendByCamp[a.campanha]||0) + a.spend;
+    (platsByCamp[a.campanha] = platsByCamp[a.campanha] || new Set()).add(a.plataforma);
+  });
+  Object.keys(spendByCamp).forEach(camp => {
+    if (byCampanha[camp]) return; // já veio via leads (campanhaRows já traz o spend autoritativo)
+    byCampanha[camp] = {
+      campanha: camp, spend: spendByCamp[camp], leads:0, oportunidades:0,
+      pipe:0, ganho:0, plataformas:[...platsByCamp[camp]], roasProjetado:null
+    };
+  });
+  return Object.values(byCampanha).map(r => {
+    const statusPorCanal = statusPorCanalCampanha(r.campanha, ads);
+    const enriched = { ...r, statusPorCanal, statusComposto: statusCompostoDe(statusPorCanal) };
+    enriched.saude = saudeCampanha(enriched);
+    enriched.foraDoPadrao = !CAMPANHAS_MESTRE.has(r.campanha);
+    return enriched;
+  });
+}
+
+function renderTabelaCampanhas(tbodyId, rows, emptyMsg){
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  renderRows(tbody, rows, [
+    r => ({ html:`<div class="t-name">${esc(r.campanha)}</div>` }),
+    r => ({ html: statusCompostoBadge(r.statusComposto), attrs:`title="${esc(statusPorCanalTitle(r.statusPorCanal))}"` }),
+    r => ({ html: r.plataformas.length ? r.plataformas.map(p=>pill(p)).join(' ') : '—' }),
+    r => ({ html:`<span style="font-size:15px" title="${esc(r.saude.label+' — '+r.saude.motivo)}">${r.saude.icon}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${brl(r.spend)}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${fmt(r.leads)}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${r.leads>0?brl(r.spend/r.leads):'—'}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${fmt(r.oportunidades)}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${brl(r.pipe)}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono);color:var(--purple)">${r.roasProjetado!=null?r.roasProjetado.toFixed(2)+'x':'—'}</span>` })
+  ], emptyMsg || 'Sem campanhas no período',
+  r => `style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="campanha:${esc(r.campanha)}" aria-label="Ver leads reais de ${esc(r.campanha)}"`);
+}
+
+function renderCampanhas(){
+  const rows = buildCampanhasEnriquecidas();
+  if (!rows) return;
+
+  // KPIs (todas as campanhas, padrão + fora do padrão). Divisões protegidas → "—".
+  const invest    = rows.reduce((s,r)=>s+r.spend,0);
+  const leads     = rows.reduce((s,r)=>s+r.leads,0);
+  const pipeGanho = rows.reduce((s,r)=>s+r.pipe,0);
+  const ativas    = rows.filter(r=>r.statusComposto!=='Pausada').length;
+  const emAlerta  = rows.filter(r=>r.saude.sev<=1).length; // 🔴 (0) ou 🟡 (1)
+  const cpl       = leads>0   ? invest/leads    : null;
+  const roasAgg   = invest>0  ? pipeGanho/invest : null;
+
+  const setTxt  = (id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
+  const setHTML = (id,v)=>{const el=document.getElementById(id); if(el) el.innerHTML=v;};
+  setTxt('cp-ativas', fmt(ativas));
+  setTxt('cp-ativas-foot', `${fmt(rows.length)} no total`);
+  setTxt('cp-invest', brl(invest));
+  setTxt('cp-leads', fmt(leads));
+  setTxt('cp-cpl', cpl!=null ? brl(cpl) : '—');
+  setHTML('cp-cpl-foot', cpl!=null ? metaHTML(cpl,'cplBlended',brl) : '');
+  setTxt('cp-pipe', brl(pipeGanho));
+  setHTML('cp-pipe-foot', roasAgg!=null ? metaHTML(roasAgg,'roasBlended',v=>v.toFixed(2)+'x') : '');
+  setTxt('cp-alerta', fmt(emAlerta));
+  setTxt('cp-alerta-foot', emAlerta>0 ? 'clique para ver na tabela' : 'nenhuma em alerta');
+
+  // Ordenação: severidade de saúde (🔴,🟡,⚪,🟢) e desempate por investimento desc — "onde focar agora".
+  const ordenar = arr => arr.slice().sort((a,b)=> a.saude.sev - b.saude.sev || b.spend - a.spend);
+  const padrao = ordenar(rows.filter(r=>!r.foraDoPadrao));
+  const fora   = ordenar(rows.filter(r=>r.foraDoPadrao));
+
+  renderTabelaCampanhas('cp-tabela-body', padrao, 'Sem campanhas no período');
+  const foraCard  = document.getElementById('card-campanhas-forapadrao');
+  const foraBadge = document.getElementById('cp-forapadrao-badge');
+  if (foraCard)  foraCard.style.display = fora.length ? '' : 'none';
+  if (foraBadge) foraBadge.textContent = fora.length ? `${fmt(fora.length)} não mapeada${fora.length!==1?'s':''}` : '—';
+  if (fora.length) renderTabelaCampanhas('cp-forapadrao-body', fora, '');
+}
+
+// Reusa buildCriativoData já calculado por Criativos quando o cache de ads do período está quente
+// (troca de aba). Em cache frio (primeira carga ou auto-refresh que invalidou o range) reconstrói
+// do zero — mesmas dependências que loadCriativos resolve.
+async function loadCampanhas(){
+  const p = period();
+  const key = `${p.startDate}_${p.endDate}`;
+  if (!_criativoData || !_adsCacheStore[key]){
+    await loadSalesforce();
+    const ads = await fetchAdsData();
+    _criativoData = buildCriativoData(ads);
+  }
+  renderCampanhas();
+}
+
 async function initDates(){
   const h = new Date();
   const f = x => x.toISOString().slice(0,10);
@@ -3117,6 +3395,7 @@ const LOADERS = {
   utm: loadGA4,
   lp: loadGA4,
   oportunidades: loadSalesforce,
+  campanhas: loadCampanhas,
   criativos: loadCriativos,
   meta: loadMeta,
   linkedin: loadLinkedIn,
