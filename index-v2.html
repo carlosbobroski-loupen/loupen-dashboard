@@ -28,8 +28,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .shell.sidebar-collapsed .logo-name::first-letter{font-size:18px}
 .shell.sidebar-collapsed .last-update span{display:none}
 .shell.sidebar-collapsed .last-update{justify-content:center}
-.sidebar-toggle{background:var(--surface);border:1px solid var(--border2);color:var(--muted);width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .15s;flex-shrink:0}
-.sidebar-toggle:hover{color:var(--text);background:var(--surface2)}
+.sidebar-toggle-full{width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:8px;padding:9px 10px;cursor:pointer;font-size:12.5px;font-weight:500;transition:all .15s;margin-bottom:12px;text-align:left}
+.sidebar-toggle-full:hover{color:var(--text);background:var(--surface2)}
+.sidebar-toggle-full i{font-size:16px;flex-shrink:0}
+.shell.sidebar-collapsed .sidebar-toggle-full{justify-content:center;padding:9px 0}
+.shell.sidebar-collapsed .sidebar-toggle-label{display:none}
 /* Tooltip customizado do funil comercial (substitui o <title> nativo) + animação de entrada dos segmentos */
 #funil-tooltip{position:fixed;z-index:9998;pointer-events:none;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 11px;font-size:12px;color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.45);opacity:0;transition:opacity .12s ease;max-width:240px;line-height:1.45}
 #funil-tooltip.show{opacity:1}
@@ -180,6 +183,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('gads')"><i class="ti ti-brand-google"></i>Google ADS</button>
   </nav>
   <div class="sidebar-footer">
+    <button type="button" id="sidebar-toggle" class="sidebar-toggle-full" onclick="toggleSidebar()" aria-label="Recolher menu lateral"><i class="ti ti-layout-sidebar-left-collapse" id="sidebar-toggle-icon"></i><span class="sidebar-toggle-label">Recolher menu</span></button>
     <div class="last-update"><div class="pulse" id="pulse"></div><span id="stxt">Carregando...</span></div>
   </div>
 </aside>
@@ -187,10 +191,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 <main class="main">
 <div class="main-inner">
   <div class="topbar">
-    <div style="display:flex;align-items:center;gap:12px">
-      <button type="button" id="sidebar-toggle" class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Recolher ou expandir o menu lateral"><i class="ti ti-menu-2"></i></button>
-      <div class="page-title" id="page-title">Visão geral</div>
-    </div>
+    <div class="page-title" id="page-title">Visão geral</div>
     <div class="topbar-right">
       <div class="date-range-wrap">
         <i class="ti ti-calendar" style="color:var(--muted);font-size:15px"></i>
@@ -291,6 +292,34 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </select>
     <button class="filter-clear" onclick="limparFiltrosCriativos()"><i class="ti ti-x"></i>Limpar</button>
     <span style="font-size:12px;color:var(--muted);margin-left:auto" id="cr-filter-count"></span>
+  </div>
+
+  <div class="global-filters" id="cp-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="cp-f-saude" onchange="aplicarFiltrosCampanhas()" title="Semáforo de prioridade de cada campanha.">
+      <option value="">Toda saúde</option>
+      <option value="critica">🔴 Crítica</option>
+      <option value="atencao">🟡 Atenção</option>
+      <option value="neutra">⚪ Neutra</option>
+      <option value="saudavel">🟢 Saudável</option>
+    </select>
+    <select class="filter-sel" id="cp-f-status" onchange="aplicarFiltrosCampanhas()">
+      <option value="">Todo status</option>
+      <option value="Ativa">Ativa</option>
+      <option value="Parcial">Parcial</option>
+      <option value="Pausada">Pausada</option>
+    </select>
+    <select class="filter-sel" id="cp-f-campanha" onchange="aplicarFiltrosCampanhas()">
+      <option value="">Toda campanha</option>
+    </select>
+    <select class="filter-sel" id="cp-f-canal" onchange="aplicarFiltrosCampanhas()" title="Escopo dos canais nos gráficos e no detalhamento por canal.">
+      <option value="">Todos os canais</option>
+      <option value="Meta ADS">Meta ADS</option>
+      <option value="Google ADS">Google ADS</option>
+      <option value="LinkedIn ADS">LinkedIn ADS</option>
+    </select>
+    <button class="filter-clear" onclick="limparFiltrosCampanhas()"><i class="ti ti-x"></i>Limpar</button>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto" id="cp-filter-count"></span>
   </div>
 
   <!-- OVERVIEW -->
@@ -634,6 +663,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="kpi red" style="cursor:pointer" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-campanhas-tabela" aria-label="Ir para a tabela de campanhas em alerta"><div class="kpi-label" title="Campanhas com saúde 🔴 (crítica) ou 🟡 (atenção).">Em alerta</div><div class="kpi-value" id="cp-alerta">—</div><div class="kpi-footer" id="cp-alerta-foot"></div></div>
     </div>
 
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Mix de investimento por canal</div><div class="section-badge">gasto real de cada canal por campanha</div></div>
+        <div class="legend" id="cp-mix-invest-leg"></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="c-cp-mix-invest" role="img" aria-label="Investimento por canal em cada campanha"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-bar"></i>Leads reais por canal</div><div class="section-badge">leads da Central de Leads por campanha e canal</div></div>
+        <div class="legend" id="cp-mix-leads-leg"></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="c-cp-mix-leads" role="img" aria-label="Leads reais por canal em cada campanha"></canvas></div>
+      </div>
+    </div>
+
     <div class="card" id="card-campanhas-tabela">
       <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Campanhas em atividade</div><div class="section-badge">clique numa linha para ver os leads reais</div></div>
       <div style="overflow-x:auto">
@@ -642,6 +684,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
         <tbody id="cp-tabela-body"></tbody>
       </table>
       </div>
+    </div>
+
+    <div class="card" id="card-campanhas-canal">
+      <div class="section-row"><div class="section-title"><i class="ti ti-arrows-split-2"></i>Detalhamento por canal</div><div class="section-badge">investimento, leads reais e CPL real de cada canal dentro da campanha</div></div>
+      <div class="chart-click-hint" style="margin-bottom:10px">Uma linha por combinação campanha × canal. Investimento vem do gasto autoritativo da plataforma; leads reais vêm da Central de Leads cruzada por e-mail. "Sem canal atribuído" = leads reais sem UTM de canal pago rastreável (não somam, não são chutados num canal).</div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Campanha</th><th>Canal</th><th>Status do canal</th><th>Investimento</th><th>Leads reais</th><th>CPL real</th><th>% do investimento</th></tr></thead>
+        <tbody id="cp-canal-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card" id="card-campanhas-cpl-canal">
+      <div class="section-row"><div class="section-title"><i class="ti ti-target"></i>CPL real por canal (consolidado)</div><div class="section-badge">investimento total ÷ leads reais de cada canal no recorte filtrado</div></div>
+      <div id="cp-cpl-canal-bars"></div>
     </div>
 
     <div class="card" id="card-campanhas-forapadrao" style="display:none">
@@ -835,7 +893,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 <script>
 // Aplica o estado salvo da sidebar o quanto antes (shell já está no DOM) para reduzir flash visual.
 (function(){
-  try { if (localStorage.getItem('sidebarCollapsed') === '1') document.querySelector('.shell').classList.add('sidebar-collapsed'); } catch(e){}
+  try {
+    if (localStorage.getItem('sidebarCollapsed') === '1') {
+      document.querySelector('.shell').classList.add('sidebar-collapsed');
+      const icon = document.getElementById('sidebar-toggle-icon');
+      const label = document.querySelector('.sidebar-toggle-label');
+      const btn = document.getElementById('sidebar-toggle');
+      if (icon) icon.className = 'ti ti-layout-sidebar-left-expand';
+      if (label) label.textContent = 'Expandir menu';
+      if (btn) btn.setAttribute('aria-label', 'Expandir menu lateral');
+    }
+  } catch(e){}
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -857,6 +925,9 @@ const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff
 // GA4 agora é buscado pelo mesmo backend seguro do n8n (ver fetchAdsData/loadGA4) —
 // removida a assinatura JWT client-side com chave privada (era um risco de segurança).
 const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
+// Cores fixas por canal pago — usadas nos gráficos/detalhamento do painel Campanhas para que o
+// mesmo canal tenha sempre a mesma cor entre "Mix de investimento" e "Leads reais por canal".
+const CANAL_CORES = { 'Meta ADS':'#3b82f6', 'Google ADS':'#f59e0b', 'LinkedIn ADS':'#a78bfa', 'Sem canal atribuído':'#64748b' };
 const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
@@ -956,10 +1027,12 @@ function showView(id, fromDrill){
   const gaf = document.getElementById('ga-filters');
   const of = document.getElementById('opp-filters');
   const crf = document.getElementById('criativo-filters');
+  const cpf = document.getElementById('cp-filters');
   if (gf)  gf.classList.toggle('visible',  id==='leads');
   if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
   if (of)  of.classList.toggle('visible',  id==='oportunidades');
   if (crf) crf.classList.toggle('visible', id==='criativos');
+  if (cpf) cpf.classList.toggle('visible', id==='campanhas');
   // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
   const bc = document.getElementById('drill-breadcrumb');
   if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
@@ -2523,6 +2596,17 @@ function toggleSidebar(){
   if (!shell) return;
   const collapsed = shell.classList.toggle('sidebar-collapsed');
   try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch(e){}
+  atualizarIconeSidebar(collapsed);
+}
+
+function atualizarIconeSidebar(collapsed){
+  const icon = document.getElementById('sidebar-toggle-icon');
+  const btn = document.getElementById('sidebar-toggle');
+  const label = document.querySelector('.sidebar-toggle-label');
+  if (!icon || !btn) return;
+  icon.className = collapsed ? 'ti ti-layout-sidebar-left-expand' : 'ti ti-layout-sidebar-left-collapse';
+  btn.setAttribute('aria-label', collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral');
+  if (label) label.textContent = collapsed ? 'Expandir menu' : 'Recolher menu';
 }
 
 function renderOportunidades(rows) {
@@ -3298,23 +3382,37 @@ function renderTabelaCampanhas(tbodyId, rows, emptyMsg){
   r => `style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="campanha:${esc(r.campanha)}" aria-label="Ver leads reais de ${esc(r.campanha)}"`);
 }
 
-function renderCampanhas(){
-  const rows = buildCampanhasEnriquecidas();
-  if (!rows) return;
+// ── FILTROS DO PAINEL CAMPANHAS ───────────────────────────────
+// Variáveis de módulo (mesmo padrão de fCrCampanha etc). fCpCanal restringe o ESCOPO dos gráficos
+// A/B e do detalhamento por canal àquele canal; a tabela principal continua cross-canal por
+// campanha (intencional — a linha-mestre soma todos os canais).
+let fCpSaude='', fCpStatus='', fCpCampanha='', fCpCanal='';
+const CP_SEV_MAP = { critica:0, atencao:1, neutra:2, saudavel:3 };
 
-  // KPIs (todas as campanhas, padrão + fora do padrão). Divisões protegidas → "—".
-  const invest    = rows.reduce((s,r)=>s+r.spend,0);
-  const leads     = rows.reduce((s,r)=>s+r.leads,0);
-  const pipeGanho = rows.reduce((s,r)=>s+r.pipe,0);
-  const ativas    = rows.filter(r=>r.statusComposto!=='Pausada').length;
-  const emAlerta  = rows.filter(r=>r.saude.sev<=1).length; // 🔴 (0) ou 🟡 (1)
+function renderCampanhas(){
+  const todas = buildCampanhasEnriquecidas();
+  if (!todas) return;
+
+  // Aplica os 4 filtros → rowsFiltradas (base ÚNICA de KPIs, tabelas, gráficos e detalhamento).
+  let rowsFiltradas = todas;
+  if (fCpSaude)    rowsFiltradas = rowsFiltradas.filter(r => r.saude.sev === CP_SEV_MAP[fCpSaude]);
+  if (fCpStatus)   rowsFiltradas = rowsFiltradas.filter(r => r.statusComposto === fCpStatus);
+  if (fCpCampanha) rowsFiltradas = rowsFiltradas.filter(r => r.campanha === fCpCampanha);
+  if (fCpCanal)    rowsFiltradas = rowsFiltradas.filter(r => r.plataformas.includes(fCpCanal));
+
+  // KPIs (mesmas fórmulas do render original — só muda a base para rowsFiltradas). Divisões protegidas → "—".
+  const invest    = rowsFiltradas.reduce((s,r)=>s+r.spend,0);
+  const leads     = rowsFiltradas.reduce((s,r)=>s+r.leads,0);
+  const pipeGanho = rowsFiltradas.reduce((s,r)=>s+r.pipe,0);
+  const ativas    = rowsFiltradas.filter(r=>r.statusComposto!=='Pausada').length;
+  const emAlerta  = rowsFiltradas.filter(r=>r.saude.sev<=1).length; // 🔴 (0) ou 🟡 (1)
   const cpl       = leads>0   ? invest/leads    : null;
   const roasAgg   = invest>0  ? pipeGanho/invest : null;
 
   const setTxt  = (id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
   const setHTML = (id,v)=>{const el=document.getElementById(id); if(el) el.innerHTML=v;};
   setTxt('cp-ativas', fmt(ativas));
-  setTxt('cp-ativas-foot', `${fmt(rows.length)} no total`);
+  setTxt('cp-ativas-foot', `${fmt(rowsFiltradas.length)} no total`);
   setTxt('cp-invest', brl(invest));
   setTxt('cp-leads', fmt(leads));
   setTxt('cp-cpl', cpl!=null ? brl(cpl) : '—');
@@ -3326,8 +3424,8 @@ function renderCampanhas(){
 
   // Ordenação: severidade de saúde (🔴,🟡,⚪,🟢) e desempate por investimento desc — "onde focar agora".
   const ordenar = arr => arr.slice().sort((a,b)=> a.saude.sev - b.saude.sev || b.spend - a.spend);
-  const padrao = ordenar(rows.filter(r=>!r.foraDoPadrao));
-  const fora   = ordenar(rows.filter(r=>r.foraDoPadrao));
+  const padrao = ordenar(rowsFiltradas.filter(r=>!r.foraDoPadrao));
+  const fora   = ordenar(rowsFiltradas.filter(r=>r.foraDoPadrao));
 
   renderTabelaCampanhas('cp-tabela-body', padrao, 'Sem campanhas no período');
   const foraCard  = document.getElementById('card-campanhas-forapadrao');
@@ -3335,6 +3433,159 @@ function renderCampanhas(){
   if (foraCard)  foraCard.style.display = fora.length ? '' : 'none';
   if (foraBadge) foraBadge.textContent = fora.length ? `${fmt(fora.length)} não mapeada${fora.length!==1?'s':''}` : '—';
   if (fora.length) renderTabelaCampanhas('cp-forapadrao-body', fora, '');
+
+  // Gráficos A/B, detalhamento por canal e CPL por canal seguem a MESMA ordem da tabela principal
+  // (padrão + fora), sobre a mesma base filtrada.
+  const ordemExibicao = padrao.concat(fora);
+  renderChartsCampanhas(ordemExibicao);
+  renderCanalDetalhe(ordemExibicao);
+  renderCplCanal(ordemExibicao);
+
+  // Contador de filtro (vazio quando nenhum filtro está ativo).
+  const hasFilter = fCpSaude || fCpStatus || fCpCampanha || fCpCanal;
+  const cnt = document.getElementById('cp-filter-count');
+  if (cnt) cnt.textContent = hasFilter ? `${rowsFiltradas.length} campanha${rowsFiltradas.length!==1?'s':''}` : '';
+}
+
+function aplicarFiltrosCampanhas(){
+  fCpSaude    = document.getElementById('cp-f-saude')?.value    || '';
+  fCpStatus   = document.getElementById('cp-f-status')?.value   || '';
+  fCpCampanha = document.getElementById('cp-f-campanha')?.value || '';
+  fCpCanal    = document.getElementById('cp-f-canal')?.value    || '';
+  renderCampanhas();
+}
+function limparFiltrosCampanhas(){
+  ['cp-f-saude','cp-f-status','cp-f-campanha','cp-f-canal'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  aplicarFiltrosCampanhas();
+}
+
+// Monta uma linha por (campanha, canal) para o card "Detalhamento por canal". Investimento vem do
+// gasto autoritativo de flattenCampanhaSpend (entidade de campanha da plataforma); leads reais de
+// _criativoData.leadRows agrupados por (campanha, plataforma). Leads sem UTM de canal pago
+// rastreável (plataforma===null) viram a linha honesta "Sem canal atribuído" (investimento = null,
+// nunca chutado num canal). Restrito às campanhas de `rows` e ao fCpCanal quando setado.
+function buildCanalDetalhe(rows){
+  if (!_criativoData) return [];
+  const p = period();
+  const ads = _adsCacheStore[`${p.startDate}_${p.endDate}`] || {};
+  const rowByCamp = {}; const ordem = [];
+  rows.forEach(r => { if (!(r.campanha in rowByCamp)){ rowByCamp[r.campanha] = r; ordem.push(r.campanha); } });
+  const CANAIS_PAGOS = ['Meta ADS','Google ADS','LinkedIn ADS'];
+  const spendMap = {}; // camp|||canal → spend
+  flattenCampanhaSpend(ads).forEach(a => {
+    if (!(a.campanha in rowByCamp)) return;
+    spendMap[a.campanha+'|||'+a.plataforma] = (spendMap[a.campanha+'|||'+a.plataforma]||0) + a.spend;
+  });
+  const leadsMap = {}; // camp|||canal → count (null→"Sem canal atribuído")
+  (_criativoData.leadRows||[]).forEach(l => {
+    if (!(l.campanha in rowByCamp)) return;
+    const canal = l.plataforma || 'Sem canal atribuído';
+    leadsMap[l.campanha+'|||'+canal] = (leadsMap[l.campanha+'|||'+canal]||0) + 1;
+  });
+  const out = [];
+  ordem.forEach(camp => {
+    const r = rowByCamp[camp];
+    const linhas = [];
+    [...CANAIS_PAGOS, 'Sem canal atribuído'].forEach(canal => {
+      // fCpCanal (sempre um canal pago) restringe o escopo — "Sem canal" some quando há canal selecionado.
+      if (fCpCanal && canal !== fCpCanal) return;
+      const isSemCanal = canal === 'Sem canal atribuído';
+      const spend = isSemCanal ? null : (spendMap[camp+'|||'+canal] || 0); // Sem canal nunca tem investimento
+      const leads = leadsMap[camp+'|||'+canal] || 0;
+      if ((spend||0) <= 0 && leads <= 0) return; // linha só existe com gasto OU lead
+      let statusRepr = null;
+      if (!isSemCanal){
+        const set = r.statusPorCanal && r.statusPorCanal[canal];
+        if (set && set.size) statusRepr = set.has('ACTIVE')?'ACTIVE':set.has('PAUSED')?'PAUSED':[...set][0];
+      }
+      linhas.push({
+        campanha: camp, canal, statusRepr, spend, leads,
+        cpl: (spend!=null && leads>0) ? spend/leads : null,
+        pctCampanha: (spend!=null && r.spend>0) ? spend/r.spend : null
+      });
+    });
+    linhas.sort((a,b)=> (b.spend||0) - (a.spend||0)); // dentro da campanha: maior investimento primeiro
+    out.push(...linhas);
+  });
+  return out;
+}
+
+function renderCanalDetalhe(rows){
+  const data = buildCanalDetalhe(rows);
+  renderRows(document.getElementById('cp-canal-body'), data, [
+    r => ({ html:`<div class="t-name">${esc(r.campanha)}</div>` }),
+    r => ({ html: pill(r.canal) }),
+    r => ({ html: r.canal==='Sem canal atribuído' ? '—' : (r.statusRepr ? statusChip(r.statusRepr) : '—') }),
+    r => ({ html:`<span style="font-family:var(--mono)">${r.spend==null?'—':brl(r.spend)}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${fmt(r.leads)}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${r.cpl!=null?brl(r.cpl):'—'}</span>` }),
+    r => ({ html:`<span style="font-family:var(--mono)">${r.pctCampanha!=null?pct(r.pctCampanha):'—'}</span>` })
+  ], 'Sem detalhamento por canal no período',
+  r => `style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheCard" data-arg="campanha:${esc(r.campanha)}" aria-label="Ver leads reais de ${esc(r.campanha)}"`);
+}
+
+// Gráficos A (gasto por canal) e B (leads reais por canal) — barras horizontais empilhadas, mesmas
+// labels/ordem. Reconciliação de B: a soma das barras de uma campanha (incluindo "Sem canal") = a
+// coluna "Leads reais" daquela campanha na tabela principal (ambos derivam do mesmo leadRows).
+function renderChartsCampanhas(rows){
+  const p = period();
+  const ads = _adsCacheStore[`${p.startDate}_${p.endDate}`] || {};
+  const labels = rows.map(r=>r.campanha);
+  const idx = {}; labels.forEach((c,i)=>{ if (!(c in idx)) idx[c]=i; });
+  const CANAIS_PAGOS = ['Meta ADS','Google ADS','LinkedIn ADS'];
+  const legHTML = canais => canais.map(c=>`<div class="leg"><div class="leg-dot" style="background:${CANAL_CORES[c]}"></div>${esc(c)}</div>`).join('');
+
+  // A — Mix de investimento
+  const spendMap = {};
+  flattenCampanhaSpend(ads).forEach(a => {
+    if (!(a.campanha in idx)) return;
+    spendMap[a.campanha+'|||'+a.plataforma] = (spendMap[a.campanha+'|||'+a.plataforma]||0) + a.spend;
+  });
+  const canaisInvest = fCpCanal ? [fCpCanal] : CANAIS_PAGOS;
+  const dsInvest = canaisInvest.map(canal => ({
+    label: canal,
+    data: labels.map(c => spendMap[c+'|||'+canal] || 0),
+    backgroundColor: CANAL_CORES[canal]
+  }));
+  mkChart('c-cp-mix-invest','bar',labels,dsInvest,{ indexAxis:'y', scales:{ x:{stacked:true,ticks:{callback:v=>brl(v)}}, y:{stacked:true} }, plugins:{legend:{display:false}} });
+  const legI = document.getElementById('cp-mix-invest-leg'); if (legI) legI.innerHTML = legHTML(canaisInvest);
+
+  // B — Leads reais (+ "Sem canal atribuído")
+  const leadsMap = {};
+  (_criativoData?.leadRows||[]).forEach(l => {
+    if (!(l.campanha in idx)) return;
+    const canal = l.plataforma || 'Sem canal atribuído';
+    leadsMap[l.campanha+'|||'+canal] = (leadsMap[l.campanha+'|||'+canal]||0) + 1;
+  });
+  const canaisLeads = fCpCanal ? [fCpCanal] : [...CANAIS_PAGOS, 'Sem canal atribuído'];
+  const dsLeads = canaisLeads.map(canal => ({
+    label: canal,
+    data: labels.map(c => leadsMap[c+'|||'+canal] || 0),
+    backgroundColor: CANAL_CORES[canal]
+  }));
+  mkChart('c-cp-mix-leads','bar',labels,dsLeads,{ indexAxis:'y', scales:{ x:{stacked:true,ticks:{callback:v=>fmt(v)}}, y:{stacked:true} }, plugins:{legend:{display:false}} });
+  const legL = document.getElementById('cp-mix-leads-leg'); if (legL) legL.innerHTML = legHTML(canaisLeads);
+}
+
+// Gráfico C (opcional) — CPL real consolidado por canal (barras HTML via mkBars). v = gasto ÷ leads
+// somados sobre o recorte filtrado; pula canal sem leads. "Sem canal" não entra (não tem investimento).
+function renderCplCanal(rows){
+  const el = document.getElementById('cp-cpl-canal-bars');
+  const card = document.getElementById('card-campanhas-cpl-canal');
+  if (!el) return;
+  const agg = {}; // canal → {spend, leads}
+  buildCanalDetalhe(rows).forEach(d => {
+    if (d.spend==null) return; // "Sem canal" não tem investimento
+    (agg[d.canal] = agg[d.canal] || {spend:0, leads:0});
+    agg[d.canal].spend += d.spend;
+    agg[d.canal].leads += d.leads;
+  });
+  const barRows = ['Meta ADS','Google ADS','LinkedIn ADS']
+    .filter(c => agg[c] && agg[c].leads>0)
+    .map(c => { const v = agg[c].spend/agg[c].leads; return { label:c, v, fmt:brl(v) }; });
+  if (!barRows.length){ if (card) card.style.display='none'; return; }
+  if (card) card.style.display='';
+  mkBars(el, barRows, '#f59e0b');
 }
 
 // Reusa buildCriativoData já calculado por Criativos quando o cache de ads do período está quente
@@ -3348,7 +3599,15 @@ async function loadCampanhas(){
     const ads = await fetchAdsData();
     _criativoData = buildCriativoData(ads);
   }
-  renderCampanhas();
+  // Popula o select de campanha (mesmo padrão de popularSelect em loadCriativos), preservando a
+  // seleção atual, e delega o render a aplicarFiltrosCampanhas (aplica os 4 filtros).
+  const selCamp = document.getElementById('cp-f-campanha');
+  if (selCamp){
+    const cur = selCamp.value;
+    const nomes = [...new Set((buildCampanhasEnriquecidas()||[]).map(r=>r.campanha))].sort();
+    selCamp.innerHTML = `<option value="">Toda campanha</option>` + nomes.map(v=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`).join('');
+  }
+  aplicarFiltrosCampanhas();
 }
 
 async function initDates(){
