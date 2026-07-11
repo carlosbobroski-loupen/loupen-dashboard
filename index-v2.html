@@ -330,6 +330,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
         <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados de um ou mais canais:</strong> <span id="ovx-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
       </div>
     </div>
+    <div class="card kpi-nav" id="ovx-alertas-digest" role="button" tabindex="0" data-action="showView" data-arg="campanhas" data-arg2="true" aria-label="Ver campanhas em alerta no painel Campanhas" style="display:none;padding:12px 18px;margin-bottom:16px;cursor:pointer;align-items:center;gap:10px">
+      <span id="ovx-alertas-text" style="font-size:13.5px;color:var(--text)"></span>
+    </div>
     <div class="kpi-grid-8">
       <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Soma do investimento em Google Ads + Meta Ads + LinkedIn Ads no período selecionado."><i class="ti ti-coin"></i>Investimento total</div><div class="kpi-value" id="ovx-spend-value">—</div><div class="kpi-footer" id="ovx-spend-trend"></div></div>
       <div class="kpi blue kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="Total de leads recebidos no período, vindos do RD Station (todos os canais e formulários)."><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
@@ -928,6 +931,20 @@ const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f9731
 // Cores fixas por canal pago — usadas nos gráficos/detalhamento do painel Campanhas para que o
 // mesmo canal tenha sempre a mesma cor entre "Mix de investimento" e "Leads reais por canal".
 const CANAL_CORES = { 'Meta ADS':'#3b82f6', 'Google ADS':'#f59e0b', 'LinkedIn ADS':'#a78bfa', 'Sem canal atribuído':'#64748b' };
+
+// Regras de padronização de campanha, centralizadas num único array (antes eram if/includes
+// espalhados em standardizeCampanha). Avaliadas EM ORDEM — a primeira cujo match(s) for true vence,
+// onde s = valor.toLowerCase(). Precedência preservada exatamente da lógica original:
+// 1) rescue/logmein, 2) webinar, 3) (goto|linkedin) E saude, 4) goto|linkedin. Campanha nova = novo
+// item aqui. CAMPANHAS_MESTRE é derivado deste array (não duplicar os nomes-mestre).
+const CAMPANHA_RULES = [
+  { match: (s) => s.includes('rescue') || s.includes('logmein'), nome: 'LOGMEIN_RESCUE-LICENCA-ECO_07-26' },
+  // "webinar" mapeia para a campanha de webinar mesmo sem "goto"/"linkedin" no nome
+  // (ex: "[SB] ANUNCIO_WEBINAR" é a mesma campanha, mas não traz nenhum dos dois termos).
+  { match: (s) => s.includes('webinar'), nome: 'GOTO_WEBINAR_07-26' },
+  { match: (s) => (s.includes('goto') || s.includes('linkedin')) && s.includes('saude'), nome: 'GOTO_SAUDE_06-26' },
+  { match: (s) => s.includes('goto') || s.includes('linkedin'), nome: 'GOTO_INSTITUCIONAL_07-26' },
+];
 const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
 let CC={};
 
@@ -1121,9 +1138,14 @@ function mkBars(el,rows,color,onClickLabel){
     return `<div class="bar-row" ${attrs}><div class="bar-label">${esc(r.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.v/max*100)}%;background:${color}"></div></div><div class="bar-val">${r.fmt?r.fmt:fmt(r.v)}</div></div>`;
   }).join('');
 }
+// Formata uma Date como YYYY-MM-DD no fuso America/Sao_Paulo. Usa en-CA (que já devolve
+// YYYY-MM-DD) em vez de toISOString(), que é UTC — como o Brasil é UTC-3, após ~21h local o
+// "hoje" em UTC vira o dia seguinte e deslocava os presets de período em 1 dia perto da meia-noite.
+const _fmtDiaSP = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' });
+function diaSP(date){ return _fmtDiaSP.format(date); }
 function setPreset(days, btn) {
   const h = new Date();
-  const f = x => x.toISOString().slice(0,10);
+  const f = x => diaSP(x);
   document.getElementById('date-end').value = f(h);
   document.getElementById('date-start').value = f(new Date(h - days*86400000));
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
@@ -1134,7 +1156,7 @@ function period(){
   const s = document.getElementById('date-start')?.value;
   const e = document.getElementById('date-end')?.value;
   const h = new Date();
-  const f = x => x.toISOString().slice(0,10);
+  const f = x => diaSP(x);
   const startDate = s || f(new Date(h - 30*86400000));
   const endDate   = e || f(h);
   const days = Math.round((new Date(endDate)-new Date(startDate))/86400000);
@@ -1340,28 +1362,42 @@ function renderLeads(rows) {
   }).join('');
 }
 
+// Memoização in-flight: loadSalesforce → loadLeads e loadCriativos → loadSalesforce → loadLeads,
+// e as três disparam em paralelo em carregarTudo() (Promise.allSettled). Sem isso, loadLeads
+// refazia o fetch+parse da planilha várias vezes concorrentemente. Guardamos a promise em curso e
+// resetamos ao resolver/rejeitar, para o próximo carregarTudo() buscar dado fresco (mesmo espírito
+// do _adsCacheStore dos ads).
+let _loadLeadsPromise = null;
 async function loadLeads(){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
-  const r=await fetch(url);
-  const txt=await r.text();
-  const start=txt.indexOf('{');
-  const end=txt.lastIndexOf('}')+1;
-  const d=JSON.parse(txt.slice(start,end));
-  const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
+  if (_loadLeadsPromise) return _loadLeadsPromise;
+  _loadLeadsPromise = (async () => {
+    const url=`https://docs.google.com/spreadsheets/d/${SHEET}/gviz/tq?tqx=out:json&sheet=Conversoes`;
+    const r=await fetch(url);
+    const txt=await r.text();
+    const start=txt.indexOf('{');
+    const end=txt.lastIndexOf('}')+1;
+    const d=JSON.parse(txt.slice(start,end));
+    const rows=(d.table.rows||[]).filter(r=>r.c&&r.c[2]?.v);
 
-  _allLeads = rows;
+    _allLeads = rows;
 
-  const eventos = [...new Set(rows.map(r=>normEvento(r.c[1]?.v)).filter(Boolean))].sort();
-  const selEvento = document.getElementById('f-evento');
-  if (selEvento) {
-    const cur = selEvento.value;
-    selEvento.innerHTML = '<option value="">Todos os eventos</option>' +
-      eventos.map(e=>`<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`).join('');
+    const eventos = [...new Set(rows.map(r=>normEvento(r.c[1]?.v)).filter(Boolean))].sort();
+    const selEvento = document.getElementById('f-evento');
+    if (selEvento) {
+      const cur = selEvento.value;
+      selEvento.innerHTML = '<option value="">Todos os eventos</option>' +
+        eventos.map(e=>`<option value="${esc(e)}"${e===cur?' selected':''}>${esc(e)}</option>`).join('');
+    }
+
+    document.getElementById('l-camps').textContent = eventos.length;
+
+    aplicarFiltros();
+  })();
+  try {
+    return await _loadLeadsPromise;
+  } finally {
+    _loadLeadsPromise = null;
   }
-
-  document.getElementById('l-camps').textContent = eventos.length;
-
-  aplicarFiltros();
 }
 
 // ── VISÃO GERAL EXECUTIVA ────────────────────────────────────
@@ -1572,6 +1608,29 @@ function setKpi(prefix, value, trendInner){
   const t = document.getElementById(prefix+'-trend'); if (t) t.innerHTML = trendInner;
 }
 
+// Digest de alertas de campanha no topo do Overview: reusa buildCampanhasEnriquecidas() e a mesma
+// contagem sev<=1 (🔴 crítica sev 0 + 🟡 atenção sev 1) usada no KPI "Em alerta" do painel Campanhas
+// — sem duplicar cálculo de saúde. Fica oculto enquanto os dados de campanha (_criativoData) não
+// estiverem prontos, para não parecer erro/vazio; clicável leva ao painel Campanhas.
+function renderOverviewAlertDigest(){
+  const box = document.getElementById('ovx-alertas-digest');
+  const txt = document.getElementById('ovx-alertas-text');
+  if (!box || !txt) return;
+  const todas = buildCampanhasEnriquecidas();
+  if (!todas){ box.style.display = 'none'; return; }
+  const criticas = todas.filter(r => r.saude.sev === 0).length;
+  const atencao  = todas.filter(r => r.saude.sev === 1).length;
+  box.style.display = 'flex';
+  if (criticas + atencao > 0){
+    const partes = [];
+    if (criticas > 0) partes.push(`🔴 ${fmt(criticas)} crítica${criticas>1?'s':''}`);
+    if (atencao  > 0) partes.push(`🟡 ${fmt(atencao)} em atenção`);
+    txt.innerHTML = `<strong>${partes.join(' · ')}</strong> <span style="color:var(--muted)">— clique para ver no painel Campanhas</span>`;
+  } else {
+    txt.innerHTML = `🟢 <strong>Todas as campanhas saudáveis</strong>`;
+  }
+}
+
 async function loadOverview(){
   const p = period(), pp = prevPeriod();
   // Garante _allSalesforce carregado — o Overview agora mostra Receita/ROAS (financeSummary, arquitetura §4.1).
@@ -1636,6 +1695,9 @@ async function loadOverview(){
   setKpi('ovx-qualif', taxaQualif.toFixed(1)+'%', trendHTML(taxaQualif, taxaQualifPrev) + (qualifMeta?`<div>${qualifMeta}</div>`:''));
   setKpi('ovx-sessions', fmt(sessions), trendHTML(sessions, sessionsPrev));
   setKpi('ovx-bounce', bounce.toFixed(1)+'%', trendHTML(bounce, bouncePrev, true));
+
+  // Digest de campanhas em alerta no topo (reusa a saúde já computada por buildCampanhasEnriquecidas).
+  renderOverviewAlertDigest();
 
   // ── Funil de aquisição (TOFU → MOFU → BOFU) ──
   const maxFunil = Math.max(sessions, curLeads.length, curLQ, 1);
@@ -2254,13 +2316,8 @@ let _leadEmailMap = {};
 function standardizeCampanha(v) {
   if (!v) return v;
   const s = v.toLowerCase();
-  if (s.includes('rescue') || s.includes('logmein')) return 'LOGMEIN_RESCUE-LICENCA-ECO_07-26';
-  // "webinar" mapeia para a campanha de webinar mesmo sem "goto"/"linkedin" no nome
-  // (ex: "[SB] ANUNCIO_WEBINAR" é a mesma campanha, mas não traz nenhum dos dois termos).
-  if (s.includes('webinar')) return 'GOTO_WEBINAR_07-26';
-  if (s.includes('goto') || s.includes('linkedin')) {
-    if (s.includes('saude')) return 'GOTO_SAUDE_06-26';
-    return 'GOTO_INSTITUCIONAL_07-26';
+  for (const rule of CAMPANHA_RULES) {
+    if (rule.match(s)) return rule.nome;
   }
   return v;
 }
@@ -2291,7 +2348,12 @@ function buildLeadEmailMap() {
   return map;
 }
 
+// Mesma memoização in-flight de loadLeads: dedup do fetch concorrente da planilha do Salesforce
+// quando loadCriativos/loadOverview/loadCampanhas disparam loadSalesforce em paralelo.
+let _loadSalesforcePromise = null;
 async function loadSalesforce() {
+  if (_loadSalesforcePromise) return _loadSalesforcePromise;
+  _loadSalesforcePromise = (async () => {
   await loadLeads(); // garante _allLeads carregado, necessário para cruzar o canal por e-mail
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_SF}/gviz/tq?tqx=out:json&gid=0`;
   const r = await fetch(url);
@@ -2358,13 +2420,21 @@ async function loadSalesforce() {
   }
 
   aplicarFiltrosOpp();
+  })();
+  try {
+    return await _loadSalesforcePromise;
+  } finally {
+    _loadSalesforcePromise = null;
+  }
 }
 
 function salesforceInRange(startDate, endDate) {
   const s = new Date(startDate+'T00:00:00'), e = new Date(endDate+'T23:59:59');
   return (_allSalesforce||[]).filter(row => {
     const d = row.dataConversao || row.dataCriacao;
-    if (!d) return true;
+    // Linha sem data não pode ser atribuída com confiança a nenhum período — exclui do recorte
+    // (consistente com leadsInRange e buildCriativoData; não vaza para todo período).
+    if (!d) return false;
     return d >= s && d <= e;
   });
 }
@@ -2978,7 +3048,8 @@ function buildCriativoData(adsData){
   const leadRows = (_allLeads||[]).filter(r=>{
     const c = r.c||[];
     const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
-    if (!d) return true;
+    // Lead sem data é excluído do recorte de período (mesmo critério de leadsInRange/salesforceInRange).
+    if (!d) return false;
     return d>=dStart && d<=dEnd;
   }).map(r=>{
     const c = r.c||[];
@@ -3248,12 +3319,7 @@ function renderCriativos(){
 // Nomes-mestre canônicos que standardizeCampanha() produz. Uma campanha com investimento/leads
 // cujo nome padronizado NÃO está aqui é "fora do padrão" (não mapeada) — vira seção separada em
 // vez de sumir silenciosamente. Não inventa regra de separação; só torna o não-mapeado visível.
-const CAMPANHAS_MESTRE = new Set([
-  'LOGMEIN_RESCUE-LICENCA-ECO_07-26',
-  'GOTO_WEBINAR_07-26',
-  'GOTO_SAUDE_06-26',
-  'GOTO_INSTITUCIONAL_07-26'
-]);
+const CAMPANHAS_MESTRE = new Set(CAMPANHA_RULES.map(r => r.nome));
 
 // Status real por canal da campanha-mestre. Casa as campanhas cruas de cada plataforma por
 // standardizeCampanha(c.name) === campanha. Cada plataforma → Set de status (ACTIVE/PAUSED/DRAFT).
@@ -3612,7 +3678,7 @@ async function loadCampanhas(){
 
 async function initDates(){
   const h = new Date();
-  const f = x => x.toISOString().slice(0,10);
+  const f = x => diaSP(x);
   const ds = document.getElementById('date-start');
   const de = document.getElementById('date-end');
   if (ds && !ds.value) ds.value = f(new Date(h - 30*86400000));
