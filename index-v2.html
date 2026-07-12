@@ -534,7 +534,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
 
     <div class="card">
-      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil comercial</div><div class="section-badge">Leads → Qualificados → Oportunidades → Ganhas</div></div>
+      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil comercial</div><div class="section-badge">Leads → Cadência → Qualificados → Oportunidades → Ganhas</div></div>
       <div id="o-funil"></div>
     </div>
 
@@ -2803,10 +2803,11 @@ function renderOportunidades(rows) {
   // 'qualificados-funil' do modal), não soma aritmética — evita o funil mostrar um número diferente
   // do que o pop-up de detalhe realmente lista.
   const qualificadosCumulativo = rows.filter(row => (row.status||'').toLowerCase()==='qualificado' || row.isOpportunity).length;
-  const maxFunil = Math.max(total, qualificadosCumulativo, oportunidades, ganhas.length, 1);
+  const maxFunil = Math.max(total, qualificadosCumulativo, cadencia, oportunidades, ganhas.length, 1);
   const funilRows = [
     { label:'Leads recebidos', v: total, color: CORES[0] },
-    { label:'Qualificados (período/CRM)', v: qualificadosCumulativo, color: CORES[2] },
+    { label:'Cadência', v: cadencia, color: CORES[5] },
+    { label:'Qualificados', v: qualificadosCumulativo, color: CORES[2] },
     { label:'Oportunidades', v: oportunidades, color: CORES[3] },
     { label:'Ganhas', v: ganhas.length, color: CORES[1] }
   ];
@@ -2826,7 +2827,7 @@ function renderOportunidades(rows) {
     const widths = funilRows.map(r => Math.max(Math.round((maxFunil>0 ? r.v/maxFunil : 0) * MAXW), MINW));
     // Chave do modal por estágio (mesma ordem de funilRows). "Oportunidades" e "Ganhas" reusam as
     // chaves existentes `oportunidades`/`receita`; os dois primeiros usam as chaves novas *-funil.
-    const funilKeys = ['leads-funil','qualificados-funil','oportunidades','receita'];
+    const funilKeys = ['leads-funil','cadencia','qualificados-funil','oportunidades','receita'];
     // Clareia um hex misturando com branco (amt=0..1) para o topo do gradiente de cada segmento.
     const lighten = (hex, amt) => {
       const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
@@ -2862,7 +2863,7 @@ function renderOportunidades(rows) {
         + `<text x="${CX}" y="${cy+14}" text-anchor="middle" class="fnl-val">${esc(line2)}</text>`
         + `</g>`;
     }).join('');
-    funilEl.innerHTML = `<svg viewBox="0 0 ${VW} ${VH}" width="100%" role="group" aria-label="Funil comercial: leads recebidos, qualificados, oportunidades e ganhas" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:100%;height:auto;overflow:visible">`
+    funilEl.innerHTML = `<svg viewBox="0 0 ${VW} ${VH}" width="100%" role="group" aria-label="Funil comercial: leads recebidos, em cadência, qualificados, oportunidades e ganhas" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:100%;height:auto;overflow:visible">`
       + `<style>`
       + `.funnel-seg{cursor:pointer;transition:opacity .15s ease;animation:funnelIn .4s ease backwards;transform-box:fill-box;transform-origin:center}`
       + `.funnel-seg path{transition:filter .15s ease, stroke .15s ease;stroke:transparent;stroke-width:1.5}`
