@@ -8,7 +8,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <style>
-:root{--bg:#0d0f12;--surface:#141619;--surface2:#1c1f24;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f0;--muted:#7a7f8a;--dim:#3d424d;--blue:#3b82f6;--blue-dim:rgba(59,130,246,0.12);--green:#22c55e;--green-dim:rgba(34,197,94,0.12);--amber:#f59e0b;--amber-dim:rgba(245,158,11,0.12);--red:#ef4444;--red-dim:rgba(239,68,68,0.12);--purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);--font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+:root{--bg:#0d0f12;--surface:#141619;--surface2:#1c1f24;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0f0f0;--muted:#7a7f8a;--dim:#3d424d;--blue:#3b82f6;--blue-dim:rgba(59,130,246,0.12);--green:#22c55e;--green-dim:rgba(34,197,94,0.12);--amber:#f59e0b;--amber-dim:rgba(245,158,11,0.12);--red:#ef4444;--red-dim:rgba(239,68,68,0.12);--purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);--font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+/* Rampa ordinal do funil comercial: 1 hue (azul), clara→escura por estágio — posição no funil,
+   não identidade de série. Validada: node scripts/validate_palette.js "#93c5fd,#60a5fa,#3b82f6,
+   #2563eb,#1e40af" --mode dark --surface #0d0f12 --ordinal → ALL CHECKS PASS. */
+--fnl-1:#93c5fd;--fnl-2:#60a5fa;--fnl-3:#3b82f6;--fnl-4:#2563eb;--fnl-5:#1e40af;
+/* Tokens usados só via JS (Chart.js não resolve var() em canvas — lidos com cssVar() na hora do
+   render) + cores de identidade fixa por canal (Meta/Google/LinkedIn), tudo com par claro/escuro. */
+--chart-grid:rgba(255,255,255,.05);--chart-mute-fill:rgba(255,255,255,0.08);--li-brand:#0A66C2;
+--canal-meta:#3b82f6;--canal-google:#f59e0b;--canal-linkedin:#a78bfa;--canal-none:#64748b}
+/* Tema claro — mesmos papéis, valores recalibrados (bordas invertem polaridade, hues recebem
+   degraus mais escuros/saturados pra vencer o contraste 3:1 num fundo claro). Todas as rampas de
+   cor (--fnl-*, CORES_LIGHT em JS) foram revalidadas com scripts/validate_palette.js da skill
+   dataviz contra a superfície --surface real (#ffffff), não reaproveitadas do escuro. */
+:root[data-theme="light"]{--bg:#f1f4f6;--surface:#ffffff;--surface2:#e7ebee;--border:rgba(15,23,32,0.08);--border2:rgba(15,23,32,0.14);--text:#0f1115;--muted:#5b6472;--dim:#9aa3b2;--blue:#2563eb;--blue-dim:rgba(37,99,235,0.12);--green:#16a34a;--green-dim:rgba(22,163,74,0.12);--amber:#d97706;--amber-dim:rgba(217,119,6,0.12);--red:#dc2626;--red-dim:rgba(220,38,38,0.12);--purple:#7c3aed;--purple-dim:rgba(124,58,237,0.12);
+--fnl-1:#60a5fa;--fnl-2:#3b82f6;--fnl-3:#1d4ed8;--fnl-4:#1e3a8a;--fnl-5:#172554;
+--chart-grid:rgba(15,23,32,.06);--chart-mute-fill:rgba(15,23,32,0.08);--li-brand:#004182;
+--canal-meta:#2563eb;--canal-google:#d97706;--canal-linkedin:#7c3aed;--canal-none:#475569}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;min-height:100vh}
 .shell{display:flex;min-height:100vh}
@@ -36,9 +52,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 /* Tooltip customizado do funil comercial (substitui o <title> nativo) + animação de entrada dos segmentos */
 #funil-tooltip{position:fixed;z-index:9998;pointer-events:none;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 11px;font-size:12px;color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.45);opacity:0;transition:opacity .12s ease;max-width:240px;line-height:1.45}
 #funil-tooltip.show{opacity:1}
-#funil-tooltip .ft-title{font-weight:700;margin-bottom:2px}
-#funil-tooltip .ft-val{font-family:var(--mono);color:var(--muted)}
+/* Valor lidera (forte/alto-contraste), rótulo do estágio é secundário — o leitor já sabe em qual
+   estágio está (hover), quer o número. */
+#funil-tooltip .ft-title{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:2px}
+#funil-tooltip .ft-val{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--text)}
 @keyframes funnelIn{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+/* Funil comercial v2: lista de barras horizontais, 1 estágio por linha (form ordinal — ver skill
+   dataviz/choosing-a-form.md). Grid de 3 colunas (rótulo | trilho | valor) reaproveitado pelo
+   conector, pra alinhar pixel-perfect sem cálculo manual de offset. */
+.funil2{display:flex;flex-direction:column}
+.funil2-row{display:grid;grid-template-columns:168px 1fr 110px;align-items:center;gap:16px;padding:9px 10px;border-radius:8px;cursor:pointer;animation:funnelIn .4s ease backwards;transition:background .15s ease}
+.funil2-row:hover{background:var(--surface2)}
+.funil2-row:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.funil2-name{font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.funil2-track{position:relative;height:26px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.funil2-fill{position:absolute;top:0;left:0;bottom:0;border-radius:0 5px 5px 0;transition:width .5s cubic-bezier(.22,1,.36,1)}
+.funil2-val{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--text);text-align:right}
+.funil2-connector{display:grid;grid-template-columns:168px 1fr 110px;gap:16px;padding:1px 10px}
+.funil2-connector-inner{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:11px}
+.funil2-connector-inner i{font-size:13px}
+.funil2-connector-inner b{color:var(--muted);font-weight:600;font-family:var(--mono)}
+.funil2-foot{display:flex;justify-content:flex-end;margin-top:6px}
+.funil2-tbl-toggle{background:none;border:none;color:var(--muted);font-size:11px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:6px}
+.funil2-tbl-toggle:hover{color:var(--text);background:var(--surface2)}
+.funil2-table{width:100%;border-collapse:collapse;margin-top:10px}
+.funil2-table th{text-align:left;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 8px 8px;border-bottom:1px solid var(--border)}
+.funil2-table th:not(:first-child){text-align:right}
+.funil2-table td{padding:8px;border-bottom:1px solid var(--border);font-size:12.5px}
+.funil2-table td:not(:first-child){text-align:right;font-family:var(--mono)}
+.funil2-table tr:last-child td{border-bottom:none}
+@media(max-width:720px){.funil2-row,.funil2-connector{grid-template-columns:100px 1fr 84px;gap:10px}}
 .logo{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
 .logo-name{font-size:15px;font-weight:600;letter-spacing:-.2px}
 .logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
@@ -183,6 +226,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('gads')"><i class="ti ti-brand-google"></i>Google ADS</button>
   </nav>
   <div class="sidebar-footer">
+    <button type="button" id="theme-toggle" class="sidebar-toggle-full" onclick="toggleTheme()" aria-label="Mudar para tema claro"><i class="ti ti-sun" id="theme-toggle-icon"></i><span class="sidebar-toggle-label" id="theme-toggle-label">Tema claro</span></button>
     <button type="button" id="sidebar-toggle" class="sidebar-toggle-full" onclick="toggleSidebar()" aria-label="Recolher menu lateral"><i class="ti ti-layout-sidebar-left-collapse" id="sidebar-toggle-icon"></i><span class="sidebar-toggle-label">Recolher menu</span></button>
     <div class="last-update"><div class="pulse" id="pulse"></div><span id="stxt">Carregando...</span></div>
   </div>
@@ -894,17 +938,30 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 </div>
 
 <script>
-// Aplica o estado salvo da sidebar o quanto antes (shell já está no DOM) para reduzir flash visual.
+// Aplica o estado salvo da sidebar e do tema o quanto antes (shell já está no DOM) para reduzir
+// flash visual — o tema em especial, pra não piscar escuro→claro (ou vice-versa) no primeiro paint.
 (function(){
   try {
     if (localStorage.getItem('sidebarCollapsed') === '1') {
       document.querySelector('.shell').classList.add('sidebar-collapsed');
       const icon = document.getElementById('sidebar-toggle-icon');
-      const label = document.querySelector('.sidebar-toggle-label');
+      const label = document.querySelector('#sidebar-toggle .sidebar-toggle-label');
       const btn = document.getElementById('sidebar-toggle');
       if (icon) icon.className = 'ti ti-layout-sidebar-left-expand';
       if (label) label.textContent = 'Expandir menu';
       if (btn) btn.setAttribute('aria-label', 'Expandir menu lateral');
+    }
+  } catch(e){}
+  try {
+    // Padrão continua escuro (ux atual) — tema claro é opt-in, só aplicado se já foi escolhido antes.
+    if (localStorage.getItem('theme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      const icon = document.getElementById('theme-toggle-icon');
+      const label = document.getElementById('theme-toggle-label');
+      const btn = document.getElementById('theme-toggle');
+      if (icon) icon.className = 'ti ti-moon';
+      if (label) label.textContent = 'Tema escuro';
+      if (btn) btn.setAttribute('aria-label', 'Mudar para tema escuro');
     }
   } catch(e){}
 })();
@@ -927,10 +984,30 @@ const GADS_MCC_ID          = '8437421207';
 const ADS_API_URL = 'https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff8e85ea49e64';
 // GA4 agora é buscado pelo mesmo backend seguro do n8n (ver fetchAdsData/loadGA4) —
 // removida a assinatura JWT client-side com chave privada (era um risco de segurança).
-const CORES=['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
+// Lê uma custom property do :root já resolvida (Chart.js pinta em <canvas> — não entende var(),
+// só um valor de cor real —, então qualquer cor usada num gráfico precisa passar por aqui na hora
+// do render pra refletir o tema ativo). hexToRgba() deriva um wash translúcido de uma cor de CORES
+// (ex. preenchimento de área de um gráfico de linha) sem fixar o RGB de um tema só.
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function hexToRgba(hex, alpha){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${alpha})`;
+}
+// CORES_DARK/CORES_LIGHT: paletas categóricas validadas (node scripts/validate_palette.js
+// "<hexs>" --mode <dark|light> --surface <#0d0f12|#ffffff>, skill dataviz) contra cada superfície.
+// `CORES` é o array MUTÁVEL de fato lido pelos ~28 pontos de gráfico do arquivo — applyTheme()
+// troca o conteúdo em memória (CORES.length=0; CORES.push(...)) pra não precisar tocar em cada
+// call site quando o tema alterna.
+const CORES_DARK  = ['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ef4444','#06b6d4','#f97316','#ec4899'];
+const CORES_LIGHT = ['#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#ea580c','#db2777'];
+const CORES = CORES_DARK.slice();
 // Cores fixas por canal pago — usadas nos gráficos/detalhamento do painel Campanhas para que o
 // mesmo canal tenha sempre a mesma cor entre "Mix de investimento" e "Leads reais por canal".
-const CANAL_CORES = { 'Meta ADS':'#3b82f6', 'Google ADS':'#f59e0b', 'LinkedIn ADS':'#a78bfa', 'Sem canal atribuído':'#64748b' };
+// Guarda o NOME da custom property (não o hex) — cada consumidor resolve via var()/cssVar()
+// conforme o contexto (CSS inline vs. Chart.js), sempre lendo o tema ativo no momento do uso.
+const CANAL_CORES = { 'Meta ADS':'--canal-meta', 'Google ADS':'--canal-google', 'LinkedIn ADS':'--canal-linkedin', 'Sem canal atribuído':'--canal-none' };
 
 // Regras de padronização de campanha, centralizadas num único array (antes eram if/includes
 // espalhados em standardizeCampanha). Avaliadas EM ORDEM — a primeira cujo match(s) for true vence,
@@ -1085,6 +1162,19 @@ function verCampanhaNoCriativos(campanha){
   showView('criativos', true);
   filtrarPorCampanhaCriativo(campanha);
 }
+// Alterna a view em tabela do funil comercial (par acessível do gráfico — não há estado em
+// memória, lê/escreve direto no DOM via os ids fixos gerados no render do funil).
+function toggleFunilTabela(){
+  const tbl = document.getElementById('o-funil-tabela');
+  const btn = document.getElementById('o-funil-tbl-toggle');
+  if (!tbl) return;
+  const estavaEscondida = tbl.hasAttribute('hidden');
+  if (estavaEscondida) tbl.removeAttribute('hidden'); else tbl.setAttribute('hidden', '');
+  if (btn) {
+    btn.innerHTML = `<i class="ti ti-table"></i>${estavaEscondida ? 'Ocultar tabela' : 'Ver como tabela'}`;
+    btn.setAttribute('aria-expanded', estavaEscondida ? 'true' : 'false');
+  }
+}
 const DELEGATED_ACTIONS = {
   filtrarPorCanalLead:        (a)    => filtrarPorCanalLead(a),
   filtrarPorCanalOpp:         (a)    => filtrarPorCanalOpp(a),
@@ -1096,7 +1186,8 @@ const DELEGATED_ACTIONS = {
   verCampanhaNoCriativos:     (a)    => verCampanhaNoCriativos(a),
   fecharDetalheCard:          ()     => fecharDetalheCard(),
   scrollToCard:               (a)    => scrollToCard(a),
-  showView:                   (a, b) => showView(a, b === 'true')
+  showView:                   (a, b) => showView(a, b === 'true'),
+  toggleFunilTabela:          ()     => toggleFunilTabela()
 };
 function _dispatchDelegated(el){
   const fn = DELEGATED_ACTIONS[el.getAttribute('data-action')];
@@ -1162,7 +1253,7 @@ function period(){
   const days = Math.round((new Date(endDate)-new Date(startDate))/86400000);
   return{days,startDate,endDate,startUnix:Math.floor(new Date(startDate)/1000),endUnix:Math.floor(new Date(endDate)/1000)};
 }
-function scOpts(){return{x:{grid:{display:false},ticks:{color:'#7a7f8a',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#7a7f8a',font:{size:11}}}};}
+function scOpts(){const tick=cssVar('--muted')||'#7a7f8a',grid=cssVar('--chart-grid')||'rgba(255,255,255,.05)';return{x:{grid:{display:false},ticks:{color:tick,font:{size:11}}},y:{grid:{color:grid},ticks:{color:tick,font:{size:11}}}};}
 
 // ── META ADS ─────────────────────────────────────────────────
 let _allLeads = [];
@@ -1349,7 +1440,7 @@ function renderLeads(rows) {
   if (serieBadge) serieBadge.textContent = serie.length ? `${serie.length} ponto${serie.length!==1?'s':''}` : 'sem dados no período';
   mkChart('c-leads-serie','line', serie.map(p=>p.bucket), [{
     label:'Leads', data:serie.map(p=>p.valor), borderColor:CORES[0],
-    backgroundColor:'rgba(96,165,250,.12)', fill:true, tension:.3, pointRadius:2, borderWidth:2
+    backgroundColor:hexToRgba(CORES[0],.12), fill:true, tension:.3, pointRadius:2, borderWidth:2
   }], { scales:scOpts() });
 
   const byEvento={};
@@ -1891,7 +1982,7 @@ async function loadGA4(){
   const labs = channels.map(c=>c.channel);
   const dS   = channels.map(c=>c.sessions);
   mkLeg(document.getElementById('ga-leg'), labs);
-  mkChart('c-ga-canal','bar',labs,[{label:'Sessões',data:dS,backgroundColor:labs.map((l,i)=>!activeChannel||l===activeChannel?CORES[i%CORES.length]:'rgba(255,255,255,0.08)'),borderWidth:0,borderRadius:4}],{
+  mkChart('c-ga-canal','bar',labs,[{label:'Sessões',data:dS,backgroundColor:labs.map((l,i)=>!activeChannel||l===activeChannel?CORES[i%CORES.length]:cssVar('--chart-mute-fill')),borderWidth:0,borderRadius:4}],{
     ...sc,
     onClick:(evt,els)=>{ if(!els.length)return; const i=els[0].index; const val=labs[i]===activeChannel?'':labs[i]; activeChannel=val; if(selCanal) selCanal.value=val; loadGA4(); }
   });
@@ -2123,7 +2214,7 @@ async function loadLinkedIn(){
   </tr>`).join('') : '<tr><td colspan="9" class="empty">Sem dados no período</td></tr>';
 
   const spendRows = [...campRows].sort((a,b)=>b.spend-a.spend).slice(0,6).map(c=>({label:c.name.slice(0,24),v:c.spend,fmt:brl(c.spend)}));
-  mkBars(document.getElementById('li-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], '#0A66C2');
+  mkBars(document.getElementById('li-spend-bars'), spendRows.length?spendRows:[{label:'Sem dados',v:0,fmt:'R$ 0'}], cssVar('--li-brand'));
 
   const clickRows = [...campRows].sort((a,b)=>b.clicks-a.clicks).slice(0,6);
   mkLeg(document.getElementById('li-click-leg'), clickRows.map(c=>c.name.slice(0,20)));
@@ -2672,11 +2763,38 @@ function toggleSidebar(){
 function atualizarIconeSidebar(collapsed){
   const icon = document.getElementById('sidebar-toggle-icon');
   const btn = document.getElementById('sidebar-toggle');
-  const label = document.querySelector('.sidebar-toggle-label');
+  const label = document.querySelector('#sidebar-toggle .sidebar-toggle-label');
   if (!icon || !btn) return;
   icon.className = collapsed ? 'ti ti-layout-sidebar-left-expand' : 'ti ti-layout-sidebar-left-collapse';
   btn.setAttribute('aria-label', collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral');
   if (label) label.textContent = collapsed ? 'Expandir menu' : 'Recolher menu';
+}
+
+// Alterna tema claro/escuro (padrão continua escuro — claro é opt-in, ver IIFE de boot). CSS já
+// reage sozinho via [data-theme] (154 usos de var(--bg)/var(--surface)/etc na folha de estilo);
+// só o que Chart.js já pintou em canvas (CORES, scOpts(), CANAL_CORES — todos lidos via cssVar()/
+// mutação em memória) precisa de um re-render explícito, por isso o reload da view ativa abaixo.
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+  const fonte = theme === 'light' ? CORES_LIGHT : CORES_DARK;
+  CORES.length = 0;
+  CORES.push(...fonte);
+}
+function toggleTheme(){
+  const atual = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const novo = atual === 'light' ? 'dark' : 'light';
+  applyTheme(novo);
+  try { localStorage.setItem('theme', novo); } catch(e){}
+  const icon = document.getElementById('theme-toggle-icon');
+  const label = document.getElementById('theme-toggle-label');
+  const btn = document.getElementById('theme-toggle');
+  if (icon) icon.className = novo === 'light' ? 'ti ti-moon' : 'ti ti-sun';
+  if (label) label.textContent = novo === 'light' ? 'Tema escuro' : 'Tema claro';
+  if (btn) btn.setAttribute('aria-label', novo === 'light' ? 'Mudar para tema escuro' : 'Mudar para tema claro');
+  // Repinta os gráficos (canvas) da view visível com as cores do novo tema — mesmo caminho que o
+  // auto-refresh periódico já usa pra atualizar só a view ativa (arquitetura §8.3).
+  const loader = LOADERS[viewAtiva];
+  if (loader) loader();
 }
 
 function renderOportunidades(rows) {
@@ -2792,8 +2910,8 @@ function renderOportunidades(rows) {
   const oSerieBadge = document.getElementById('o-serie-badge');
   if (oSerieBadge) oSerieBadge.textContent = bucketsO.length ? `${bucketsO.length} ponto${bucketsO.length!==1?'s':''}` : 'sem dados no período';
   mkChart('c-opp-serie','line', bucketsO, [
-    { label:'Oportunidades', data:bucketsO.map(b=>mapOpp[b]||0), borderColor:CORES[3], backgroundColor:'rgba(168,85,247,.10)', fill:true, tension:.3, pointRadius:2, borderWidth:2 },
-    { label:'Ganhos', data:bucketsO.map(b=>mapWon[b]||0), borderColor:CORES[1], backgroundColor:'rgba(34,197,94,.10)', fill:true, tension:.3, pointRadius:2, borderWidth:2 }
+    { label:'Oportunidades', data:bucketsO.map(b=>mapOpp[b]||0), borderColor:CORES[3], backgroundColor:hexToRgba(CORES[3],.10), fill:true, tension:.3, pointRadius:2, borderWidth:2 },
+    { label:'Ganhos', data:bucketsO.map(b=>mapWon[b]||0), borderColor:CORES[1], backgroundColor:hexToRgba(CORES[1],.10), fill:true, tension:.3, pointRadius:2, borderWidth:2 }
   ], { scales:scOpts(), plugins:{legend:{display:true, labels:{color:'#7a7f8a',font:{size:11}}}} });
 
   // Cumulativo "qualificado OU oportunidade" sem duplicar: toda oportunidade já nasce com status
@@ -2805,80 +2923,53 @@ function renderOportunidades(rows) {
   const qualificadosCumulativo = rows.filter(row => (row.status||'').toLowerCase()==='qualificado' || row.isOpportunity).length;
   const maxFunil = Math.max(total, qualificadosCumulativo, cadencia, oportunidades, ganhas.length, 1);
   const funilRows = [
-    { label:'Leads recebidos', v: total, color: CORES[0] },
-    { label:'Cadência', v: cadencia, color: CORES[5] },
-    { label:'Qualificados', v: qualificadosCumulativo, color: CORES[2] },
-    { label:'Oportunidades', v: oportunidades, color: CORES[3] },
-    { label:'Ganhas', v: ganhas.length, color: CORES[1] }
+    { label:'Leads recebidos', v: total },
+    { label:'Cadência', v: cadencia },
+    { label:'Qualificados', v: qualificadosCumulativo },
+    { label:'Oportunidades', v: oportunidades },
+    { label:'Ganhas', v: ganhas.length }
   ];
   const funilEl = document.getElementById('o-funil');
   if (funilEl) {
-    // Funil visual real: um SVG com 4 segmentos empilhados que afunilam de estágio pra estágio.
-    // Cada segmento é um <path> cujas bordas esquerda/direita são curvas Bézier cúbicas (não linhas
-    // retas), dando uma silhueta orgânica tipo ampulheta/funil suave. Como a base de um segmento tem
-    // a mesma largura do topo do próximo (botW == topW seguinte) E as curvas chegam ao ponto de
-    // encontro com tangente vertical (pontos de controle na altura média), as bordas adjacentes se
-    // emendam sem quina — a transição entre estágios parece contínua. Largura ∝ r.v/maxFunil.
-    // Acabamento: gradiente vertical sutil por estágio (topo ~18% mais claro), tooltip HTML customizado
-    // (substitui o <title> nativo) e animação de entrada escalonada. Cada estágio é clicável (role=button
-    // + data-action) e abre o modal de detalhe via a delegação de eventos global.
-    const VW = 640, SH = 58, CX = VW/2, MAXW = 600, MINW = 34;
-    const VH = SH * funilRows.length;
-    const widths = funilRows.map(r => Math.max(Math.round((maxFunil>0 ? r.v/maxFunil : 0) * MAXW), MINW));
+    // Funil comercial v2: lista de barras horizontais, uma por estágio — forma ordinal (posição na
+    // sequência, não identidade de série), rampa de 1 hue clara→escura (--fnl-1..5, CSS). Cada linha é
+    // clicável (role=button + data-action, mesma delegação global) e abre o modal de detalhe por
+    // estágio; entre linhas, um conector mostra a taxa de conversão em relação ao estágio anterior.
+    const FUNIL_RAMP = ['var(--fnl-1)','var(--fnl-2)','var(--fnl-3)','var(--fnl-4)','var(--fnl-5)'];
     // Chave do modal por estágio (mesma ordem de funilRows). "Oportunidades" e "Ganhas" reusam as
     // chaves existentes `oportunidades`/`receita`; os dois primeiros usam as chaves novas *-funil.
     const funilKeys = ['leads-funil','cadencia','qualificados-funil','oportunidades','receita'];
-    // Clareia um hex misturando com branco (amt=0..1) para o topo do gradiente de cada segmento.
-    const lighten = (hex, amt) => {
-      const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-      if (!m) return hex;
-      const n = parseInt(m[1], 16);
-      const mix = ch => Math.min(255, Math.round(ch + (255 - ch) * amt));
-      const r = mix((n>>16)&255), g = mix((n>>8)&255), b = mix(n&255);
-      return '#' + ((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1);
-    };
-    const defs = funilRows.map((r,i)=>
-      `<linearGradient id="fnl-grad-${i}" x1="0" y1="0" x2="0" y2="1">`
-      + `<stop offset="0" stop-color="${lighten(r.color,.18)}"></stop>`
-      + `<stop offset="1" stop-color="${r.color}"></stop>`
-      + `</linearGradient>`
-    ).join('');
-    const segs = funilRows.map((r,i)=>{
-      const topW = widths[i];
-      const botW = (i < funilRows.length-1) ? widths[i+1] : widths[i];
-      const y0 = i*SH, y1 = y0+SH, cy = y0 + SH/2;
-      // Extremos das bordas + altura média (pontos de controle) para o S-curve ease-in-out.
-      const tl = CX-topW/2, tr = CX+topW/2, bl = CX-botW/2, br = CX+botW/2, cym = y0 + SH/2;
-      // Borda esquerda desce em curva (tl→bl), reta na base até br, borda direita sobe em curva (br→tr).
-      const d = `M ${tl},${y0} C ${tl},${cym} ${bl},${cym} ${bl},${y1} L ${br},${y1} C ${br},${cym} ${tr},${cym} ${tr},${y0} Z`;
-      const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
-      const line2 = fmt(r.v) + (conv ? '  ·  ' + conv : '');
-      const aria = `${r.label}: ${fmt(r.v)}${conv ? ', ' + conv : ''}. Clique para ver os leads.`;
-      return `<g class="funnel-seg" role="button" tabindex="0" aria-label="${esc(aria)}" `
+    const rowsHTML = funilRows.map((r,i)=>{
+      // Largura mínima de 3% pra manter a barra clicável/visível mesmo com valor baixo (não faz o
+      // 0 real virar barra visível — só evita larguras sub-pixel para valores pequenos porém > 0).
+      const widthPct = maxFunil>0 && r.v>0 ? Math.max(r.v/maxFunil*100, 3) : 0;
+      const conv = (i>0 && funilRows[i-1].v>0) ? (r.v/funilRows[i-1].v*100) : null;
+      const convTxt = conv!=null ? `${conv.toFixed(1)}% de conversão` : '';
+      const aria = `${r.label}: ${fmt(r.v)}${convTxt ? ', ' + convTxt : ''}. Clique para ver os leads.`;
+      const row = `<div class="funil2-row funnel-seg" role="button" tabindex="0" aria-label="${esc(aria)}" `
         + `data-action="abrirDetalheCard" data-arg="${funilKeys[i]}" `
-        + `data-fnl-label="${esc(r.label)}" data-fnl-val="${esc(fmt(r.v))}" data-fnl-conv="${esc(conv)}" `
-        + `style="animation-delay:${i*70}ms">`
-        + `<path d="${d}" fill="url(#fnl-grad-${i})"></path>`
-        + `<text x="${CX}" y="${cy-1}" text-anchor="middle" class="fnl-name">${esc(r.label)}</text>`
-        + `<text x="${CX}" y="${cy+14}" text-anchor="middle" class="fnl-val">${esc(line2)}</text>`
-        + `</g>`;
+        + `data-fnl-label="${esc(r.label)}" data-fnl-val="${esc(fmt(r.v))}" data-fnl-conv="${esc(convTxt)}" `
+        + `style="animation-delay:${i*60}ms">`
+        + `<div class="funil2-name">${esc(r.label)}</div>`
+        + `<div class="funil2-track"><div class="funil2-fill" style="width:${widthPct}%;background:${FUNIL_RAMP[i]}"></div></div>`
+        + `<div class="funil2-val">${esc(fmt(r.v))}</div>`
+        + `</div>`;
+      const proximoConv = (i < funilRows.length-1)
+        ? (funilRows[i].v>0 ? (funilRows[i+1].v/funilRows[i].v*100).toFixed(1) : '0.0')
+        : null;
+      const connector = (i < funilRows.length-1)
+        ? `<div class="funil2-connector"><div></div><div class="funil2-connector-inner"><i class="ti ti-corner-down-right"></i>`
+          + `<b>${proximoConv}%</b> segue para ${esc(funilRows[i+1].label)}</div><div></div></div>`
+        : '';
+      return row + connector;
     }).join('');
-    funilEl.innerHTML = `<svg viewBox="0 0 ${VW} ${VH}" width="100%" role="group" aria-label="Funil comercial: leads recebidos, em cadência, qualificados, oportunidades e ganhas" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:100%;height:auto;overflow:visible">`
-      + `<style>`
-      + `.funnel-seg{cursor:pointer;transition:opacity .15s ease;animation:funnelIn .4s ease backwards;transform-box:fill-box;transform-origin:center}`
-      + `.funnel-seg path{transition:filter .15s ease, stroke .15s ease;stroke:transparent;stroke-width:1.5}`
-      + `.funnel-seg text{pointer-events:none;paint-order:stroke;stroke:rgba(10,12,15,.55);stroke-width:2px;fill:#fff;font-family:'Inter',sans-serif}`
-      + `.funnel-seg .fnl-name{font-size:14px;font-weight:700}`
-      + `.funnel-seg .fnl-val{font-size:11px;font-weight:500;opacity:.92}`
-      + `svg:hover .funnel-seg{opacity:.42}`
-      + `svg:hover .funnel-seg:hover{opacity:1}`
-      + `.funnel-seg:hover path{filter:brightness(1.16);stroke:rgba(255,255,255,.85)}`
-      + `.funnel-seg:focus{outline:none}`
-      + `.funnel-seg:focus-visible path{stroke:var(--blue);stroke-width:2.5}`
-      + `</style>`
-      + `<defs>${defs}</defs>`
-      + segs
-      + `</svg>`;
+    const tableRowsHTML = funilRows.map((r,i)=>{
+      const conv = (i>0 && funilRows[i-1].v>0) ? (r.v/funilRows[i-1].v*100).toFixed(1)+'%' : '—';
+      return `<tr><td>${esc(r.label)}</td><td>${esc(fmt(r.v))}</td><td>${conv}</td></tr>`;
+    }).join('');
+    funilEl.innerHTML = `<div class="funil2" role="group" aria-label="Funil comercial: leads recebidos, em cadência, qualificados, oportunidades e ganhas">${rowsHTML}</div>`
+      + `<div class="funil2-foot"><button type="button" class="funil2-tbl-toggle" id="o-funil-tbl-toggle" data-action="toggleFunilTabela" aria-expanded="false" aria-controls="o-funil-tabela"><i class="ti ti-table"></i>Ver como tabela</button></div>`
+      + `<table class="funil2-table" id="o-funil-tabela" hidden><thead><tr><th>Estágio</th><th>Valor</th><th>Conversão</th></tr></thead><tbody>${tableRowsHTML}</tbody></table>`;
     setupFunilTooltip(funilEl);
   }
 
@@ -3046,13 +3137,7 @@ function buildCriativoData(adsData){
   const adRows = flattenAdsSpend(adsData || {});
   const p = period();
   const dStart = new Date(p.startDate+'T00:00:00'), dEnd = new Date(p.endDate+'T23:59:59');
-  const leadRows = (_allLeads||[]).filter(r=>{
-    const c = r.c||[];
-    const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
-    // Lead sem data é excluído do recorte de período (mesmo critério de leadsInRange/salesforceInRange).
-    if (!d) return false;
-    return d>=dStart && d<=dEnd;
-  }).map(r=>{
+  const mapLeadRow = r => {
     const c = r.c||[];
     const campanhaRaw = c[8]?.v || c[1]?.v || '';
     return {
@@ -3064,12 +3149,27 @@ function buildCriativoData(adsData){
       plataforma: inferPlataformaLead(c[15]?.v, c[10]?.v),
       data: parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v)
     };
-  });
+  };
+  const leadRows = (_allLeads||[]).filter(r=>{
+    const c = r.c||[];
+    const d = parseDataLead(c[26]?.v) || parseDataLead(c[0]?.v);
+    // Lead sem data é excluído do recorte de período (mesmo critério de leadsInRange/salesforceInRange).
+    if (!d) return false;
+    return d>=dStart && d<=dEnd;
+  }).map(mapLeadRow);
 
   const sfByEmail = {};
   (_allSalesforce||[]).forEach(sf => { if (sf.email) sfByEmail[sf.email] = sf; });
-  const leadByEmailPrimeiro = {};
-  leadRows.forEach(l => { if (l.email && !leadByEmailPrimeiro[l.email]) leadByEmailPrimeiro[l.email] = l; });
+  // Atribuição de campanha de uma oportunidade NÃO fica restrita ao período: o lead pode ter
+  // convertido na Central de Leads antes da janela filtrada e só virado oportunidade no CRM dentro
+  // dela. Mesmo critério (sem filtro de data) de buildLeadEmailMap(), usado pela aba Oportunidades —
+  // sem isso a oportunidade some do cruzamento por campanha em Criativos mesmo aparecendo em
+  // Oportunidades, gerando contagens divergentes entre as duas abas para a mesma campanha/período.
+  const leadByEmailTodos = {};
+  (_allLeads||[]).forEach(r => {
+    const l = mapLeadRow(r);
+    if (l.email && !leadByEmailTodos[l.email]) leadByEmailTodos[l.email] = l;
+  });
 
   const bucketKey = l => l.campanha+'|||'+l.conjunto+'|||'+l.criativo;
   const buckets = {};
@@ -3081,10 +3181,12 @@ function buildCriativoData(adsData){
 
   const sfRowsPeriodo = salesforceInRange(p.startDate, p.endDate);
   sfRowsPeriodo.forEach(sf => {
-    const l = sf.email ? leadByEmailPrimeiro[sf.email] : null;
+    const l = sf.email ? leadByEmailTodos[sf.email] : null;
     if (!l) return; // lead comercial sem rastreio de ads (isMarketing=false) nao entra no cruzamento de criativo
     const k = bucketKey(l);
-    if (!buckets[k]) return;
+    // Oportunidade cujo lead original não caiu no período (ver leadByEmailTodos acima) não tem bucket
+    // ainda — cria com leads:[] pra não perder a atribuição de campanha/conjunto/criativo.
+    if (!buckets[k]) buckets[k] = { campanha:l.campanha, conjunto:l.conjunto, criativo:l.criativo, leads:[], oportunidades:0, pipe:0, ganho:0 };
     if (sf.isOpportunity) buckets[k].oportunidades++;
     if (sf.isOpen) buckets[k].pipe += (sf.valorOpp||0);
     if (sf.isWon) buckets[k].ganho += (sf.valorNF||0);
@@ -3600,7 +3702,7 @@ function renderChartsCampanhas(rows){
   const labels = rows.map(r=>r.campanha);
   const idx = {}; labels.forEach((c,i)=>{ if (!(c in idx)) idx[c]=i; });
   const CANAIS_PAGOS = ['Meta ADS','Google ADS','LinkedIn ADS'];
-  const legHTML = canais => canais.map(c=>`<div class="leg"><div class="leg-dot" style="background:${CANAL_CORES[c]}"></div>${esc(c)}</div>`).join('');
+  const legHTML = canais => canais.map(c=>`<div class="leg"><div class="leg-dot" style="background:var(${CANAL_CORES[c]})"></div>${esc(c)}</div>`).join('');
 
   // A — Mix de investimento
   const spendMap = {};
@@ -3612,7 +3714,7 @@ function renderChartsCampanhas(rows){
   const dsInvest = canaisInvest.map(canal => ({
     label: canal,
     data: labels.map(c => spendMap[c+'|||'+canal] || 0),
-    backgroundColor: CANAL_CORES[canal]
+    backgroundColor: cssVar(CANAL_CORES[canal])
   }));
   mkChart('c-cp-mix-invest','bar',labels,dsInvest,{ indexAxis:'y', scales:{ x:{stacked:true,ticks:{callback:v=>brl(v)}}, y:{stacked:true} }, plugins:{legend:{display:false}} });
   const legI = document.getElementById('cp-mix-invest-leg'); if (legI) legI.innerHTML = legHTML(canaisInvest);
@@ -3628,7 +3730,7 @@ function renderChartsCampanhas(rows){
   const dsLeads = canaisLeads.map(canal => ({
     label: canal,
     data: labels.map(c => leadsMap[c+'|||'+canal] || 0),
-    backgroundColor: CANAL_CORES[canal]
+    backgroundColor: cssVar(CANAL_CORES[canal])
   }));
   mkChart('c-cp-mix-leads','bar',labels,dsLeads,{ indexAxis:'y', scales:{ x:{stacked:true,ticks:{callback:v=>fmt(v)}}, y:{stacked:true} }, plugins:{legend:{display:false}} });
   const legL = document.getElementById('cp-mix-leads-leg'); if (legL) legL.innerHTML = legHTML(canaisLeads);
@@ -3652,7 +3754,7 @@ function renderCplCanal(rows){
     .map(c => { const v = agg[c].spend/agg[c].leads; return { label:c, v, fmt:brl(v) }; });
   if (!barRows.length){ if (card) card.style.display='none'; return; }
   if (card) card.style.display='';
-  mkBars(el, barRows, '#f59e0b');
+  mkBars(el, barRows, cssVar('--amber'));
 }
 
 // Reusa buildCriativoData já calculado por Criativos quando o cache de ads do período está quente
