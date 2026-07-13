@@ -379,7 +379,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </div>
     <div class="kpi-grid-8">
       <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Soma do investimento em Google Ads + Meta Ads + LinkedIn Ads no período selecionado."><i class="ti ti-coin"></i>Investimento total</div><div class="kpi-value" id="ovx-spend-value">—</div><div class="kpi-footer" id="ovx-spend-trend"></div></div>
-      <div class="kpi blue kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="Total de leads recebidos no período, vindos do RD Station (todos os canais e formulários)."><i class="ti ti-users"></i>Leads</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
+      <div class="kpi blue kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="Total de leads recebidos no período, vindos do RD Station (todos os canais e formulários)."><i class="ti ti-users"></i>Leads (RD, período)</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
       <div class="kpi green kpi-nav" onclick="showView('oportunidades', true)"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período (Salesforce). O rodapé mostra quanto disso é atribuível a marketing (lead rastreado por e-mail)."><i class="ti ti-cash"></i>Receita ganha</div><div class="kpi-value" id="ovx-receita-value" style="font-size:18px">—</div><div class="kpi-footer" id="ovx-receita-foot"></div></div>
       <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="ROAS blended = receita ganha atribuída a marketing ÷ investimento total em mídia paga no período. Acima de 1x significa que o marketing devolveu mais do que custou. Usa só a receita rastreada até a mídia, não a receita comercial direta."><i class="ti ti-trending-up"></i>ROAS blended</div><div class="kpi-value" id="ovx-roas-value">—</div><div class="kpi-footer" id="ovx-roas-trend"></div></div>
       <div class="kpi amber kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Custo por Lead combinado: investimento total em mídia paga dividido pelo total de leads do período (não separa por canal)."><i class="ti ti-target"></i>CPL blended</div><div class="kpi-value" id="ovx-cpl-value">—</div><div class="kpi-footer" id="ovx-cpl-trend"></div></div>
@@ -464,11 +464,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- RD STATION -->
   <div class="view" id="view-rdstation">
-    <div class="chart-click-hint" style="margin-bottom:12px">Estes números são o estado atual de toda a base de contatos do RD Station Marketing — não são filtrados pelo período selecionado no topo (a API de segmentações não aceita filtro de data).</div>
+    <div class="card" style="padding:14px 20px;margin-bottom:16px;border-color:var(--amber)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="color:var(--amber);font-size:18px;flex-shrink:0"></i>
+        <div style="font-size:12.5px;color:var(--text)">Estes números são o estado atual de toda a base de contatos do RD Station Marketing — não são filtrados pelo período selecionado no topo (a API de segmentações não aceita filtro de data).</div>
+      </div>
+    </div>
     <!-- KPIs Funil -->
     <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
       <div class="kpi blue"><div class="kpi-label" title="Todos os contatos cadastrados na base do RD Station Marketing, independente do estágio no funil."><i class="ti ti-users"></i>Total Contatos</div><div class="kpi-value" id="rd-total">—</div><div class="kpi-footer">Base completa</div></div>
-      <div class="kpi green"><div class="kpi-label" title="Contatos no estágio 'Lead' — já converteram em algum formulário mas ainda não foram qualificados."><i class="ti ti-user-plus"></i>Leads</div><div class="kpi-value" id="rd-leads">—</div><div class="kpi-footer">Estágio Lead</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Contatos no estágio 'Lead' — já converteram em algum formulário mas ainda não foram qualificados."><i class="ti ti-user-plus"></i>Leads (base total)</div><div class="kpi-value" id="rd-leads">—</div><div class="kpi-footer">Estágio Lead</div></div>
       <div class="kpi amber"><div class="kpi-label" title="MQL (Marketing Qualified Lead): lead qualificado pelo marketing, pronto para abordagem comercial."><i class="ti ti-star"></i>MQL</div><div class="kpi-value" id="rd-mql">—</div><div class="kpi-footer">Lead Qualificado</div></div>
       <div class="kpi purple"><div class="kpi-label" title="Contatos em negociação ativa com o time comercial."><i class="ti ti-briefcase"></i>Oportunidades</div><div class="kpi-value" id="rd-opp">—</div><div class="kpi-footer">Em negociação</div></div>
       <div class="kpi red"><div class="kpi-label" title="Contatos que fecharam negócio e se tornaram clientes."><i class="ti ti-check"></i>Clientes</div><div class="kpi-value" id="rd-clients">—</div><div class="kpi-footer">Convertidos</div></div>
@@ -552,7 +557,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-browser"></i>Landing Pages</div></div>
       <table class="tbl"><thead><tr><th>Página</th><th>Sessões</th><th>Conversões</th><th title="Taxa de conversão = conversões ÷ sessões. Para landing pages é a métrica-fim: uma LP com poucas sessões e alta taxa converte melhor que uma com muitas sessões e taxa baixa.">Taxa conv.</th><th>Rejeição</th></tr></thead><tbody id="lp-body"></tbody></table>
-      <div class="chart-click-hint" id="lp-conv-hint">Ordenado por volume de sessões. A LP mais eficiente é a de maior taxa de conversão, não a de mais sessões.</div>
+      <div class="chart-click-hint" id="lp-conv-hint">Ordenado por taxa de conversão (a métrica que mais importa pra uma LP). A LP mais eficiente é a de maior taxa de conversão, não a de mais sessões.</div>
+      <div class="chart-click-hint" id="lp-channel-notice" style="display:none">O filtro de canal ativo não se aplica a esta tabela — o dado de canal não está disponível na granularidade de landing page (limitação da origem, não é possível filtrar aqui).</div>
     </div>
   </div>
 
@@ -769,13 +775,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
         <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do Meta Ads:</strong> <span id="m-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
       </div>
     </div>
-    <div class="kpi-grid-6">
+    <div class="kpi-grid-4">
       <div class="kpi purple"><div class="kpi-label" title="Total investido em Meta Ads (Facebook + Instagram) no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="m-spend">—</div><div class="kpi-footer" id="m-spend-trend">No período</div></div>
       <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="m-impr">—</div><div class="kpi-footer">Total</div></div>
       <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="m-clicks">—</div><div class="kpi-footer">Total</div></div>
       <div class="kpi amber"><div class="kpi-label" title="Click-Through Rate: cliques ÷ impressões. Acima de 2% é considerado bom para Meta Ads."><i class="ti ti-percentage"></i>CTR</div><div class="kpi-value" id="m-ctr">—</div><div class="kpi-footer">Taxa de clique</div></div>
       <div class="kpi red"><div class="kpi-label" title="Pessoas únicas que viram o anúncio (diferente de impressões, que conta repetições)."><i class="ti ti-users"></i>Alcance</div><div class="kpi-value" id="m-reach">—</div><div class="kpi-footer">Pessoas únicas</div></div>
       <div class="kpi green"><div class="kpi-label" title="Custo por Lead real: investimento total ÷ leads reais da Central de Leads no período (não usa o 'resultado' auto-reportado pela Meta, que mistura leads de site com leads nativos do formulário)."><i class="ti ti-target"></i>CPL real</div><div class="kpi-value" id="m-cpl">—</div><div class="kpi-footer" id="m-cpl-footer">Leads reais</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Custo por Resultado plataforma: gasto total ÷ resultados auto-reportados pela própria Meta (é o número que aparece no gerenciador de anúncios da Meta, não os leads reais da Central de Leads)."><i class="ti ti-target"></i>Custo/Result. plataforma</div><div class="kpi-value" id="m-cpl-plat">—</div><div class="kpi-footer" id="m-cpl-plat-footer">Resultados Meta</div></div>
     </div>
 
     <div class="card" style="padding:0">
@@ -829,7 +836,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
         <div style="font-size:12.5px;color:var(--text)"><strong>Falha ao buscar dados do LinkedIn Ads:</strong> <span id="li-error-msg"></span> — os números abaixo podem estar incompletos ou zerados.</div>
       </div>
     </div>
-    <div class="kpi-grid-6">
+    <div class="kpi-grid-4">
       <div class="kpi purple"><div class="kpi-label" title="Total investido em LinkedIn Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="li-spend">—</div><div class="kpi-footer" id="li-spend-trend">No período</div></div>
       <div class="kpi blue"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="li-impr">—</div><div class="kpi-footer">Total</div></div>
       <div class="kpi green"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="li-clicks">—</div><div class="kpi-footer">Total</div></div>
@@ -867,7 +874,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       </div>
     </div>
     <!-- KPIs -->
-    <div class="kpi-grid-6">
+    <div class="kpi-grid-4">
       <div class="kpi blue"><div class="kpi-label" title="Total investido em Google Ads no período."><i class="ti ti-coin"></i>Gasto total</div><div class="kpi-value" id="ga-spend">—</div><div class="kpi-footer" id="ga-spend-trend">No período</div></div>
       <div class="kpi green"><div class="kpi-label" title="Número de vezes que os anúncios foram exibidos."><i class="ti ti-eye"></i>Impressões</div><div class="kpi-value" id="ga-impr">—</div><div class="kpi-footer">Total</div></div>
       <div class="kpi purple"><div class="kpi-label" title="Total de cliques nos anúncios."><i class="ti ti-cursor"></i>Cliques</div><div class="kpi-value" id="ga-clicks">—</div><div class="kpi-footer">Total</div></div>
@@ -1793,17 +1800,34 @@ async function loadOverview(){
   // ── Funil de aquisição (TOFU → MOFU → BOFU) ──
   const maxFunil = Math.max(sessions, curLeads.length, curLQ, 1);
   const funilRows = [
-    { label:'Sessões', v:sessions, color:CORES[0] },
-    { label:'Leads', v:curLeads.length, color:CORES[2] },
-    { label:'Leads qualificados', v:curLQ, color:CORES[1] }
+    { label:'Sessões', v:sessions },
+    { label:'Leads', v:curLeads.length },
+    { label:'Leads qualificados', v:curLQ }
   ];
   const funilEl = document.getElementById('ovx-funnel');
   if (funilEl) {
-    funilEl.innerHTML = funilRows.map((r,i)=>{
-      const w = maxFunil>0 ? Math.round(r.v/maxFunil*100) : 0;
-      const conv = (i>0 && funilRows[i-1].v>0) ? `${(r.v/funilRows[i-1].v*100).toFixed(1)}% de conversão` : '';
-      return `<div class="bar-row"><div class="bar-label" style="width:150px">${r.label}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${r.color}"></div></div><div class="bar-val" style="width:150px;text-align:right">${fmt(r.v)} <span style="color:var(--muted);font-size:10px">${conv}</span></div></div>`;
-    }).join('');
+    // Funil de aquisição v2: forma ordinal (posição na sequência, não série independente), rampa de 1 hue
+    // clara→escura (--fnl-1..3) em vez de cores categóricas; conector entre linhas mostra a conversão para
+    // o próximo estágio. Estático — só a rampa + conectores do padrão-ouro (#o-funil), sem modal/tooltip/tabela.
+    const FUNIL_RAMP = ['var(--fnl-1)','var(--fnl-2)','var(--fnl-3)'];
+    funilEl.innerHTML = `<div class="funil2" role="group" aria-label="Funil de aquisição: sessões, leads e leads qualificados">`
+      + funilRows.map((r,i)=>{
+        const w = maxFunil>0 ? Math.round(r.v/maxFunil*100) : 0;
+        const row = `<div class="funil2-row" style="animation-delay:${i*60}ms">`
+          + `<div class="funil2-name">${esc(r.label)}</div>`
+          + `<div class="funil2-track"><div class="funil2-fill" style="width:${w}%;background:${FUNIL_RAMP[i]}"></div></div>`
+          + `<div class="funil2-val">${esc(fmt(r.v))}</div>`
+          + `</div>`;
+        const proximoConv = (i < funilRows.length-1)
+          ? (funilRows[i].v>0 ? (funilRows[i+1].v/funilRows[i].v*100).toFixed(1) : '0.0')
+          : null;
+        const connector = (i < funilRows.length-1)
+          ? `<div class="funil2-connector"><div></div><div class="funil2-connector-inner"><i class="ti ti-corner-down-right"></i>`
+            + `<b>${proximoConv}%</b> segue para ${esc(funilRows[i+1].label)}</div><div></div></div>`
+          : '';
+        return row + connector;
+      }).join('')
+      + `</div>`;
   }
 
   // ── Comparação de canais pagos ──
@@ -2008,7 +2032,13 @@ async function loadGA4(){
     <td class="${c.bounceRate*100<40?'rej-ok':c.bounceRate*100<65?'rej-warn':'rej-bad'}">${(c.bounceRate*100).toFixed(1)}%</td>
   </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhuma campanha UTM no período (ou nenhuma no canal filtrado)</td></tr>';
 
-  const landingPages = ga.landingPages || [];
+  // Ordena por taxa de conversão desc (conversions/sessions; sessions===0 → taxa 0, sem divisão por zero).
+  // Cópia com spread: ga.landingPages é referência a dado cacheado (_adsCacheStore) reusado entre re-renders — não mutar o original.
+  const landingPages = [...(ga.landingPages || [])].sort((a,b)=>{
+    const ra = a.sessions>0 ? a.conversions/a.sessions : 0;
+    const rb = b.sessions>0 ? b.conversions/b.sessions : 0;
+    return rb - ra;
+  });
   document.getElementById('lp-body').innerHTML = landingPages.length ? landingPages.map(r=>{
     const u = r.page;
     return `<tr><td style="font-family:var(--mono);font-size:11px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u)}">${esc(u.length>60?'…'+u.slice(-58):u)}</td>
@@ -2020,12 +2050,25 @@ async function loadGA4(){
   const lpSess = landingPages.reduce((s,r)=>s+(r.sessions||0),0);
   const lpConv = landingPages.reduce((s,r)=>s+(r.conversions||0),0);
   const lpRate = convRate(lpConv, lpSess);
+  // Melhor LP: maior taxa de conversão entre linhas com sessions>0 (não destaca LP sem tráfego).
+  const bestLp = landingPages
+    .filter(r => (r.sessions||0) > 0)
+    .reduce((best, r) => {
+      const rate = convRate(r.conversions, r.sessions);
+      return (best == null || rate > best.rate) ? { page: r.page, rate } : best;
+    }, null);
   const lpHint = document.getElementById('lp-conv-hint');
   if (lpHint) {
-    const base = 'Ordenado por volume de sessões. A LP mais eficiente é a de maior taxa de conversão, não a de mais sessões.';
+    const base = 'Ordenado por taxa de conversão (a métrica que mais importa pra uma LP). A LP mais eficiente é a de maior taxa de conversão, não a de mais sessões.';
     const pill = lpRate!=null ? metaHTML(lpRate, 'lpConversion', v=>Number(v).toFixed(0)+'%') : '';
-    lpHint.innerHTML = `${base}${lpRate!=null?` Taxa média: ${lpRate.toFixed(2)}%.`:''}` + (pill?` ${pill}`:'');
+    const bn = bestLp ? (bestLp.page.length>36 ? '…'+bestLp.page.slice(-34) : bestLp.page) : '';
+    const bestPill = bestLp ? `<span class="meta-pill" style="background:var(--green-dim);color:var(--green)" title="LP de maior taxa de conversão no período (entre as com tráfego): ${esc(bestLp.page)}">Melhor LP: ${esc(bn)} (${bestLp.rate.toFixed(1)}%)</span>` : '';
+    lpHint.innerHTML = `${base}${lpRate!=null?` Taxa média: ${lpRate.toFixed(2)}%.`:''}` + (bestPill?` ${bestPill}`:'') + (pill?` ${pill}`:'');
   }
+  // Divulgação honesta: o filtro de canal não é aplicável às LPs porque a origem (agregado GA4/n8n)
+  // não expõe canal nessa granularidade. Mostra o aviso só quando há canal filtrado ativo.
+  const lpNotice = document.getElementById('lp-channel-notice');
+  if (lpNotice) lpNotice.style.display = activeChannel ? 'block' : 'none';
 }
 
 function switchMetaTab(tab) {
@@ -2072,6 +2115,11 @@ async function loadMeta(){
   document.getElementById('m-cpl').textContent    = cplGeral > 0 ? brl(cplGeral) : '—';
   const mCplFooter = document.getElementById('m-cpl-footer');
   if (mCplFooter) mCplFooter.textContent = `${fmt(totalLeadsReais)} leads reais (Meta reportou ${fmt(totResults)})`;
+  const cplPlataforma = totResults > 0 ? totSpend/totResults : 0;
+  const mCplPlat = document.getElementById('m-cpl-plat');
+  if (mCplPlat) mCplPlat.textContent = cplPlataforma > 0 ? brl(cplPlataforma) : '—';
+  const mCplPlatFooter = document.getElementById('m-cpl-plat-footer');
+  if (mCplPlatFooter) mCplPlatFooter.textContent = `${fmt(totResults)} resultados`;
 
   // Trend período-a-período do gasto (Média #9, §6.2) — reusa fetchAdsDataPrev (já cacheado) + trendHTML.
   try {
@@ -2361,17 +2409,35 @@ async function loadRDStation(){
   // Funil visual
   const maxFunil = Math.max(leads, mql, opp, clients, 1);
   const funilItems = [
-    {label: 'Leads',         v: leads,   color: CORES[0]},
-    {label: 'MQL',           v: mql,     color: CORES[2]},
-    {label: 'Oportunidades', v: opp,     color: CORES[3]},
-    {label: 'Clientes',      v: clients, color: CORES[1]}
+    {label: 'Leads',         v: leads},
+    {label: 'MQL',           v: mql},
+    {label: 'Oportunidades', v: opp},
+    {label: 'Clientes',      v: clients}
   ];
-  document.getElementById('rd-funil-bars').innerHTML = funilItems.map(item => `
-    <div class="bar-row">
-      <div class="bar-label">${item.label}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(item.v/maxFunil*100)}%;background:${item.color}"></div></div>
-      <div class="bar-val">${fmt(item.v)}</div>
-    </div>`).join('');
+  // Funil RD Station v2: forma ordinal, rampa de 1 hue clara→escura (--fnl-1..4) em vez de cores
+  // categóricas; conector entre linhas mostra a conversão para o próximo estágio. Estático — só a rampa
+  // + conectores do padrão-ouro (#o-funil), sem modal/tooltip/tabela. A seção "Taxas de conversão"
+  // abaixo (#rd-taxas) permanece como está; os conectores são um complemento visual, não duplicata.
+  const FUNIL_RAMP = ['var(--fnl-1)','var(--fnl-2)','var(--fnl-3)','var(--fnl-4)'];
+  document.getElementById('rd-funil-bars').innerHTML =
+    `<div class="funil2" role="group" aria-label="Funil RD Station: leads, MQL, oportunidades e clientes">`
+    + funilItems.map((item,i)=>{
+      const w = Math.round(item.v/maxFunil*100);
+      const row = `<div class="funil2-row" style="animation-delay:${i*60}ms">`
+        + `<div class="funil2-name">${esc(item.label)}</div>`
+        + `<div class="funil2-track"><div class="funil2-fill" style="width:${w}%;background:${FUNIL_RAMP[i]}"></div></div>`
+        + `<div class="funil2-val">${esc(fmt(item.v))}</div>`
+        + `</div>`;
+      const proximoConv = (i < funilItems.length-1)
+        ? (funilItems[i].v>0 ? (funilItems[i+1].v/funilItems[i].v*100).toFixed(1) : '0.0')
+        : null;
+      const connector = (i < funilItems.length-1)
+        ? `<div class="funil2-connector"><div></div><div class="funil2-connector-inner"><i class="ti ti-corner-down-right"></i>`
+          + `<b>${proximoConv}%</b> segue para ${esc(funilItems[i+1].label)}</div><div></div></div>`
+        : '';
+      return row + connector;
+    }).join('')
+    + `</div>`;
 
   // Taxas de conversão
   const taxas = [
@@ -2912,7 +2978,7 @@ function renderOportunidades(rows) {
   mkChart('c-opp-serie','line', bucketsO, [
     { label:'Oportunidades', data:bucketsO.map(b=>mapOpp[b]||0), borderColor:CORES[3], backgroundColor:hexToRgba(CORES[3],.10), fill:true, tension:.3, pointRadius:2, borderWidth:2 },
     { label:'Ganhos', data:bucketsO.map(b=>mapWon[b]||0), borderColor:CORES[1], backgroundColor:hexToRgba(CORES[1],.10), fill:true, tension:.3, pointRadius:2, borderWidth:2 }
-  ], { scales:scOpts(), plugins:{legend:{display:true, labels:{color:'#7a7f8a',font:{size:11}}}} });
+  ], { scales:scOpts(), plugins:{legend:{display:true, labels:{color:cssVar('--muted')||'#7a7f8a',font:{size:11}}}} });
 
   // Cumulativo "qualificado OU oportunidade" sem duplicar: toda oportunidade já nasce com status
   // "Qualificado" no CRM (confirmado nos dados reais — as 14 linhas isOpportunity também são as 14
@@ -2925,7 +2991,7 @@ function renderOportunidades(rows) {
   const funilRows = [
     { label:'Leads recebidos', v: total },
     { label:'Cadência', v: cadencia },
-    { label:'Qualificados', v: qualificadosCumulativo },
+    { label:'Qualificados (cumulativo)', v: qualificadosCumulativo },
     { label:'Oportunidades', v: oportunidades },
     { label:'Ganhas', v: ganhas.length }
   ];
