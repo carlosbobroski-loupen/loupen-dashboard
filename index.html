@@ -2500,7 +2500,10 @@ function buildLeadEmailMap() {
     // GOTO_INSTITUCIONAL_07-26, GOTO_WEBINAR_07-26, GOTO_SAUDE_06-26 — padrão definido em 2026-07-07,
     // mês do GoTo Saúde corrigido para 06-26 em 2026-07-08).
     // c[3] = "Nome" na Central de Leads — usado como fallback quando o CRM/Salesforce não traz o nome.
-    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '', nome: r.c[3]?.v || '' };
+    // data = data de captura na Central de Leads (mesmo critério de buildCriativoData/leadRows) —
+    // usada por salesforceInRange() para decidir período por esta data, e não pela data que o CRM
+    // registrou, que pode atrasar por sync (ver salesforceInRange).
+    map[email] = { canal: normCanal(r.c[15]?.v, r.c[14]?.v, r.c[10]?.v), campanha: r.c[1]?.v || '', nome: r.c[3]?.v || '', data: parseDataLead(r.c[26]?.v) || parseDataLead(r.c[0]?.v) };
   });
   return map;
 }
@@ -2545,12 +2548,15 @@ async function loadSalesforce() {
     // não muda nada em quem já está padronizado, mas corrige quem só existe no Salesforce.
     const origemPadronizada = standardizeCampanha(origemBase);
     const canal = (info && info.canal) ? info.canal : inferCanalOrigem(origem);
+    // Data de captura na Central de Leads (só existe para isMarketing) — usada por
+    // salesforceInRange() para não divergir de Campanhas/Criativos por atraso de sync do CRM.
+    const dataLeadOriginal = info ? info.data : null;
     return {
       origem: origemPadronizada, origemCRM: origem, dataConversao: parseDataLead(v(2)), nome: v(3) || '—', email,
       empresa: v(5) || '—', dataCriacao: parseDataLead(v(6)), status: v(7) || 'Não informado',
       motivoRejeicao: v(8), nomeOpp, produto: v(11), fase, motivoPerda,
       valorOpp: v(14) || 0, valorNF: valorNF || 0, dataFechamento: parseDataLead(v(16)),
-      isOpportunity, isLost, isWon, isOpen, canal, isMarketing
+      isOpportunity, isLost, isWon, isOpen, canal, isMarketing, dataLeadOriginal
     };
   });
 
@@ -2588,7 +2594,13 @@ async function loadSalesforce() {
 function salesforceInRange(startDate, endDate) {
   const s = new Date(startDate+'T00:00:00'), e = new Date(endDate+'T23:59:59');
   return (_allSalesforce||[]).filter(row => {
-    const d = row.dataConversao || row.dataCriacao;
+    // Lead de marketing: usa a data de captura na Central de Leads (mesma fonte/critério de
+    // Campanhas e Criativos) em vez da data que o CRM registrou — o CRM pode sincronizar com
+    // atraso e ter uma dataConversao/dataCriacao própria que não bate com a captura real,
+    // gerando contagens de "leads" divergentes entre as abas para o mesmo filtro de período.
+    // Lead comercial (sem correspondência na Central de Leads) não tem essa data — mantém o
+    // critério original (dataConversao || dataCriacao do próprio CRM).
+    const d = (row.isMarketing && row.dataLeadOriginal) ? row.dataLeadOriginal : (row.dataConversao || row.dataCriacao);
     // Linha sem data não pode ser atribuída com confiança a nenhum período — exclui do recorte
     // (consistente com leadsInRange e buildCriativoData; não vaza para todo período).
     if (!d) return false;
