@@ -955,7 +955,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 
   <!-- MDFs -->
   <div class="view" id="view-mdfs">
-    <div class="chart-click-hint" style="margin-bottom:12px">Metas do plano de MDF selecionado (fonte: planilha de planejamento). Realizado calculado ao vivo a partir das Oportunidades (Salesforce), filtrado pelo período fixo e pela campanha de cada plano — não é afetado pelo filtro de data do topo.</div>
+    <div class="chart-click-hint" style="margin-bottom:12px">Metas do plano de MDF selecionado (fonte: planilha de planejamento). Realizado calculado ao vivo a partir das Oportunidades (Salesforce), filtrado pelo período fixo e pela campanha de cada plano — não é afetado pelo filtro de data do topo. O RD Station só envia ao Salesforce leads já qualificados: por isso o realizado mede MQL (não há "Leads" de topo de funil rastreável nesta fonte — a Meta Leads da planilha fica só como referência).</div>
 
     <div class="kpi-grid-4" id="mdf-kpis"></div>
 
@@ -964,10 +964,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
         <div class="section-title"><i class="ti ti-target-arrow"></i>Ações com custo de MDF</div>
         <div class="section-badge" id="mdf-acoes-badge"></div>
       </div>
-      <div class="chart-click-hint" style="margin-bottom:10px">Realizado por ação só é calculável para o Webinar (única ação com campanha própria rastreada no CRM). As demais ações compartilham a mesma campanha do plano — o realizado delas aparece agregado nos KPIs acima, não linha a linha.</div>
+      <div class="chart-click-hint" style="margin-bottom:10px">Realizado (MQL) por ação só é calculável para o Webinar (única ação com campanha própria rastreada no CRM). As demais ações compartilham a mesma campanha do plano — o realizado delas aparece agregado nos KPIs acima, não linha a linha.</div>
       <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Ação</th><th>Investimento</th><th>% Total</th><th>Meta Leads</th><th>Meta MQL/SQL</th><th>Meta Vendas</th><th>Meta MRR/ARR</th><th>Realizado</th></tr></thead>
+        <thead><tr><th>Ação</th><th>Investimento</th><th>% Total</th><th>Meta Leads</th><th>Meta MQL/SQL</th><th>Meta Vendas</th><th>Meta MRR/ARR</th><th>Realizado (MQL)</th></tr></thead>
         <tbody id="mdf-acoes-body"></tbody>
       </table>
       </div>
@@ -2801,34 +2801,34 @@ function mdfRowsInPlano(plano) {
 }
 
 // mdfRealizadoPlano(plano): agregado no nível do PLANO (não por ação — ver limitação em
-// mdfRealizadoAcao). Reaproveita os MESMOS predicados de DETALHE_CARD_DEFS (linha ~2854) para não
-// divergir de Oportunidades: qualificados = proxy de MQL (mesmo critério de 'qualificados-funil':
-// status==='qualificado' OU isOpportunity — cumulativo do funil), oportunidades = proxy de SQL
-// (isOpportunity), vendas = isWon, receita = Σ valorNF em isWon (já representa MRR/ARR direto,
-// confirmado com o usuário — sem fator de conversão).
+// mdfRealizadoAcao). CORRIGIDO (2026-07-29): o RD Station só envia ao Salesforce leads já
+// qualificados — ou seja, toda linha que chega em _allSalesforce JÁ É um MQL, não um "lead" de
+// topo de funil (esse número não existe nesta fonte; "Meta Leads" da planilha fica goal-only,
+// sem realizado). mqls = total de linhas do recorte (plano/ação), oportunidades = proxy de SQL
+// (isOpportunity — virou oportunidade no CRM), vendas = isWon, receita = Σ valorNF em isWon (já
+// representa MRR/ARR direto, confirmado com o usuário — sem fator de conversão).
 function mdfRealizadoPlano(plano) {
   const rows = mdfRowsInPlano(plano);
-  const leads = rows.length;
-  const qualificados = rows.filter(r => (r.status||'').toLowerCase()==='qualificado' || r.isOpportunity).length;
+  const mqls = rows.length;
   const oportunidades = rows.filter(r => r.isOpportunity).length;
   const vendas = rows.filter(r => r.isWon).length;
   const receita = rows.filter(r => r.isWon).reduce((s,r)=>s+(r.valorNF||0), 0);
-  return { rows, leads, qualificados, oportunidades, vendas, receita };
+  return { rows, mqls, oportunidades, vendas, receita };
 }
 
 // mdfRealizadoAcao(plano, acao): só retorna valor quando a ação tem origemMatchAcao definido (hoje,
 // só "Webinar" em cada plano — única ação com campanha própria rastreável no CRM; as demais ações
 // de um mesmo plano compartilham a mesma origem de campanha, sem campo que as sub-segmente — ver
 // plano de implementação). Retorna null quando não computável (renderizado como "—" pelo pill).
+// Mesma correção de mdfRealizadoPlano: mqls = total de linhas (RD Station só envia MQL ao CRM).
 function mdfRealizadoAcao(plano, acao) {
   if (typeof acao.origemMatchAcao !== 'function') return null;
   const rows = mdfRowsInPlano(plano).filter(r => acao.origemMatchAcao(r.origem));
-  const leads = rows.length;
-  const qualificados = rows.filter(r => (r.status||'').toLowerCase()==='qualificado' || r.isOpportunity).length;
+  const mqls = rows.length;
   const oportunidades = rows.filter(r => r.isOpportunity).length;
   const vendas = rows.filter(r => r.isWon).length;
   const receita = rows.filter(r => r.isWon).reduce((s,r)=>s+(r.valorNF||0), 0);
-  return { rows, leads, qualificados, oportunidades, vendas, receita };
+  return { rows, mqls, oportunidades, vendas, receita };
 }
 
 function aplicarFiltrosOpp() {
@@ -4081,15 +4081,19 @@ async function loadCampanhas(){
 }
 
 // ── MDFs: render + loader (metas de MDF_PLANOS + realizado ao vivo de Oportunidades) ──────────
-// renderMDFKpis(): KPIs agregados do plano (leads/qualificados/oportunidades/vendas) vs metaPlano
-// (conservador/esperado) — usa metaHTMLDireto contra a meta "esperada" (mais exigente das duas).
+// renderMDFKpis(): KPIs agregados do plano (mqls/oportunidades/vendas) vs metaPlano (conservador/
+// esperado) — usa metaHTMLDireto contra a meta "esperada" (mais exigente das duas).
+// CORRIGIDO (2026-07-29): o RD Station só envia ao Salesforce leads já qualificados — toda linha
+// de _allSalesforce já é um MQL, não um "lead" de topo de funil. Por isso não há mais card de
+// "Leads" (não é rastreável nesta fonte — "Meta Leads" da planilha fica goal-only); o card de MQL
+// usa o total de linhas direto, sem proxy.
 function renderMDFKpis(plano, realizado){
   const el = document.getElementById('mdf-kpis');
   if (!el) return;
+  el.style.gridTemplateColumns = 'repeat(3,1fr)';
   const mp = plano.metaPlano || {};
   el.innerHTML = `
-    <div class="kpi blue"><div class="kpi-label" title="Total de leads capturados no período do plano, na campanha correspondente."><i class="ti ti-users"></i>Leads</div><div class="kpi-value">${fmt(realizado.leads)}</div></div>
-    <div class="kpi green"><div class="kpi-label" title="Proxy de MQL: status Qualificado OU já virou oportunidade (cumulativo do funil, mesmo critério de Oportunidades)."><i class="ti ti-user-check"></i>MQLs (proxy)</div><div class="kpi-value">${fmt(realizado.qualificados)}</div><div class="kpi-footer">${metaHTMLDireto(realizado.qualificados, mp.mqlsEsperado, false, fmt)}</div></div>
+    <div class="kpi green"><div class="kpi-label" title="Leads enviados pelo RD Station ao Salesforce no período do plano — já chegam qualificados (MQL), o RD Station não envia leads crus ao CRM."><i class="ti ti-user-check"></i>MQLs</div><div class="kpi-value">${fmt(realizado.mqls)}</div><div class="kpi-footer">${metaHTMLDireto(realizado.mqls, mp.mqlsEsperado, false, fmt)}</div></div>
     <div class="kpi amber"><div class="kpi-label" title="Proxy de SQL: virou oportunidade no CRM."><i class="ti ti-briefcase"></i>SQLs (proxy)</div><div class="kpi-value">${fmt(realizado.oportunidades)}</div><div class="kpi-footer">${metaHTMLDireto(realizado.oportunidades, mp.sqlsEsperado, false, fmt)}</div></div>
     <div class="kpi purple"><div class="kpi-label" title="Vendas ganhas (isWon) no período do plano — receita somada em R$ (valorNF, já equivalente a MRR/ARR do contrato)."><i class="ti ti-trophy"></i>Vendas / Receita</div><div class="kpi-value">${fmt(realizado.vendas)}</div><div class="kpi-footer">${brl(realizado.receita)} · ${metaHTMLDireto(realizado.receita, mp.pipelineEsperado, false, brl)}</div></div>
   `;
@@ -4124,9 +4128,12 @@ function renderMDFAcoesTable(plano){
     },
     row => {
       const realizado = mdfRealizadoAcao(plano, row);
-      const alvo = row.metas?.leads ?? null;
+      const m = row.metas;
+      // Realizado mede MQL (linhas recebidas no Salesforce), não Leads — RD Station só envia
+      // lead já qualificado ao CRM. Por isso compara contra a meta de MQL, não a de Leads.
+      const alvo = m ? (m.mqls != null ? m.mqls : m.mqlsMax) : null;
       if (!realizado) return { html: metaHTMLDireto(null, alvo, false, fmt) };
-      return { html: metaHTMLDireto(realizado.leads, alvo, false, fmt) + ` <span class="chart-click-hint" style="display:block">${fmt(realizado.vendas)} vendas · ${brl(realizado.receita)}</span>` };
+      return { html: metaHTMLDireto(realizado.mqls, alvo, false, fmt) + ` <span class="chart-click-hint" style="display:block">${fmt(realizado.vendas)} vendas · ${brl(realizado.receita)}</span>` };
     }
   ], 'Nenhuma ação cadastrada para este plano.');
 }
