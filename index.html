@@ -220,6 +220,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
     <button class="nav-item" onclick="showView('campanhas')"><i class="ti ti-speakerphone"></i>Campanhas</button>
     <button class="nav-item" onclick="showView('criativos')"><i class="ti ti-photo"></i>Criativos</button>
+    <button class="nav-item" onclick="showView('mdfs')"><i class="ti ti-report-money"></i>MDFs</button>
     <div class="nav-label">Anúncios</div>
     <button class="nav-item" onclick="showView('meta')"><i class="ti ti-brand-meta"></i>Meta ADS</button>
     <button class="nav-item" onclick="showView('linkedin')"><i class="ti ti-brand-linkedin"></i>LinkedIn ADS</button>
@@ -364,6 +365,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     </select>
     <button class="filter-clear" onclick="limparFiltrosCampanhas()"><i class="ti ti-x"></i>Limpar</button>
     <span style="font-size:12px;color:var(--muted);margin-left:auto" id="cp-filter-count"></span>
+  </div>
+
+  <div class="global-filters" id="mdf-filters">
+    <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Plano</span>
+    <select class="filter-sel" id="mdf-plano" onchange="loadMDFs()">
+      <option value="goto_q2">Plano Goto Q2</option>
+      <option value="goto_q3">Plano Goto Q3</option>
+      <option value="rescue_q2">Plano Rescue Emergencial Q2</option>
+    </select>
+    <span style="font-size:12px;color:var(--muted)" id="mdf-periodo-label"></span>
+    <span style="font-size:11px;color:var(--muted);margin-left:auto">Realizado calculado ao vivo a partir de Oportunidades — independe do período selecionado no topo.</span>
   </div>
 
   <!-- OVERVIEW -->
@@ -940,6 +952,37 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       </div>
     </div>
   </div>
+
+  <!-- MDFs -->
+  <div class="view" id="view-mdfs">
+    <div class="chart-click-hint" style="margin-bottom:12px">Metas do plano de MDF selecionado (fonte: planilha de planejamento). Realizado calculado ao vivo a partir das Oportunidades (Salesforce), filtrado pelo período fixo e pela campanha de cada plano — não é afetado pelo filtro de data do topo.</div>
+
+    <div class="kpi-grid-4" id="mdf-kpis"></div>
+
+    <div class="card">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-target-arrow"></i>Ações com custo de MDF</div>
+        <div class="section-badge" id="mdf-acoes-badge"></div>
+      </div>
+      <div class="chart-click-hint" style="margin-bottom:10px">Realizado por ação só é calculável para o Webinar (única ação com campanha própria rastreada no CRM). As demais ações compartilham a mesma campanha do plano — o realizado delas aparece agregado nos KPIs acima, não linha a linha.</div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Ação</th><th>Investimento</th><th>% Total</th><th>Meta Leads</th><th>Meta MQL/SQL</th><th>Meta Vendas</th><th>Meta MRR/ARR</th><th>Realizado</th></tr></thead>
+        <tbody id="mdf-acoes-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list-check"></i>Ações sem custo de MDF</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Ação</th><th>Responsável</th><th>Objetivo</th></tr></thead>
+        <tbody id="mdf-semcusto-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
 </div>
 </main>
 </div>
@@ -1029,7 +1072,117 @@ const CAMPANHA_RULES = [
   { match: (s) => (s.includes('goto') || s.includes('linkedin')) && s.includes('saude'), nome: 'GOTO_SAUDE_06-26' },
   { match: (s) => s.includes('goto') || s.includes('linkedin'), nome: 'GOTO_INSTITUCIONAL_07-26' },
 ];
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS'};
+
+// ── MDF_PLANOS: metas por plano/ação (fonte: planilha "AÇÕES PARA UTILIZAÇÃO DO MDF") ──
+// Estático, editável direto aqui — mesmo espírito de METAS, sem backend.
+// periodo: janela FIXA do plano (independe do date-range picker global) usada por mdfRowsInPlano().
+// origemMatch: filtra _allSalesforce.origem para restringir à campanha do plano (GoTo vs Rescue).
+// origemMatchAcao (por ação): só existe quando a ação tem campanha própria no CRM (hoje, só Webinar,
+// via GOTO_WEBINAR_07-26) — as demais ações não têm como ser isoladas do resto do plano no CRM,
+// então ficam com "metas" preenchido (referência) mas sem realizado por ação (ver mdfRealizadoAcao).
+// metas em faixa (ex: mqlsMin/mqlsMax) refletem células com "30-50" na planilha; metas em valor único
+// usam a chave singular (ex: mqls). investimento/cac/ltv/roi/cicloDias/ticket são só referência
+// estática — não têm "realizado" (não vêm do CRM). metaPlano é intencionalmente igual nos 3 planos
+// (confirmado com o usuário — meta combinada da conta, repetida de propósito na planilha original).
+const MDF_METAPLANO_PADRAO = {
+  mqlsConservador: 55, mqlsEsperado: 85, sqlsConservador: 18, sqlsEsperado: 32,
+  pipelineConservador: 95000, pipelineEsperado: 190000,
+  participantesWebinarConservador: 40, participantesWebinarEsperado: 70,
+  dealsCanaisConservador: 6, dealsCanaisEsperado: 15,
+  oppCrossSellConservador: 8, oppCrossSellEsperado: 15,
+  custoPorMqlConservador: 235, custoPorMqlEsperado: 360
+};
+const MDF_PLANOS = {
+  goto_q2: {
+    label: 'Plano Goto Q2',
+    periodo: { start: '2026-05-01', end: '2026-06-30' },
+    origemMatch: (origem) => (origem||'').startsWith('GOTO_'),
+    acoesComCusto: [
+      { id:'ads', acao:'Campanhas Pagas (Ads)', descricao:'Google Ads + LinkedIn Ads + Meta Ads (foco em vídeo)', investimento:10000, pctTotal:50,
+        metas:{ visitantes:4000, leads:280, mqlsMin:30, mqlsMax:50, sqlsMin:5, sqlsMax:8,
+                mrr:4000, cac:1625, ltv:24, roi:7.38, cicloDias:60, ticket:500 } },
+      { id:'video', acao:'Produção de Vídeos e Criativos', descricao:'Vídeos curtos (15-30s) + criativos para ads', investimento:2000, pctTotal:10,
+        metas:null, obs:'Meta compartilhada com Campanhas Pagas (Ads) — célula mesclada na planilha.' },
+      { id:'ativos', acao:'Produção de Ativos', descricao:'Landing Pages + E-books iniciais + Site', investimento:1000, pctTotal:5,
+        metas:null, obs:'Meta compartilhada com Campanhas Pagas (Ads) — célula mesclada na planilha.' },
+      { id:'canais', acao:'Incentivo Canais de Revenda', descricao:'SPIF / Premiação para top revendedor', investimento:3000, pctTotal:15,
+        metas:{ sqls:12, vendas:3, mrr:1500, cac:500, ltv:24, roi:12.00 } },
+      { id:'webinar', acao:'Webinar', descricao:'Webinar IA para Atendimento', investimento:1000, pctTotal:1.5,
+        metas:{ leads:150, mqlsMin:12, mqlsMax:25, sqls:6, vendas:2, mrr:1000, cac:500, ltv:24, roi:16.00 },
+        origemMatchAcao:(o)=>o==='GOTO_WEBINAR_07-26' },
+      { id:'bdr', acao:'Apoio BDR/Apollo', descricao:'List building + sequências outbound', investimento:1500, pctTotal:7.5,
+        metas:{ leads:450, mqls:25, sqls:8, vendas:2, mrr:1000, cac:750, ltv:24, roi:10.91 } },
+      { id:'reserva', acao:'Reserva Otimização', descricao:'Testes e realocação dinâmica ou agente digital', investimento:2200, pctTotal:11, metas:null, obs:'Reserva — sem meta numérica associada.' }
+    ],
+    acoesSemCusto: [
+      { acao:'Criação de 1 E-book inicial', responsavel:'Time Interno', objetivo:'Topo de funil' },
+      { acao:'Sequências Apollo BDR', responsavel:'BDR/SDR', objetivo:'Geração de reuniões' },
+      { acao:'Nutrição Cross-sell (Base Clientes)', responsavel:'Marketing', objetivo:'Cross-sell da base' },
+      { acao:'Cortes de vídeo do Webinar', responsavel:'Marketing', objetivo:'Reutilização em ads orgânicos' },
+      { acao:'Relatório Final de Resultados', responsavel:'Carlos', objetivo:'Apresentação para GoTo' }
+    ],
+    metaPlano: MDF_METAPLANO_PADRAO
+  },
+  goto_q3: {
+    label: 'Plano Goto Q3',
+    periodo: { start: '2026-07-01', end: '2026-09-30' },
+    origemMatch: (origem) => (origem||'').startsWith('GOTO_'),
+    acoesComCusto: [
+      { id:'trafego', acao:'Tráfego Pago Otimizado', descricao:'Campanhas com dados de Q2 (Search + Retargeting + Vertical)', investimento:9000, pctTotal:45,
+        metas:{ visitantes:5000, leads:400, mqls:55, sqls:33, vendas:12, mrr:6000, cac:1277.78, ltv:24, roi:12.52 } },
+      { id:'conteudo', acao:'Produção de Conteúdo', descricao:'Vídeos demonstração + Criativos', investimento:2500, pctTotal:12.5,
+        metas:null, obs:'Meta compartilhada com Tráfego Pago Otimizado — célula mesclada na planilha.' },
+      { id:'webinars', acao:'Webinars Verticais', descricao:'2 webinars (Saúde e Serviços)', investimento:2000, pctTotal:10,
+        metas:{ leads:300, mqls:30, sqls:10, vendas:3, mrr:1500, cac:666.67, ltv:24, roi:12.00 },
+        origemMatchAcao:(o)=>o==='GOTO_WEBINAR_07-26' },
+      { id:'canais', acao:'Incentivo Canais de Revenda', descricao:'SPIF + premiação trimestral', investimento:3000, pctTotal:15,
+        metas:{ sqls:40, vendas:10, mrr:5000, cac:500, ltv:24, roi:40.00 } },
+      { id:'newsletter', acao:'Patrocínio Newsletter/Comunidade Vertical', descricao:'Parcerias segmentadas', investimento:1500, pctTotal:7.5,
+        metas:{ leads:80, mqls:8, sqls:3, vendas:1, mrr:500, cac:1500, ltv:24, roi:8.00 } },
+      { id:'bdr', acao:'Apoio BDR/Apollo/Listas', descricao:'List building + sequências outbound', investimento:1000, pctTotal:7.5,
+        metas:{ leads:450, mqls:25, sqls:8, vendas:2, mrr:1000, cac:500, ltv:24, roi:24.00 } },
+      { id:'reserva', acao:'Reserve Otimização e Testes', descricao:'Realocação conforme performance', investimento:1000, pctTotal:10, metas:null, obs:'Reserva — sem meta numérica associada.' },
+      { id:'summit', acao:'Startup Summit', descricao:null, investimento:null, pctTotal:null, metas:null, obs:'Sem valores definidos na planilha.' }
+    ],
+    acoesSemCusto: [
+      { acao:'Produção de 2 E-books verticais', responsavel:'Time Interno', objetivo:'Topo e meio de funil' },
+      { acao:'Sequências de Nutrição', responsavel:'Marketing', objetivo:'Nutrição MQL → SQL' },
+      { acao:'Cortes e Reaproveitamento de Webinars', responsavel:'Marketing', objetivo:'Conteúdo orgânico + ads' },
+      { acao:'Posts Orgânicos LinkedIn (3x por semana)', responsavel:'Marketing', objetivo:'Autoridade de marca' },
+      { acao:'Case Studies / Depoimentos', responsavel:'Marketing + CS', objetivo:'Prova social' },
+      { acao:'Relatório de Resultados Q3', responsavel:'Carlos', objetivo:'Apresentação para GoTo' }
+    ],
+    metaPlano: MDF_METAPLANO_PADRAO
+  },
+  rescue_q2: {
+    label: 'Plano Rescue Emergencial Q2',
+    periodo: { start: '2026-05-01', end: '2026-06-30' },
+    origemMatch: (origem) => (origem||'').startsWith('LOGMEIN_RESCUE'),
+    acoesComCusto: [
+      { id:'trafego', acao:'Tráfego Pago', descricao:'Campanhas linkedin / meta / google', investimento:10000, pctTotal:64.52,
+        metas:{ visitantes:5000, leads:400, mqls:60, sqls:36, vendas:9, licencas:27, arr:63000, cac:1388.89, ticket:7000 } },
+      { id:'conteudo', acao:'Produção de Conteúdo', descricao:'Demos em vídeo + E-books + Criativos (freelancer)', investimento:2500, pctTotal:16.13,
+        metas:null, obs:'Meta compartilhada com Tráfego Pago — célula mesclada na planilha.' },
+      { id:'canais', acao:'Incentivo Canais de Revenda', descricao:'SPIF com Meta (multiplicável)', investimento:3000, pctTotal:19.35,
+        metas:{ vendas:5, licencas:15, arr:35000, cac:600 } },
+      { id:'influenciadores', acao:'Micro influenciadores', descricao:'3 Micro influenciadores', investimento:3000, pctTotal:16.22,
+        metas:{ leads:80, mqls:20, sqls:10, vendas:3, licencas:9, arr:21000, cac:1000 } },
+      { id:'associacoes', acao:'Associações/Grupos de TI (HDI)', descricao:'Uso dos canais para envio de comunicações', investimento:null, pctTotal:null, metas:null, obs:'Sem estimativa ainda, por decisão da planilha.' },
+      { id:'webinar', acao:'Webinar', descricao:'Tema a definir', investimento:1000, pctTotal:6.45,
+        metas:{ leads:300, mqls:30, sqls:10, vendas:3, licencas:9, arr:21000, cac:333.33 },
+        origemMatchAcao:(o)=>o==='GOTO_WEBINAR_07-26' }
+    ],
+    acoesSemCusto: [
+      { acao:'Produção de 2 E-books/Guias', responsavel:'Time Interno', objetivo:'Topo e meio de funil' },
+      { acao:'Cadência de comunicação (Base)', responsavel:'Marketing', objetivo:'Nutrição MQL → SQL' },
+      { acao:'Cases de Sucesso', responsavel:'Marketing + CS', objetivo:'Prova social' },
+      { acao:'Relatório de Resultados Q3', responsavel:'Carlos', objetivo:'Apresentação para LogMeIn' }
+    ],
+    metaPlano: MDF_METAPLANO_PADRAO
+  }
+};
+
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
 let CC={};
 
 // ── v2: SEGURANÇA, METAS/BENCHMARKS E HELPERS DE RENDER ──────
@@ -1084,6 +1237,27 @@ function metaHTML(valorAtual, chaveMeta, fmtAlvo){
     + `aria-label="Meta ${alvoTxt}, ${status}"><i class="ti ${icon}"></i>${sym} meta ${alvoTxt}</span>`;
 }
 
+// metaHTMLDireto(): mesma lógica de semáforo de metaHTML(), mas recebe o alvo/invert direto em vez
+// de buscar em METAS[chaveMeta] — usado pelas metas de MDF_PLANOS (estrutura aninhada por plano/ação,
+// não um objeto flat como METAS). alvo==null (sem meta) ou valorAtual==null (sem granularidade de
+// CRM pra essa ação) renderizam o mesmo pill neutro (.meta-none) com motivos diferentes no title.
+function metaHTMLDireto(valorAtual, alvo, invert, fmtAlvo, motivoSemDado){
+  const fmtFn = typeof fmtAlvo === 'function' ? fmtAlvo : (x=>x);
+  if (alvo == null) return `<span class="meta-pill meta-none">sem meta</span>`;
+  if (valorAtual == null || isNaN(valorAtual)) {
+    const motivo = motivoSemDado || 'Sem granularidade no CRM para isolar esta ação — ver KPIs do plano.';
+    return `<span class="meta-pill meta-none" title="${esc(motivo)}">—</span>`;
+  }
+  const ratio = invert ? (valorAtual > 0 ? alvo / valorAtual : 0) : (alvo > 0 ? valorAtual / alvo : 0);
+  let cls, icon, sym, status;
+  if (ratio >= 1)         { cls='meta-hit';  icon='ti-flag-check'; sym='✓'; status='Acima'; }
+  else if (ratio >= 0.85) { cls='meta-near'; icon='ti-flag';       sym='≈'; status='Dentro de 15%'; }
+  else                    { cls='meta-miss'; icon='ti-flag-off';   sym='✗'; status='Abaixo'; }
+  const alvoTxt = esc(fmtFn(alvo)), atualTxt = esc(fmtFn(valorAtual));
+  return `<span class="meta-pill ${cls}" title="Meta: ${alvoTxt}. Realizado: ${atualTxt}. ${status} da meta." `
+    + `aria-label="Meta ${alvoTxt}, ${status}"><i class="ti ${icon}"></i>${atualTxt} / ${alvoTxt}</span>`;
+}
+
 // renderRows(): helper de render de linhas de tabela com esc() embutido (dedup PARCIAL — arquitetura §9).
 // Uso previsto: código NOVO e tabelas já tocadas pelas fases seguintes (não migra as tabelas de ads estáveis).
 // - tbodyEl : elemento <tbody> alvo
@@ -1129,17 +1303,21 @@ function showView(id, fromDrill){
   const of = document.getElementById('opp-filters');
   const crf = document.getElementById('criativo-filters');
   const cpf = document.getElementById('cp-filters');
+  const mdff = document.getElementById('mdf-filters');
   if (gf)  gf.classList.toggle('visible',  id==='leads');
   if (gaf) gaf.classList.toggle('visible', ['ga4','utm','lp','overview'].includes(id));
   if (of)  of.classList.toggle('visible',  id==='oportunidades');
   if (crf) crf.classList.toggle('visible', id==='criativos');
   if (cpf) cpf.classList.toggle('visible', id==='campanhas');
+  if (mdff) mdff.classList.toggle('visible', id==='mdfs');
   // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
   const bc = document.getElementById('drill-breadcrumb');
   if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');
   // Popula o painel Campanhas sob demanda (reusa _criativoData/cache quando quente) — não deixa
   // a view em branco na primeira visita.
   if (id==='campanhas') loadCampanhas();
+  // Painel MDFs: metas por plano + realizado calculado ao vivo (aba Oportunidades) — carrega sob demanda.
+  if (id==='mdfs') loadMDFs();
 }
 function scrollToCard(id){
   const el = document.getElementById(id);
@@ -2608,6 +2786,51 @@ function salesforceInRange(startDate, endDate) {
   });
 }
 
+// ── MDFs: realizado calculado ao vivo a partir de Oportunidades (ver MDF_PLANOS) ──────────────
+// mdfRowsInPlano(plano): mesma regra de seleção de data de salesforceInRange() (dataLeadOriginal
+// quando isMarketing, senão dataConversao||dataCriacao), mas com janela FIXA do plano — o painel
+// MDFs nunca deve mudar com o date-range picker global do topo, só com o plano selecionado.
+function mdfRowsInPlano(plano) {
+  const s = new Date(plano.periodo.start+'T00:00:00'), e = new Date(plano.periodo.end+'T23:59:59');
+  return (_allSalesforce||[]).filter(row => {
+    const d = (row.isMarketing && row.dataLeadOriginal) ? row.dataLeadOriginal : (row.dataConversao || row.dataCriacao);
+    if (!d) return false;
+    if (d < s || d > e) return false;
+    return plano.origemMatch(row.origem);
+  });
+}
+
+// mdfRealizadoPlano(plano): agregado no nível do PLANO (não por ação — ver limitação em
+// mdfRealizadoAcao). Reaproveita os MESMOS predicados de DETALHE_CARD_DEFS (linha ~2854) para não
+// divergir de Oportunidades: qualificados = proxy de MQL (mesmo critério de 'qualificados-funil':
+// status==='qualificado' OU isOpportunity — cumulativo do funil), oportunidades = proxy de SQL
+// (isOpportunity), vendas = isWon, receita = Σ valorNF em isWon (já representa MRR/ARR direto,
+// confirmado com o usuário — sem fator de conversão).
+function mdfRealizadoPlano(plano) {
+  const rows = mdfRowsInPlano(plano);
+  const leads = rows.length;
+  const qualificados = rows.filter(r => (r.status||'').toLowerCase()==='qualificado' || r.isOpportunity).length;
+  const oportunidades = rows.filter(r => r.isOpportunity).length;
+  const vendas = rows.filter(r => r.isWon).length;
+  const receita = rows.filter(r => r.isWon).reduce((s,r)=>s+(r.valorNF||0), 0);
+  return { rows, leads, qualificados, oportunidades, vendas, receita };
+}
+
+// mdfRealizadoAcao(plano, acao): só retorna valor quando a ação tem origemMatchAcao definido (hoje,
+// só "Webinar" em cada plano — única ação com campanha própria rastreável no CRM; as demais ações
+// de um mesmo plano compartilham a mesma origem de campanha, sem campo que as sub-segmente — ver
+// plano de implementação). Retorna null quando não computável (renderizado como "—" pelo pill).
+function mdfRealizadoAcao(plano, acao) {
+  if (typeof acao.origemMatchAcao !== 'function') return null;
+  const rows = mdfRowsInPlano(plano).filter(r => acao.origemMatchAcao(r.origem));
+  const leads = rows.length;
+  const qualificados = rows.filter(r => (r.status||'').toLowerCase()==='qualificado' || r.isOpportunity).length;
+  const oportunidades = rows.filter(r => r.isOpportunity).length;
+  const vendas = rows.filter(r => r.isWon).length;
+  const receita = rows.filter(r => r.isWon).reduce((s,r)=>s+(r.valorNF||0), 0);
+  return { rows, leads, qualificados, oportunidades, vendas, receita };
+}
+
 function aplicarFiltrosOpp() {
   const fOrigem   = document.getElementById('o-origem')?.value   || '';
   const fCanal    = document.getElementById('o-canal')?.value    || '';
@@ -3857,6 +4080,82 @@ async function loadCampanhas(){
   aplicarFiltrosCampanhas();
 }
 
+// ── MDFs: render + loader (metas de MDF_PLANOS + realizado ao vivo de Oportunidades) ──────────
+// renderMDFKpis(): KPIs agregados do plano (leads/qualificados/oportunidades/vendas) vs metaPlano
+// (conservador/esperado) — usa metaHTMLDireto contra a meta "esperada" (mais exigente das duas).
+function renderMDFKpis(plano, realizado){
+  const el = document.getElementById('mdf-kpis');
+  if (!el) return;
+  const mp = plano.metaPlano || {};
+  el.innerHTML = `
+    <div class="kpi blue"><div class="kpi-label" title="Total de leads capturados no período do plano, na campanha correspondente."><i class="ti ti-users"></i>Leads</div><div class="kpi-value">${fmt(realizado.leads)}</div></div>
+    <div class="kpi green"><div class="kpi-label" title="Proxy de MQL: status Qualificado OU já virou oportunidade (cumulativo do funil, mesmo critério de Oportunidades)."><i class="ti ti-user-check"></i>MQLs (proxy)</div><div class="kpi-value">${fmt(realizado.qualificados)}</div><div class="kpi-footer">${metaHTMLDireto(realizado.qualificados, mp.mqlsEsperado, false, fmt)}</div></div>
+    <div class="kpi amber"><div class="kpi-label" title="Proxy de SQL: virou oportunidade no CRM."><i class="ti ti-briefcase"></i>SQLs (proxy)</div><div class="kpi-value">${fmt(realizado.oportunidades)}</div><div class="kpi-footer">${metaHTMLDireto(realizado.oportunidades, mp.sqlsEsperado, false, fmt)}</div></div>
+    <div class="kpi purple"><div class="kpi-label" title="Vendas ganhas (isWon) no período do plano — receita somada em R$ (valorNF, já equivalente a MRR/ARR do contrato)."><i class="ti ti-trophy"></i>Vendas / Receita</div><div class="kpi-value">${fmt(realizado.vendas)}</div><div class="kpi-footer">${brl(realizado.receita)} · ${metaHTMLDireto(realizado.receita, mp.pipelineEsperado, false, brl)}</div></div>
+  `;
+}
+
+// renderMDFAcoesTable(): tabela de ações com custo — metas (planilha) + realizado (Webinar isolado
+// via origemMatchAcao; demais ações mostram "—" com tooltip, ver limitação de granularidade do CRM).
+function renderMDFAcoesTable(plano){
+  const tbody = document.getElementById('mdf-acoes-body');
+  const badge = document.getElementById('mdf-acoes-badge');
+  const acoes = plano.acoesComCusto || [];
+  if (badge) badge.textContent = `${acoes.length} ações`;
+  renderRows(tbody, acoes, [
+    row => ({ html: esc(row.acao) + (row.obs ? ` <span class="chart-click-hint" style="display:block">${esc(row.obs)}</span>` : '') }),
+    row => row.investimento != null ? brl(row.investimento) : '—',
+    row => row.pctTotal != null ? row.pctTotal.toLocaleString('pt-BR')+'%' : '—',
+    row => row.metas?.leads != null ? fmt(row.metas.leads) : '—',
+    row => {
+      const m = row.metas;
+      if (!m) return '—';
+      const mql = m.mqls != null ? m.mqls : (m.mqlsMax != null ? `${m.mqlsMin}-${m.mqlsMax}` : '—');
+      const sql = m.sqls != null ? m.sqls : (m.sqlsMax != null ? `${m.sqlsMin}-${m.sqlsMax}` : '—');
+      return `${mql} / ${sql}`;
+    },
+    row => row.metas?.vendas != null ? fmt(row.metas.vendas) : '—',
+    row => {
+      const m = row.metas;
+      if (!m) return '—';
+      if (m.arr != null) return brl(m.arr)+' ARR';
+      if (m.mrr != null) return brl(m.mrr)+' MRR';
+      return '—';
+    },
+    row => {
+      const realizado = mdfRealizadoAcao(plano, row);
+      const alvo = row.metas?.leads ?? null;
+      if (!realizado) return { html: metaHTMLDireto(null, alvo, false, fmt) };
+      return { html: metaHTMLDireto(realizado.leads, alvo, false, fmt) + ` <span class="chart-click-hint" style="display:block">${fmt(realizado.vendas)} vendas · ${brl(realizado.receita)}</span>` };
+    }
+  ], 'Nenhuma ação cadastrada para este plano.');
+}
+
+// renderMDFSemCusto(): lista estática (ação/responsável/objetivo) — sem meta/realizado numérico.
+function renderMDFSemCusto(plano){
+  const tbody = document.getElementById('mdf-semcusto-body');
+  renderRows(tbody, plano.acoesSemCusto || [], [
+    row => row.acao,
+    row => row.responsavel,
+    row => row.objetivo
+  ], 'Nenhuma ação sem custo cadastrada para este plano.');
+}
+
+// loadMDFs(): orquestrador do painel MDFs — garante _allSalesforce carregado (memoizado, seguro
+// chamar de qualquer view), lê o plano selecionado no filtro e popula KPIs + as duas tabelas.
+async function loadMDFs(){
+  await loadSalesforce();
+  const planoId = document.getElementById('mdf-plano')?.value || 'goto_q2';
+  const plano = MDF_PLANOS[planoId];
+  if (!plano) return;
+  const periodoLabel = document.getElementById('mdf-periodo-label');
+  if (periodoLabel) periodoLabel.textContent = `Período: ${plano.periodo.start.split('-').reverse().join('/')} a ${plano.periodo.end.split('-').reverse().join('/')}`;
+  const realizado = mdfRealizadoPlano(plano);
+  renderMDFKpis(plano, realizado);
+  renderMDFAcoesTable(plano);
+  renderMDFSemCusto(plano);
+}
+
 async function initDates(){
   const h = new Date();
   const f = x => diaSP(x);
@@ -3905,7 +4204,8 @@ const LOADERS = {
   criativos: loadCriativos,
   meta: loadMeta,
   linkedin: loadLinkedIn,
-  gads: loadGoogleAds
+  gads: loadGoogleAds,
+  mdfs: loadMDFs
 };
 async function refreshViewAtiva(){
   const pulse = document.getElementById('pulse');
