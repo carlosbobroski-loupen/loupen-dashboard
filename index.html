@@ -656,13 +656,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- OPORTUNIDADES V2 (Salesforce direto) — foto pontual, não substitui a aba Oportunidades acima -->
   <div class="view" id="view-oportunidades_v2">
     <div class="chart-click-hint" style="margin-bottom:12px">
-      <b>Foto pontual do Salesforce</b> (não é ao vivo — atualizada manualmente sob pedido). Cruza os e-mails "Lead Qualificado" da Central de Leads com o Lead/Conta/Oportunidade correspondente no Salesforce (não usa mais o texto do LeadSource — usa <code>ConvertedAccountId</code>, que captura também oportunidades de upsell abertas depois na mesma conta). Separação Produto/Serviço via <code>RecordType</code> do Salesforce. O <b>Valor no Salesforce é MRR</b>: para Produto, o Valor de Contrato só é calculado quando a venda está <b>Ganha</b> e o prazo é conhecido (extraído do nome da oportunidade ou confirmado manualmente na planilha-ponte) — enquanto aberto/perdido, mostra só o MRR. Serviço usa o valor do Salesforce direto, sem multiplicar.
+      <b>Foto pontual do Salesforce</b> (não é ao vivo — atualizada manualmente sob pedido, ver aba <code>Ponte_SF_RD_Station</code>). Cruza os leads "Qualificado" da Central de Leads com Lead/Conta/Oportunidade no Salesforce via <code>ConvertedAccountId</code> (captura também upsell aberto depois na mesma conta, não só a oportunidade da conversão). Tipo Produto/Serviço vem do <code>RecordType</code> do Salesforce. O <b>valor no Salesforce é MRR</b>: Valor de Contrato só é calculado para Produto já <b>Ganho</b> com prazo confirmado (nome da oportunidade ou preenchido manualmente na planilha-ponte); enquanto aberto/perdido ou sem prazo, mostra o MRR. Serviço usa o valor do Salesforce direto, sem multiplicar.
     </div>
-    <div class="kpi-grid-4" id="ov2-kpis">
-      <div class="kpi blue"><div class="kpi-label" title="Oportunidades encontradas no Salesforce a partir de leads qualificados da Central de Leads.">Oportunidades mapeadas</div><div class="kpi-value" id="ov2-total">—</div><div class="kpi-footer" id="ov2-total-foot"></div></div>
-      <div class="kpi green"><div class="kpi-label" title="Soma do valor no Salesforce (MRR para Produto, valor direto para Serviço), sem multiplicar por meses.">Soma MRR/valor bruto (SF)</div><div class="kpi-value" id="ov2-mrr" style="font-size:18px">—</div></div>
-      <div class="kpi purple"><div class="kpi-label" title="Produto Ganho com prazo conhecido: MRR × meses. Produto sem prazo conhecido e Serviço (todos os status) entram pelo valor do Salesforce.">Valor de contrato (onde computável)</div><div class="kpi-value" id="ov2-contrato" style="font-size:18px">—</div><div class="kpi-footer" id="ov2-contrato-foot"></div></div>
-      <div class="kpi amber"><div class="kpi-label" title="Oportunidades de Produto marcadas como Ganho no Salesforce mas sem prazo de contrato identificado (nem no nome, nem confirmado manualmente) — valor de contrato não pode ser calculado ainda.">Ganhos sem prazo identificado</div><div class="kpi-value" id="ov2-sem-prazo">—</div><div class="kpi-footer" id="ov2-sem-prazo-foot"></div></div>
+    <div class="kpi-grid-6">
+      <div class="kpi blue"><div class="kpi-label" title="E-mails com lead_stage 'Lead Qualificado' na Central de Leads (RD Station) — todos os que a Salesforce recebe como MQL.">Leads Qualificados (RD Station)</div><div class="kpi-value" id="ov2-leads-qualif">—</div><div class="kpi-footer" id="ov2-leads-qualif-foot"></div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Desses, quantos têm Lead correspondente no Salesforce que converteu em Conta/Oportunidade.">Convertidos no Salesforce</div><div class="kpi-value" id="ov2-convertidos">—</div><div class="kpi-footer" id="ov2-convertidos-foot"></div></div>
+      <div class="kpi green"><div class="kpi-label" title="Oportunidades encontradas nas contas dos leads convertidos (inclui upsell aberto depois da conversão original).">Oportunidades mapeadas</div><div class="kpi-value" id="ov2-total">—</div><div class="kpi-footer" id="ov2-total-foot"></div></div>
+      <div class="kpi blue"><div class="kpi-label" title="Soma do valor no Salesforce (MRR para Produto, valor direto para Serviço), sem multiplicar por meses.">MRR/valor bruto (SF)</div><div class="kpi-value" id="ov2-mrr" style="font-size:18px">—</div></div>
+      <div class="kpi green"><div class="kpi-label" title="Produto já Ganho com prazo de contrato confirmado: MRR × meses.">Contrato fechado (Produto)</div><div class="kpi-value" id="ov2-contrato-fechado" style="font-size:18px">—</div><div class="kpi-footer" id="ov2-contrato-foot"></div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Oportunidades de Serviço já Ganhas — valor direto do Salesforce (não é MRR).">Receita Serviço (ganha)</div><div class="kpi-value" id="ov2-servico-ganho" style="font-size:18px">—</div></div>
+    </div>
+    <div class="kpi-grid-4">
+      <div class="kpi green"><div class="kpi-label" title="Oportunidades (Produto + Serviço) marcadas como Ganho no Salesforce.">Ganhas</div><div class="kpi-value" id="ov2-ganhas">—</div><div class="kpi-footer" id="ov2-ganhas-valor"></div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Oportunidades ainda abertas (não fechadas) — valor mostrado é MRR/valor SF, ainda não é contrato fechado.">Em negociação</div><div class="kpi-value" id="ov2-abertas">—</div><div class="kpi-footer" id="ov2-abertas-valor"></div></div>
+      <div class="kpi red"><div class="kpi-label" title="Oportunidades marcadas como Perdido no Salesforce.">Perdidas</div><div class="kpi-value" id="ov2-perdidas">—</div><div class="kpi-footer" id="ov2-perdidas-valor"></div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Produto marcado como Ganho no Salesforce mas sem prazo de contrato identificado (nem no nome, nem confirmado manualmente) — valor de contrato ainda não pode ser calculado.">Ganhos sem prazo identificado</div><div class="kpi-value" id="ov2-sem-prazo">—</div><div class="kpi-footer" id="ov2-sem-prazo-foot"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Funil RD Station → Salesforce</div><div class="section-badge">Qualificado → Encontrado → Convertido → Oportunidade → Ganho</div></div>
+      <div id="ov2-funil"></div>
     </div>
 
     <div class="two-col">
@@ -680,7 +693,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Oportunidades por lead (detalhe)</div><div class="section-badge">fonte: aba Ponte_SF_RD_Station</div></div>
       <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Lead (Central de Leads)</th><th>Conta (Salesforce)</th><th>Oportunidade</th><th>Tipo</th><th>Estágio</th><th>MRR/Valor (SF)</th><th>Meses</th><th>Valor de contrato</th></tr></thead>
+        <thead><tr><th>Lead</th><th>Conta (Salesforce)</th><th>Oportunidade</th><th>Tipo</th><th>Estágio</th><th>MRR/Valor (SF)</th><th>Meses</th><th>Valor de contrato</th></tr></thead>
         <tbody id="ov2-tbody"></tbody>
       </table>
       </div>
@@ -4192,6 +4205,12 @@ function renderMDFSemCusto(plano){
 // meses_contrato_confirmado (preenchido manualmente na planilha) tem prioridade sobre
 // meses_contrato_nome (extraído por regex do nome da oportunidade, ex: "contrato 36 meses").
 const SHEET_CENTRAL_LEADS = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
+// Topo do funil (Qualificado → Encontrado → Convertido) vem da mesma análise que gerou a ponte
+// (222 e-mails "Lead Qualificado" na Central de Leads cruzados contra o Lead do Salesforce por
+// e-mail, 2026-07-31). Não está na planilha ainda (só as 44 linhas com oportunidade foram
+// gravadas) — atualizar estes 4 números manualmente junto da próxima atualização da ponte.
+const OV2_FUNIL_TOPO = { leadsQualificados: 222, encontradosSF: 216, convertidos: 33, contasConvertidas: 31 };
+
 let _oppV2Rows = null;
 async function loadOportunidadesV2(){
   if (!_oppV2Rows){
@@ -4204,6 +4223,7 @@ async function loadOportunidadesV2(){
       const v = i => (c[i] ? c[i].v : null);
       const tipo = v(18); // 'PRODUTO' | 'SERVICO' | null
       const ganho = !!v(12);
+      const fechada = !!v(13);
       const valor = parseFloat(v(11)) || null;
       const meses = v(20) != null ? Number(v(20)) : (v(19) != null ? Number(v(19)) : null);
       let valorContrato = null, contratoComputado = false;
@@ -4214,56 +4234,124 @@ async function loadOportunidadesV2(){
       }
       return {
         leadEmail: v(0), leadNome: v(1) || v(0), accountNome: v(7) || v(6),
-        oppNome: v(9), estagio: v(10), tipo, valor, ganho, fechada: !!v(13), meses, valorContrato, contratoComputado,
+        oppNome: v(9), estagio: v(10), tipo, valor, ganho, fechada, aberta: !fechada,
+        meses, valorContrato, contratoComputado,
         semPrazo: tipo === 'PRODUTO' && ganho && !meses,
       };
     });
   }
   renderOportunidadesV2(_oppV2Rows);
 }
+
+// Badge de estágio no mesmo padrão visual de statusBadgeHTML() (Ganha=verde, Perdida=vermelho,
+// Em negociação=roxo) — reaproveita as mesmas classes/CSS vars, só troca a fonte do dado (SF x Sheets).
+function ov2EstagioBadgeHTML(r){
+  if (r.ganho) return `<span class="badge lq">Ganha</span>`;
+  if (r.fechada) return `<span class="badge" style="background:var(--red-dim);color:var(--red)">Perdida</span>`;
+  return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">${esc(r.estagio)||'Em negociação'}</span>`;
+}
+function ov2TipoBadgeHTML(tipo){
+  if (tipo === 'PRODUTO') return `<span class="badge" style="background:var(--blue-dim);color:var(--blue)">Produto</span>`;
+  if (tipo === 'SERVICO') return `<span class="badge" style="background:var(--purple-dim);color:var(--purple)">Serviço</span>`;
+  return `<span class="badge" style="background:var(--surface2);color:var(--muted)">Não classificado</span>`;
+}
+
 function renderOportunidadesV2(rows){
   const produto = rows.filter(r => r.tipo === 'PRODUTO');
   const servico = rows.filter(r => r.tipo === 'SERVICO');
   const semTipo = rows.filter(r => !r.tipo);
   const semPrazo = rows.filter(r => r.semPrazo);
+  const ganhas = rows.filter(r => r.ganho);
+  const perdidas = rows.filter(r => r.fechada && !r.ganho);
+  const abertas = rows.filter(r => r.aberta);
   const sum = (arr, key) => arr.reduce((a,r) => a + (r[key]||0), 0);
 
+  // ── KPIs topo (funil de origem: Qualificado RD Station → Encontrado/Convertido no SF) ──
+  const topo = OV2_FUNIL_TOPO;
+  document.getElementById('ov2-leads-qualif').textContent = fmt(topo.leadsQualificados);
+  document.getElementById('ov2-leads-qualif-foot').textContent = `${fmt(topo.encontradosSF)} encontrados no Salesforce`;
+  document.getElementById('ov2-convertidos').textContent = fmt(topo.convertidos);
+  document.getElementById('ov2-convertidos-foot').textContent = `${(topo.convertidos/topo.leadsQualificados*100).toFixed(1)}% dos qualificados · ${fmt(topo.contasConvertidas)} contas`;
   document.getElementById('ov2-total').textContent = fmt(rows.length);
   document.getElementById('ov2-total-foot').textContent = `${fmt(produto.length)} Produto · ${fmt(servico.length)} Serviço${semTipo.length? ' · '+fmt(semTipo.length)+' não classificado':''}`;
   document.getElementById('ov2-mrr').textContent = brl(sum(rows,'valor'));
-  document.getElementById('ov2-contrato').textContent = brl(sum(rows,'valorContrato'));
-  const pendentes = produto.filter(r => !(r.ganho && r.meses)).length;
-  document.getElementById('ov2-contrato-foot').textContent = pendentes ? `${fmt(pendentes)} de Produto ainda com MRR (não fechou ou sem prazo) — valor tende a subir` : 'Todas as oportunidades de Produto já com valor de contrato definido';
+  document.getElementById('ov2-contrato-fechado').textContent = brl(sum(produto.filter(r=>r.contratoComputado),'valorContrato'));
+  const pendentes = produto.filter(r => !r.contratoComputado).length;
+  document.getElementById('ov2-contrato-foot').textContent = pendentes ? `+${fmt(pendentes)} Produto ainda em MRR (aberto/perdido ou sem prazo)` : 'Todas as oportunidades de Produto já com prazo definido';
+  document.getElementById('ov2-servico-ganho').textContent = brl(sum(servico.filter(r=>r.ganho),'valor'));
+
+  document.getElementById('ov2-ganhas').textContent = fmt(ganhas.length);
+  document.getElementById('ov2-ganhas-valor').textContent = brl(sum(ganhas,'valorContrato'));
+  document.getElementById('ov2-abertas').textContent = fmt(abertas.length);
+  document.getElementById('ov2-abertas-valor').textContent = brl(sum(abertas,'valor'))+' em MRR';
+  document.getElementById('ov2-perdidas').textContent = fmt(perdidas.length);
+  document.getElementById('ov2-perdidas-valor').textContent = brl(sum(perdidas,'valor'));
   document.getElementById('ov2-sem-prazo').textContent = fmt(semPrazo.length);
   document.getElementById('ov2-sem-prazo-foot').textContent = semPrazo.length ? 'Preencha meses_contrato_confirmado na aba Ponte_SF_RD_Station' : 'Nenhuma pendência';
 
-  const resumoTipo = (list) => {
+  // ── Funil visual (mesma anatomia CSS do funil2 da aba Oportunidades: barra + conector com taxa) ──
+  const funilRows = [
+    { label:'Leads Qualificados (RD Station)', v: topo.leadsQualificados },
+    { label:'Encontrados no Salesforce', v: topo.encontradosSF },
+    { label:'Convertidos (Conta)', v: topo.convertidos },
+    { label:'Oportunidades', v: rows.length },
+    { label:'Ganhas', v: ganhas.length },
+  ];
+  const funilEl = document.getElementById('ov2-funil');
+  if (funilEl){
+    const FUNIL_RAMP = ['var(--fnl-1)','var(--fnl-2)','var(--fnl-3)','var(--fnl-4)','var(--fnl-5)'];
+    const maxFunil = Math.max(...funilRows.map(r=>r.v), 1);
+    const rowsHTML = funilRows.map((r,i)=>{
+      const widthPct = r.v>0 ? Math.max(r.v/maxFunil*100, 3) : 0;
+      const conv = (i>0 && funilRows[i-1].v>0) ? (r.v/funilRows[i-1].v*100).toFixed(1)+'%' : '';
+      const row = `<div class="funil2-row" style="animation-delay:${i*60}ms">`
+        + `<div class="funil2-name">${esc(r.label)}</div>`
+        + `<div class="funil2-track"><div class="funil2-fill" style="width:${widthPct}%;background:${FUNIL_RAMP[i]}"></div></div>`
+        + `<div class="funil2-val">${esc(fmt(r.v))}</div>`
+        + `</div>`;
+      const connector = (i < funilRows.length-1)
+        ? `<div class="funil2-connector"><div></div><div class="funil2-connector-inner"><i class="ti ti-corner-down-right"></i>`
+          + `<b>${funilRows[i].v>0 ? (funilRows[i+1].v/funilRows[i].v*100).toFixed(1) : '0.0'}%</b> segue para ${esc(funilRows[i+1].label)}</div><div></div></div>`
+        : '';
+      return row + connector;
+    }).join('');
+    funilEl.innerHTML = `<div class="funil2" role="group" aria-label="Funil RD Station para Salesforce">${rowsHTML}</div>`;
+  }
+
+  // ── Cards Produto/Serviço: contagem + valor por estágio, no mesmo padrão mono/mono da tabela ──
+  const resumoTipo = (list, valueKey) => {
     if (!list.length) return '<div class="empty">Sem oportunidades</div>';
-    const ganhas = list.filter(r=>r.ganho), perdidas = list.filter(r=>r.fechada && !r.ganho), abertas = list.filter(r=>!r.fechada);
-    return `<div style="display:flex;flex-direction:column;gap:6px">
-      <div>Oportunidades: <b>${fmt(list.length)}</b></div>
-      <div>Ganho: <b>${fmt(ganhas.length)}</b> · ${brl(sum(ganhas,'valorContrato'))}</div>
-      <div>Aberto: <b>${fmt(abertas.length)}</b> · ${brl(sum(abertas,'valorContrato'))}</div>
-      <div>Perdido: <b>${fmt(perdidas.length)}</b> · ${brl(sum(perdidas,'valorContrato'))}</div>
-    </div>`;
+    const g = list.filter(r=>r.ganho), p = list.filter(r=>r.fechada && !r.ganho), a = list.filter(r=>r.aberta);
+    const linha = (label, arr, cls) => `<div style="display:flex;justify-content:space-between;gap:12px">`
+      + `<span>${label} <b>${fmt(arr.length)}</b></span>`
+      + `<span style="font-family:var(--mono)" class="${cls||''}">${brl(sum(arr,valueKey))}</span></div>`;
+    return `<div style="display:flex;flex-direction:column;gap:8px">`
+      + linha('Ganho', g, '')
+      + linha('Aberto', a, '')
+      + linha('Perdido', p, '')
+      + `</div>`;
   };
-  document.getElementById('ov2-produto-resumo').innerHTML = resumoTipo(produto);
+  document.getElementById('ov2-produto-resumo').innerHTML = resumoTipo(produto, 'valorContrato');
   document.getElementById('ov2-produto-badge').textContent = brl(sum(produto,'valorContrato'))+' no total';
-  document.getElementById('ov2-servico-resumo').innerHTML = resumoTipo(servico);
+  document.getElementById('ov2-servico-resumo').innerHTML = resumoTipo(servico, 'valor');
   document.getElementById('ov2-servico-badge').textContent = brl(sum(servico,'valor'))+' no total';
 
+  // ── Tabela de detalhe: mesma linguagem visual da aba Oportunidades (t-name/t-sub, mono nas colunas
+  // de valor, badges de tipo/estágio) ──
   const ordered = rows.slice().sort((a,b) => (b.valorContrato||0)-(a.valorContrato||0));
   renderRows(document.getElementById('ov2-tbody'), ordered, [
-    r => `${r.leadNome||''} <span style="color:var(--muted);font-size:12px">${r.leadEmail||''}</span>`,
+    r => ({ html: `<div class="t-name">${esc(r.leadNome||'')}</div><div class="t-sub">${esc(r.leadEmail||'')}</div>` }),
     r => r.accountNome,
     r => r.oppNome,
-    r => r.tipo === 'PRODUTO' ? 'Produto' : (r.tipo === 'SERVICO' ? 'Serviço' : '—'),
-    r => r.estagio,
-    r => brl(r.valor||0),
+    r => ({ html: ov2TipoBadgeHTML(r.tipo) }),
+    r => ({ html: ov2EstagioBadgeHTML(r) }),
+    r => ({ html: `<span style="font-family:var(--mono)">${brl(r.valor||0)}</span>` }),
     r => r.meses ? (r.meses+'m') : (r.tipo==='PRODUTO' ? '—' : ''),
-    r => r.semPrazo
-        ? { html: `${brl(r.valor||0)} <span style="color:var(--amber)">(prazo não identificado)</span>` }
-        : (r.contratoComputado ? brl(r.valorContrato||0) : (r.valorContrato!=null ? brl(r.valorContrato)+' (MRR)' : '—')),
+    r => {
+      if (r.semPrazo) return { html: `<span style="font-family:var(--mono)">${brl(r.valor||0)}</span> <span style="color:var(--amber);font-size:11px">prazo não identificado</span>` };
+      if (r.contratoComputado) return { html: `<span style="font-family:var(--mono)">${brl(r.valorContrato||0)}</span>` };
+      return r.valorContrato!=null ? { html: `<span style="font-family:var(--mono)">${brl(r.valorContrato)}</span> <span style="color:var(--muted);font-size:11px">(MRR)</span>` } : '—';
+    },
   ], 'Nenhuma oportunidade mapeada.');
 }
 
