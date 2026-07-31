@@ -218,6 +218,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
     <div class="nav-label">Comercial</div>
     <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
+    <button class="nav-item" onclick="showView('oportunidades_v2')"><i class="ti ti-brand-salesforce"></i>Oportunidades v2 (Salesforce)</button>
     <button class="nav-item" onclick="showView('campanhas')"><i class="ti ti-speakerphone"></i>Campanhas</button>
     <button class="nav-item" onclick="showView('criativos')"><i class="ti ti-photo"></i>Criativos</button>
     <button class="nav-item" onclick="showView('mdfs')"><i class="ti ti-report-money"></i>MDFs</button>
@@ -647,6 +648,40 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <table class="tbl">
         <thead><tr><th>Nome / Empresa</th><th>Segmento</th><th>Origem</th><th>Canal</th><th>Status</th><th>Motivo</th><th>Valor</th><th>Data</th></tr></thead>
         <tbody id="o-all"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPORTUNIDADES V2 (Salesforce direto) — foto pontual, não substitui a aba Oportunidades acima -->
+  <div class="view" id="view-oportunidades_v2">
+    <div class="chart-click-hint" style="margin-bottom:12px">
+      <b>Foto pontual do Salesforce</b> (não é ao vivo — atualizada manualmente sob pedido). Cruza os e-mails "Lead Qualificado" da Central de Leads com o Lead/Conta/Oportunidade correspondente no Salesforce (não usa mais o texto do LeadSource — usa <code>ConvertedAccountId</code>, que captura também oportunidades de upsell abertas depois na mesma conta). Separação Produto/Serviço via <code>RecordType</code> do Salesforce. O <b>Valor no Salesforce é MRR</b>: para Produto, o Valor de Contrato só é calculado quando a venda está <b>Ganha</b> e o prazo é conhecido (extraído do nome da oportunidade ou confirmado manualmente na planilha-ponte) — enquanto aberto/perdido, mostra só o MRR. Serviço usa o valor do Salesforce direto, sem multiplicar.
+    </div>
+    <div class="kpi-grid-4" id="ov2-kpis">
+      <div class="kpi blue"><div class="kpi-label" title="Oportunidades encontradas no Salesforce a partir de leads qualificados da Central de Leads.">Oportunidades mapeadas</div><div class="kpi-value" id="ov2-total">—</div><div class="kpi-footer" id="ov2-total-foot"></div></div>
+      <div class="kpi green"><div class="kpi-label" title="Soma do valor no Salesforce (MRR para Produto, valor direto para Serviço), sem multiplicar por meses.">Soma MRR/valor bruto (SF)</div><div class="kpi-value" id="ov2-mrr" style="font-size:18px">—</div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Produto Ganho com prazo conhecido: MRR × meses. Produto sem prazo conhecido e Serviço (todos os status) entram pelo valor do Salesforce.">Valor de contrato (onde computável)</div><div class="kpi-value" id="ov2-contrato" style="font-size:18px">—</div><div class="kpi-footer" id="ov2-contrato-foot"></div></div>
+      <div class="kpi amber"><div class="kpi-label" title="Oportunidades de Produto marcadas como Ganho no Salesforce mas sem prazo de contrato identificado (nem no nome, nem confirmado manualmente) — valor de contrato não pode ser calculado ainda.">Ganhos sem prazo identificado</div><div class="kpi-value" id="ov2-sem-prazo">—</div><div class="kpi-footer" id="ov2-sem-prazo-foot"></div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-box"></i>Produto</div><div class="section-badge" id="ov2-produto-badge">—</div></div>
+        <div id="ov2-produto-resumo"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-headset"></i>Serviço</div><div class="section-badge" id="ov2-servico-badge">—</div></div>
+        <div id="ov2-servico-resumo"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Oportunidades por lead (detalhe)</div><div class="section-badge">fonte: aba Ponte_SF_RD_Station</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Lead (Central de Leads)</th><th>Conta (Salesforce)</th><th>Oportunidade</th><th>Tipo</th><th>Estágio</th><th>MRR/Valor (SF)</th><th>Meses</th><th>Valor de contrato</th></tr></thead>
+        <tbody id="ov2-tbody"></tbody>
       </table>
       </div>
     </div>
@@ -1182,7 +1217,7 @@ const MDF_PLANOS = {
   }
 };
 
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
+const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',oportunidades_v2:'Oportunidades v2 (Salesforce)',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
 let CC={};
 
 // ── v2: SEGURANÇA, METAS/BENCHMARKS E HELPERS DE RENDER ──────
@@ -1318,6 +1353,8 @@ function showView(id, fromDrill){
   if (id==='campanhas') loadCampanhas();
   // Painel MDFs: metas por plano + realizado calculado ao vivo (aba Oportunidades) — carrega sob demanda.
   if (id==='mdfs') loadMDFs();
+  // Oportunidades v2: lê a "ponte" Lead↔Salesforce (foto pontual, não é live) — carrega sob demanda.
+  if (id==='oportunidades_v2') loadOportunidadesV2();
 }
 function scrollToCard(id){
   const el = document.getElementById(id);
@@ -4146,6 +4183,88 @@ function renderMDFSemCusto(plano){
     row => row.responsavel,
     row => row.objetivo
   ], 'Nenhuma ação sem custo cadastrada para este plano.');
+}
+
+// ── OPORTUNIDADES V2 (Salesforce direto) ─────────────────────
+// Lê a aba "Ponte_SF_RD_Station" (mesma planilha da Central de Leads), gravada manualmente por
+// um workflow n8n a partir de uma consulta pontual ao Salesforce (Lead por e-mail → ConvertedAccountId
+// → todas as Oportunidades da conta). NÃO é ao vivo — é uma foto, atualizada sob pedido.
+// meses_contrato_confirmado (preenchido manualmente na planilha) tem prioridade sobre
+// meses_contrato_nome (extraído por regex do nome da oportunidade, ex: "contrato 36 meses").
+const SHEET_CENTRAL_LEADS = '12xck94yAtE94Z6XK-aZJW13q55mt9YQRNzFPsCDi2Og';
+let _oppV2Rows = null;
+async function loadOportunidadesV2(){
+  if (!_oppV2Rows){
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_CENTRAL_LEADS}/gviz/tq?tqx=out:json&sheet=Ponte_SF_RD_Station`;
+    const r = await fetch(url);
+    const txt = await r.text();
+    const d = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}')+1));
+    _oppV2Rows = (d.table.rows || []).filter(row => row.c && row.c[8]?.v).map(row => {
+      const c = row.c || [];
+      const v = i => (c[i] ? c[i].v : null);
+      const tipo = v(18); // 'PRODUTO' | 'SERVICO' | null
+      const ganho = !!v(12);
+      const valor = parseFloat(v(11)) || null;
+      const meses = v(20) != null ? Number(v(20)) : (v(19) != null ? Number(v(19)) : null);
+      let valorContrato = null, contratoComputado = false;
+      if (tipo === 'SERVICO'){ valorContrato = valor; contratoComputado = true; }
+      else if (tipo === 'PRODUTO'){
+        if (ganho && meses){ valorContrato = (valor||0) * meses; contratoComputado = true; }
+        else valorContrato = valor; // MRR como placeholder enquanto não fecha / não tem prazo
+      }
+      return {
+        leadEmail: v(0), leadNome: v(1) || v(0), accountNome: v(7) || v(6),
+        oppNome: v(9), estagio: v(10), tipo, valor, ganho, fechada: !!v(13), meses, valorContrato, contratoComputado,
+        semPrazo: tipo === 'PRODUTO' && ganho && !meses,
+      };
+    });
+  }
+  renderOportunidadesV2(_oppV2Rows);
+}
+function renderOportunidadesV2(rows){
+  const produto = rows.filter(r => r.tipo === 'PRODUTO');
+  const servico = rows.filter(r => r.tipo === 'SERVICO');
+  const semTipo = rows.filter(r => !r.tipo);
+  const semPrazo = rows.filter(r => r.semPrazo);
+  const sum = (arr, key) => arr.reduce((a,r) => a + (r[key]||0), 0);
+
+  document.getElementById('ov2-total').textContent = fmt(rows.length);
+  document.getElementById('ov2-total-foot').textContent = `${fmt(produto.length)} Produto · ${fmt(servico.length)} Serviço${semTipo.length? ' · '+fmt(semTipo.length)+' não classificado':''}`;
+  document.getElementById('ov2-mrr').textContent = brl(sum(rows,'valor'));
+  document.getElementById('ov2-contrato').textContent = brl(sum(rows,'valorContrato'));
+  const pendentes = produto.filter(r => !(r.ganho && r.meses)).length;
+  document.getElementById('ov2-contrato-foot').textContent = pendentes ? `${fmt(pendentes)} de Produto ainda com MRR (não fechou ou sem prazo) — valor tende a subir` : 'Todas as oportunidades de Produto já com valor de contrato definido';
+  document.getElementById('ov2-sem-prazo').textContent = fmt(semPrazo.length);
+  document.getElementById('ov2-sem-prazo-foot').textContent = semPrazo.length ? 'Preencha meses_contrato_confirmado na aba Ponte_SF_RD_Station' : 'Nenhuma pendência';
+
+  const resumoTipo = (list) => {
+    if (!list.length) return '<div class="empty">Sem oportunidades</div>';
+    const ganhas = list.filter(r=>r.ganho), perdidas = list.filter(r=>r.fechada && !r.ganho), abertas = list.filter(r=>!r.fechada);
+    return `<div style="display:flex;flex-direction:column;gap:6px">
+      <div>Oportunidades: <b>${fmt(list.length)}</b></div>
+      <div>Ganho: <b>${fmt(ganhas.length)}</b> · ${brl(sum(ganhas,'valorContrato'))}</div>
+      <div>Aberto: <b>${fmt(abertas.length)}</b> · ${brl(sum(abertas,'valorContrato'))}</div>
+      <div>Perdido: <b>${fmt(perdidas.length)}</b> · ${brl(sum(perdidas,'valorContrato'))}</div>
+    </div>`;
+  };
+  document.getElementById('ov2-produto-resumo').innerHTML = resumoTipo(produto);
+  document.getElementById('ov2-produto-badge').textContent = brl(sum(produto,'valorContrato'))+' no total';
+  document.getElementById('ov2-servico-resumo').innerHTML = resumoTipo(servico);
+  document.getElementById('ov2-servico-badge').textContent = brl(sum(servico,'valor'))+' no total';
+
+  const ordered = rows.slice().sort((a,b) => (b.valorContrato||0)-(a.valorContrato||0));
+  renderRows(document.getElementById('ov2-tbody'), ordered, [
+    r => `${r.leadNome||''} <span style="color:var(--muted);font-size:12px">${r.leadEmail||''}</span>`,
+    r => r.accountNome,
+    r => r.oppNome,
+    r => r.tipo === 'PRODUTO' ? 'Produto' : (r.tipo === 'SERVICO' ? 'Serviço' : '—'),
+    r => r.estagio,
+    r => brl(r.valor||0),
+    r => r.meses ? (r.meses+'m') : (r.tipo==='PRODUTO' ? '—' : ''),
+    r => r.semPrazo
+        ? { html: `${brl(r.valor||0)} <span style="color:var(--amber)">(prazo não identificado)</span>` }
+        : (r.contratoComputado ? brl(r.valorContrato||0) : (r.valorContrato!=null ? brl(r.valorContrato)+' (MRR)' : '—')),
+  ], 'Nenhuma oportunidade mapeada.');
 }
 
 // loadMDFs(): orquestrador do painel MDFs — garante _allSalesforce carregado (memoizado, seguro
