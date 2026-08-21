@@ -372,6 +372,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- FILTRO SRD IA (leads WhatsApp do Lucas Brito) -->
   <div class="global-filters" id="srd-filters">
     <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
+    <select class="filter-sel" id="srd-f-periodo" onchange="aplicarFiltrosSRD()" title="Filtra pela data de criação do lead no Salesforce.">
+      <option value="">Todo o período</option>
+      <option value="7">Últimos 7 dias</option>
+      <option value="30">Últimos 30 dias</option>
+      <option value="90" selected>Últimos 90 dias</option>
+    </select>
     <select class="filter-sel" id="srd-f-tipo" onchange="aplicarFiltrosSRD()">
       <option value="">Campanha + Não-campanha</option>
       <option value="campanha">Só campanha</option>
@@ -382,8 +388,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <option value="com">Só com criativo mapeado</option>
       <option value="sem">Só sem rastreamento</option>
     </select>
+    <select class="filter-sel" id="srd-f-status" onchange="aplicarFiltrosSRD()">
+      <option value="">Todo status</option>
+    </select>
     <select class="filter-sel" id="srd-f-fonte" onchange="aplicarFiltrosSRD()">
       <option value="">Toda origem (LeadSource)</option>
+    </select>
+    <select class="filter-sel" id="srd-f-campanha" onchange="aplicarFiltrosSRD()" title="Filtra pela campanha do Meta Ads resolvida via Campanha_LinkedIn__c.">
+      <option value="">Toda campanha (Meta)</option>
+    </select>
+    <select class="filter-sel" id="srd-f-conjunto" onchange="aplicarFiltrosSRD()">
+      <option value="">Todo conjunto</option>
+    </select>
+    <select class="filter-sel" id="srd-f-anuncio" onchange="aplicarFiltrosSRD()">
+      <option value="">Todo anúncio</option>
     </select>
     <button class="filter-clear" onclick="limparFiltrosSRD()"><i class="ti ti-x"></i>Limpar</button>
     <span style="font-size:12px;color:var(--muted);margin-left:auto" id="srd-filter-count"></span>
@@ -724,20 +742,75 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- SRD IA (leads WhatsApp criados via bot sob o Lucas Brito, Salesforce) -->
   <div class="view" id="view-srd_ia">
     <div class="chart-click-hint" style="margin-bottom:12px">
-      <b>Foto pontual do Salesforce</b> (não é ao vivo — atualizada manualmente sob pedido). Leads criados automaticamente por bot de WhatsApp sob o Lucas Brito, com apenas nome/telefone/origem. O campo <code>Campanha_LinkedIn__c</code> guarda o <b>Ad ID do Meta Ads</b> quando capturado — cruzado direto com a API do Meta Ads (campanha/conjunto/anúncio/criativo). Só <b id="srd-cobertura-hint">—</b> dos leads têm esse dado na origem; o restante fica como "sem rastreamento" (o bot descarta o identificador antes de gravar no Salesforce, não é falha de busca).
+      <b>Foto pontual do Salesforce</b> (não é ao vivo — atualizada manualmente sob pedido, lead mais recente de <b id="srd-snapshot-data">—</b>; os filtros de período abaixo contam a partir dessa data, não da data de hoje). Leads criados automaticamente por bot de WhatsApp sob o Lucas Brito, com apenas nome/telefone/origem. O campo <code>Campanha_LinkedIn__c</code> guarda o <b>Ad ID do Meta Ads</b> quando capturado — cruzado direto com a API do Meta Ads (campanha/conjunto/anúncio/criativo). Só <b id="srd-cobertura-hint">—</b> dos leads têm esse dado na origem, considerando o snapshot completo (não o recorte de período aplicado abaixo); o restante fica como "sem rastreamento" (o bot descarta o identificador antes de gravar no Salesforce, não é falha de busca).
     </div>
-    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi blue"><div class="kpi-label" title="Total de leads WhatsApp sob o Lucas Brito no recorte atual.">Leads (WhatsApp)</div><div class="kpi-value" id="srd-total">—</div></div>
-      <div class="kpi purple"><div class="kpi-label" title="LeadSource contém 'Campanha' ou é um código de campanha (ex: LOGMEIN_RESCUE-LICENCA-ECO_08-26).">Campanha</div><div class="kpi-value" id="srd-campanha">—</div><div class="kpi-footer" id="srd-campanha-pct"></div></div>
-      <div class="kpi amber"><div class="kpi-label" title="LeadSource genérico (GoTo, Webinar, Outbound) — sem campanha de mídia paga identificada.">Não-campanha</div><div class="kpi-value" id="srd-nao-campanha">—</div><div class="kpi-footer" id="srd-nao-campanha-pct"></div></div>
-      <div class="kpi green"><div class="kpi-label" title="Leads com Campanha_LinkedIn__c preenchido e resolvido contra a API do Meta Ads (campanha/conjunto/anúncio/criativo).">Com criativo mapeado</div><div class="kpi-value" id="srd-mapeados">—</div><div class="kpi-footer" id="srd-mapeados-pct"></div></div>
+
+    <div class="kpi-grid-4">
+      <div class="kpi blue"><div class="kpi-label" title="Total de leads WhatsApp sob o Lucas Brito no recorte atual.">Leads (WhatsApp)</div><div class="kpi-value" id="srd-total">—</div><div class="kpi-footer" id="srd-total-trend"></div></div>
+      <div class="kpi purple" style="cursor:pointer" role="button" tabindex="0" data-action="filtrarTipoSRD" data-arg="campanha" aria-label="Ver só leads de campanha"><div class="kpi-label" title="LeadSource contém 'Campanha' ou é um código de campanha (ex: LOGMEIN_RESCUE-LICENCA-ECO_08-26).">Campanha</div><div class="kpi-value" id="srd-campanha">—</div><div class="kpi-footer" id="srd-campanha-pct"></div></div>
+      <div class="kpi amber" style="cursor:pointer" role="button" tabindex="0" data-action="filtrarTipoSRD" data-arg="nao_campanha" aria-label="Ver só leads não-campanha"><div class="kpi-label" title="LeadSource genérico (GoTo, Webinar, Outbound) — sem campanha de mídia paga identificada.">Não-campanha</div><div class="kpi-value" id="srd-nao-campanha">—</div><div class="kpi-footer" id="srd-nao-campanha-pct"></div></div>
+      <div class="kpi green" style="cursor:pointer" role="button" tabindex="0" data-action="filtrarRastreioSRD" data-arg="com" aria-label="Ver só leads com criativo mapeado"><div class="kpi-label" title="Leads com Campanha_LinkedIn__c preenchido e resolvido contra a API do Meta Ads (campanha/conjunto/anúncio/criativo).">Com criativo mapeado</div><div class="kpi-value" id="srd-mapeados">—</div><div class="kpi-footer" id="srd-mapeados-pct"></div></div>
+    </div>
+    <div class="kpi-grid-4">
+      <div class="kpi green" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheSRD" data-arg="engajado" aria-label="Ver leads que responderam ao contato"><div class="kpi-label" title="Leads que de fato responderam ao bot (status Respondeu), incluindo os já qualificados/agendados — 'Contato dia N' NÃO conta aqui, é tentativa sem resposta, o oposto de engajamento.">Respondeu ao contato</div><div class="kpi-value" id="srd-engaj">—</div><div class="kpi-footer" id="srd-engaj-pct"></div></div>
+      <div class="kpi green" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheSRD" data-arg="qualificado" aria-label="Ver leads qualificados ou com demo agendada"><div class="kpi-label" title="Status 'Qualificado' ou 'Agendado Demo' — leads prontos para o comercial.">Qualificado / Demo agendada</div><div class="kpi-value" id="srd-qualif">—</div><div class="kpi-footer" id="srd-qualif-pct"></div></div>
+      <div class="kpi red" style="cursor:pointer" role="button" tabindex="0" data-action="abrirDetalheSRD" data-arg="rejeitado" aria-label="Ver leads rejeitados"><div class="kpi-label" title="Leads marcados como Rejeitado pelo bot/SDR — sem interesse, dados inválidos ou fora do perfil.">Rejeitados</div><div class="kpi-value" id="srd-rejeitado">—</div><div class="kpi-footer" id="srd-rejeitado-pct"></div></div>
+      <div class="kpi purple"><div class="kpi-label" title="Nº de campanhas de Meta Ads distintas com pelo menos 1 lead mapeado no recorte atual.">Campanhas ativas</div><div class="kpi-value" id="srd-campanhas-ativas">—</div><div class="kpi-footer" id="srd-conjuntos-anuncios">—</div></div>
     </div>
 
     <div class="card">
-      <div class="section-row"><div class="section-title"><i class="ti ti-photo"></i>Por campanha / conjunto / criativo (Meta Ads)</div><div class="section-badge" id="srd-porcampanha-badge">—</div></div>
+      <div class="section-row"><div class="section-title"><i class="ti ti-filter"></i>Jornada da cadência (WhatsApp)</div><div class="section-badge">Leads → Contatados → Respondeu → Qualificado/Demo</div></div>
+      <div id="srd-funil"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-line"></i>Leads por período</div><div class="section-badge" id="srd-serie-badge">—</div></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="c-srd-serie" role="img" aria-label="Leads por período"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-chart-donut"></i>Campanha × Não-campanha</div></div>
+        <div class="legend" id="srd-tipo-leg"></div>
+        <div class="chart-wrap" style="height:180px"><canvas id="c-srd-tipo" role="img" aria-label="Campanha vs não-campanha"></canvas></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-progress"></i>Por status</div><div class="section-badge">clique para filtrar</div></div>
+        <div id="srd-status-bars"></div>
+      </div>
+      <div class="card">
+        <div class="section-row"><div class="section-title"><i class="ti ti-route"></i>Por origem (LeadSource)</div><div class="section-badge">clique para filtrar</div></div>
+        <div id="srd-fonte-bars"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-speakerphone"></i>Por campanha (Meta Ads)</div><div class="section-badge">clique para ver os conjuntos</div></div>
       <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Campanha</th><th>Conjunto</th><th>Anúncio</th><th>Criativo (ID)</th><th>Leads</th></tr></thead>
+        <thead><tr><th>Campanha</th><th>Conjuntos</th><th>Anúncios</th><th>Leads</th><th>Qualificado/Demo</th><th>Rejeitados</th><th>Taxa qualificação</th></tr></thead>
+        <tbody id="srd-campanha-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-adjustments"></i>Por conjunto de anúncios</div><div class="section-badge" id="srd-conjunto-badge">clique para ver os anúncios</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Conjunto</th><th>Campanha</th><th>Anúncios</th><th>Leads</th><th>Qualificado/Demo</th></tr></thead>
+        <tbody id="srd-conjunto-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row"><div class="section-title"><i class="ti ti-photo"></i>Por anúncio / criativo</div><div class="section-badge" id="srd-porcampanha-badge">—</div></div>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Anúncio</th><th>Conjunto</th><th>Campanha</th><th>Criativo (ID)</th><th>Leads</th><th>Qualificado/Demo</th></tr></thead>
         <tbody id="srd-porcampanha-body"></tbody>
       </table>
       </div>
@@ -747,7 +820,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
       <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Leads (detalhe)</div><div class="section-badge" id="srd-tbody-badge">—</div></div>
       <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Lead</th><th>Telefone</th><th>Data</th><th>Status</th><th>Origem (LeadSource)</th><th>Tipo</th><th>Campanha (Meta)</th><th>Conjunto</th><th>Criativo</th></tr></thead>
+        <thead><tr><th>Lead</th><th>Telefone</th><th>Data</th><th>Status</th><th>Origem (LeadSource)</th><th>Tipo</th><th>Campanha (Meta)</th><th>Conjunto</th><th>Anúncio</th><th>Criativo</th></tr></thead>
         <tbody id="srd-tbody"></tbody>
       </table>
       </div>
@@ -1480,7 +1553,15 @@ const DELEGATED_ACTIONS = {
   fecharDetalheCard:          ()     => fecharDetalheCard(),
   scrollToCard:               (a)    => scrollToCard(a),
   showView:                   (a, b) => showView(a, b === 'true'),
-  toggleFunilTabela:          ()     => toggleFunilTabela()
+  toggleFunilTabela:          ()     => toggleFunilTabela(),
+  filtrarTipoSRD:             (a)    => filtrarTipoSRD(a),
+  filtrarRastreioSRD:         (a)    => filtrarRastreioSRD(a),
+  filtrarPorStatusSRD:        (a)    => filtrarPorStatusSRD(a),
+  filtrarPorFonteSRD:         (a)    => filtrarPorFonteSRD(a),
+  filtrarPorCampanhaSRD:      (a)    => filtrarPorCampanhaSRD(a),
+  filtrarPorConjuntoSRD:      (a)    => filtrarPorConjuntoSRD(a),
+  filtrarPorAnuncioSRD:       (a, b) => filtrarPorAnuncioSRD(a, b),
+  abrirDetalheSRD:            (a)    => abrirDetalheSRD(a)
 };
 function _dispatchDelegated(el){
   const fn = DELEGATED_ACTIONS[el.getAttribute('data-action')];
@@ -1512,7 +1593,7 @@ const brl  = v=>'R$\u00a0'+fmtR(parseFloat(v)||0);
 function pill(s){const l=(s||'').toLowerCase();if(l.includes('google ads')||l==='google ads')return`<span class="sp sp-g">Google ADS</span>`;if(l.includes('meta ads')||l.includes('facebook'))return`<span class="sp sp-m">Meta ADS</span>`;if(l.includes('orgânico')||l.includes('organic'))return`<span class="sp sp-o">Orgânico</span>`;if(l.includes('direto')||l==='(direct)'||l==='direct')return`<span class="sp sp-d">Direto</span>`;if(l.includes('e-mail')||l.includes('email'))return`<span class="sp sp-o">E-mail</span>`;return`<span class="sp sp-o">${esc(s)||'—'}</span>`;}
 function statusChip(s){const l=(s||'').toUpperCase();if(l==='ACTIVE')return`<span class="status-chip chip-active">Ativo</span>`;if(l==='PAUSED')return`<span class="status-chip chip-paused">Pausado</span>`;return`<span class="status-chip chip-other">${esc(s)}</span>`;}
 function mkChart(id,type,labels,datasets,extra={}){if(CC[id])CC[id].destroy();const c=document.getElementById(id);if(!c)return;CC[id]=new Chart(c,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},...extra}});}
-function mkLeg(el,labels){if(!el)return;el.innerHTML=labels.map((l,i)=>`<div class="leg"><div class="leg-dot" style="background:${CORES[i%CORES.length]}"></div>${esc(l)}</div>`).join('');}
+function mkLeg(el,labels,cores){if(!el)return;const c=cores||CORES;el.innerHTML=labels.map((l,i)=>`<div class="leg"><div class="leg-dot" style="background:${c[i%c.length]}"></div>${esc(l)}</div>`).join('');}
 function mkBars(el,rows,color,onClickLabel){
   if(!el)return;
   const max=Math.max(...rows.map(r=>r.v),1);
@@ -4438,29 +4519,114 @@ function renderOportunidadesV2(rows){
 // ── SRD IA: leads WhatsApp (bot) sob o Lucas Brito no Salesforce ─────────────────────────────
 // SRD_IA_LEADS já vem com isCampanha/adId/campanha/conjunto/anuncio/criativo calculados (ver
 // definição do array). Aqui só filtra (aplicarFiltrosSRD) e renderiza.
-let _srdFiltro = { tipo:'', rastreio:'', fonte:'' };
-function srdRowsFiltradas(){
+let _srdFiltro = { periodo:'90', tipo:'', rastreio:'', status:'', fonte:'', campanha:'', conjunto:'', anuncio:'' };
+let _srdRowsAtuais = [];
+// SRD_IA_LEADS é uma foto pontual (não uma API viva) — usar Date.now() como referência de "hoje" faria
+// os filtros de período (7/30/90 dias) esvaziarem a aba sozinhos conforme o tempo real passa do último
+// lead capturado no snapshot. Ancora em vez disso no lead mais recente do próprio snapshot.
+const SRD_REF_DATE = SRD_IA_LEADS.reduce((max,r) => {
+  const t = r.data ? new Date(r.data).getTime() : NaN;
+  return Number.isFinite(t) && t > max ? t : max;
+}, 0);
+// Classifica o status do bot num "tier" cumulativo da jornada (0 aberto → 3 qualificado/demo) mais
+// um "exit" para os dois desvios que não avançam a cadência (rejeitado / cai pra nutrição de ebook).
+// IMPORTANTE (confirmado com o usuário): "Contato dia N" é tentativa de contato SEM resposta — não é
+// sinal de engajamento, é o oposto (o bot seguiu tentando porque o lead não respondeu). Por isso todo
+// "Contato dia N", independente de N, fica em tier 1 (contatado/em cadência) — o tier 2 (engajado) só
+// sobe quando o lead de fato responde ("Respondeu", ou já avançou pra Qualificado/Agendado Demo).
+function srdStatusInfo(status){
+  const s = (status||'').trim().toLowerCase();
+  if (s === 'aberto') return { tier:0, exit:null };
+  if (s === 'rejeitado') return { tier:1, exit:'rejeitado' };
+  if (s === 'cadência ebook' || s === 'cadencia ebook') return { tier:1, exit:'nutricao' };
+  if (s === 'tentando contato') return { tier:1, exit:null };
+  if (/^contato dia \d+$/.test(s)) return { tier:1, exit:null };
+  if (s === 'respondeu') return { tier:2, exit:null };
+  if (s === 'qualificado' || s === 'agendado demo') return { tier:3, exit:null };
+  return { tier:1, exit:null };
+}
+// Mesmo predicado usado no funil, nos KPIs clicáveis e no modal de detalhe (abrirDetalheSRD) —
+// uma única fonte de verdade para não divergir entre onde o número é mostrado e o que ele abre.
+const SRD_DETALHE_DEFS = {
+  total:       { titulo:'Leads recebidos (WhatsApp)',        filtro: r => true },
+  contatado:   { titulo:'Contatados pela cadência',          filtro: r => srdStatusInfo(r.status).tier >= 1 },
+  engajado:    { titulo:'Respondeu ao contato',                filtro: r => srdStatusInfo(r.status).tier >= 2 },
+  qualificado: { titulo:'Qualificado / Demo agendada',        filtro: r => srdStatusInfo(r.status).tier >= 3 },
+  rejeitado:   { titulo:'Rejeitados',                         filtro: r => srdStatusInfo(r.status).exit === 'rejeitado' },
+};
+// Filtra SRD_IA_LEADS por um conjunto de critérios (default: _srdFiltro atual). Aceita overrides
+// pontuais (_rangeStart/_rangeEnd em ms) para recalcular a janela anterior do trend sem tocar no
+// estado global de filtro — usado só por srdRowsFiltradas() abaixo.
+function srdRowsComFiltros(overrides){
+  const f = Object.assign({}, _srdFiltro, overrides||{});
   return SRD_IA_LEADS.filter(r => {
-    if (_srdFiltro.tipo === 'campanha' && !r.isCampanha) return false;
-    if (_srdFiltro.tipo === 'nao_campanha' && r.isCampanha) return false;
-    if (_srdFiltro.rastreio === 'com' && !r.campanha) return false;
-    if (_srdFiltro.rastreio === 'sem' && r.campanha) return false;
-    if (_srdFiltro.fonte && r.fonte !== _srdFiltro.fonte) return false;
+    if (f.tipo === 'campanha' && !r.isCampanha) return false;
+    if (f.tipo === 'nao_campanha' && r.isCampanha) return false;
+    if (f.rastreio === 'com' && !r.campanha) return false;
+    if (f.rastreio === 'sem' && r.campanha) return false;
+    if (f.status && r.status !== f.status) return false;
+    if (f.fonte && r.fonte !== f.fonte) return false;
+    if (f.campanha && r.campanha !== f.campanha) return false;
+    if (f.conjunto && r.conjunto !== f.conjunto) return false;
+    if (f.anuncio && r.anuncio !== f.anuncio) return false;
+    const ms = r.data ? new Date(r.data).getTime() : NaN;
+    const t = Number.isFinite(ms) ? ms : null; // data ausente OU inválida cai fora de qualquer filtro de período
+    if (f._rangeStart != null || f._rangeEnd != null) {
+      if (t == null) return false;
+      if (f._rangeStart != null && t < f._rangeStart) return false;
+      if (f._rangeEnd != null && t >= f._rangeEnd) return false;
+    } else if (f.periodo) {
+      const limite = SRD_REF_DATE - parseInt(f.periodo,10)*86400000;
+      if (t == null || t < limite) return false;
+    }
     return true;
   });
 }
+function srdRowsFiltradas(){ return srdRowsComFiltros(); }
 function aplicarFiltrosSRD(){
   _srdFiltro = {
+    periodo: document.getElementById('srd-f-periodo').value,
     tipo: document.getElementById('srd-f-tipo').value,
     rastreio: document.getElementById('srd-f-rastreio').value,
+    status: document.getElementById('srd-f-status').value,
     fonte: document.getElementById('srd-f-fonte').value,
+    campanha: document.getElementById('srd-f-campanha').value,
+    conjunto: document.getElementById('srd-f-conjunto').value,
+    anuncio: document.getElementById('srd-f-anuncio').value,
   };
   renderSRDIA();
 }
 function limparFiltrosSRD(){
-  document.getElementById('srd-f-tipo').value = '';
-  document.getElementById('srd-f-rastreio').value = '';
-  document.getElementById('srd-f-fonte').value = '';
+  ['srd-f-tipo','srd-f-rastreio','srd-f-status','srd-f-fonte','srd-f-campanha','srd-f-conjunto','srd-f-anuncio'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const periodoSel = document.getElementById('srd-f-periodo'); if (periodoSel) periodoSel.value = '90';
+  aplicarFiltrosSRD();
+}
+// Wrappers usados pelos data-action (clique em KPI/bar/tabela) — só setam o <select> correspondente
+// e reaplicam, mesmo padrão de filtrarPorCampanhaCriativo/filtrarPorConjuntoCriativo na aba Criativos.
+function filtrarTipoSRD(v){ const el=document.getElementById('srd-f-tipo'); if(el) el.value=v; aplicarFiltrosSRD(); }
+function filtrarRastreioSRD(v){ const el=document.getElementById('srd-f-rastreio'); if(el) el.value=v; aplicarFiltrosSRD(); }
+function filtrarPorStatusSRD(v){ const el=document.getElementById('srd-f-status'); if(el) el.value=v; aplicarFiltrosSRD(); }
+function filtrarPorFonteSRD(v){ const el=document.getElementById('srd-f-fonte'); if(el) el.value=v; aplicarFiltrosSRD(); }
+function filtrarPorCampanhaSRD(v){
+  const el=document.getElementById('srd-f-campanha'); if(el) el.value=v;
+  const c=document.getElementById('srd-f-conjunto'); if(c) c.value='';
+  const a=document.getElementById('srd-f-anuncio'); if(a) a.value='';
+  aplicarFiltrosSRD();
+}
+function filtrarPorConjuntoSRD(v){
+  const el=document.getElementById('srd-f-conjunto'); if(el) el.value=v;
+  const a=document.getElementById('srd-f-anuncio'); if(a) a.value='';
+  aplicarFiltrosSRD();
+}
+// O mesmo nome de anúncio pode se repetir em conjuntos diferentes (a Meta reusa nomes de criativo
+// entre ad sets) — filtrar só por anúncio atravessaria conjuntos e devolveria leads de fora da linha
+// clicada. Por isso o clique na tabela granular sempre passa o conjunto junto (arg2); dentro de um
+// mesmo conjunto o nome do anúncio já é 1:1 com o criativo, então a dupla é suficiente.
+function filtrarPorAnuncioSRD(v, conjunto){
+  const el=document.getElementById('srd-f-anuncio'); if(el) el.value=v;
+  if (conjunto) { const c=document.getElementById('srd-f-conjunto'); if(c) c.value=conjunto; }
   aplicarFiltrosSRD();
 }
 function srdTipoBadgeHTML(r){
@@ -4468,55 +4634,276 @@ function srdTipoBadgeHTML(r){
     ? `<span class="badge lq">Campanha</span>`
     : `<span class="badge" style="background:var(--surface2);color:var(--muted)">Não-campanha</span>`;
 }
-function loadSRDIA(){
-  // Popula o select de origem (LeadSource) uma única vez, na ordem de volume.
-  const fSel = document.getElementById('srd-f-fonte');
-  if (fSel && fSel.options.length <= 1){
-    const porFonte = {};
-    SRD_IA_LEADS.forEach(r => { porFonte[r.fonte] = (porFonte[r.fonte]||0) + 1; });
-    Object.keys(porFonte).sort((a,b) => porFonte[b]-porFonte[a]).forEach(fonte => {
-      const opt = document.createElement('option');
-      opt.value = fonte; opt.textContent = `${fonte} (${porFonte[fonte]})`;
-      fSel.appendChild(opt);
-    });
+// Reusa o modal genérico de detalhe (#lead-detail-modal) já usado por abrirDetalheCard, com colunas
+// próprias do SRD IA (sem valor/produto — este funil não tem oportunidade/CRM comercial associada).
+function abrirDetalheSRD(tipo){
+  const def = SRD_DETALHE_DEFS[tipo];
+  const modal = document.getElementById('lead-detail-modal');
+  if (!def || !modal) return;
+  const footer = document.getElementById('lead-detail-footer');
+  if (footer) { footer.style.display = 'none'; footer.innerHTML = ''; }
+  const leads = _srdRowsAtuais.filter(def.filtro);
+  const titleEl = document.getElementById('lead-detail-title');
+  if (titleEl) titleEl.textContent = `${def.titulo} — ${fmt(leads.length)} lead${leads.length!==1?'s':''}`;
+  const thead = document.getElementById('lead-detail-thead');
+  if (thead) thead.innerHTML = `<tr><th>Nome</th><th>Telefone</th><th>Status</th><th>Origem</th><th>Campanha (Meta)</th><th>Data</th></tr>`;
+  const body = document.getElementById('lead-detail-body');
+  if (body) {
+    const ordenados = leads.slice().sort((a,b) => new Date(b.data||0) - new Date(a.data||0));
+    body.innerHTML = ordenados.length ? ordenados.map(r => `<tr>
+      <td><div class="t-name">${esc(r.nome||'—')}</div></td>
+      <td style="font-family:var(--mono)">${esc(r.tel||'—')}</td>
+      <td>${esc(r.status||'—')}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.fonte)}">${esc(r.fonte||'—')}</td>
+      <td>${r.campanha ? esc(r.campanha) : '<span style="color:var(--muted);font-size:11px">sem rastreamento</span>'}</td>
+      <td>${r.data ? new Date(r.data).toLocaleDateString('pt-BR') : '—'}</td>
+    </tr>`).join('') : `<tr><td colspan="6" class="empty">Nenhum lead neste recorte</td></tr>`;
   }
+  modal.style.display = 'flex';
+  const closeBtn = document.getElementById('lead-detail-close');
+  if (closeBtn) closeBtn.focus();
+}
+function loadSRDIA(){
+  // Popula os selects (origem/status/campanha/conjunto/anúncio) uma única vez, na ordem de volume.
+  const popularSelect = (id, valores) => {
+    const el = document.getElementById(id);
+    if (!el || el.options.length > 1) return;
+    valores.forEach(([valor,n]) => {
+      const opt = document.createElement('option');
+      opt.value = valor; opt.textContent = `${valor} (${n})`;
+      el.appendChild(opt);
+    });
+  };
+  const contarPor = (campo) => {
+    const acc = {};
+    SRD_IA_LEADS.forEach(r => { if (r[campo]) acc[r[campo]] = (acc[r[campo]]||0)+1; });
+    return Object.entries(acc).sort((a,b)=>b[1]-a[1]);
+  };
+  popularSelect('srd-f-fonte', contarPor('fonte'));
+  popularSelect('srd-f-status', contarPor('status'));
+  popularSelect('srd-f-campanha', contarPor('campanha'));
+  // Conjunto e anúncio NÃO entram aqui — são repopulados a cada render por
+  // atualizarSelectsDependentesSRD(), escopados pela campanha/conjunto selecionados (ver ali por quê).
+
   const total = SRD_IA_LEADS.length;
   const mapeados = SRD_IA_LEADS.filter(r => r.campanha).length;
-  document.getElementById('srd-cobertura-hint').textContent = `${fmt(mapeados)} de ${fmt(total)} (${(mapeados/total*100).toFixed(1)}%)`;
+  document.getElementById('srd-cobertura-hint').textContent = total ? `${fmt(mapeados)} de ${fmt(total)} (${(mapeados/total*100).toFixed(1)}%)` : '—';
+  const snapshotEl = document.getElementById('srd-snapshot-data');
+  if (snapshotEl) snapshotEl.textContent = SRD_REF_DATE ? new Date(SRD_REF_DATE).toLocaleDateString('pt-BR') : '—';
   renderSRDIA();
 }
+// Repopula os selects de Conjunto e Anúncio escopados pela campanha (e, no caso do anúncio, também
+// pelo conjunto) atualmente selecionados — sem isso os dois listavam TODOS os valores do snapshot
+// inteiro, então dava pra escolher uma combinação campanha+conjunto que não existe junta e cair num
+// recorte vazio sem nenhum aviso. Se a seleção atual deixar de existir na lista recalculada, ela é
+// resetada aqui (e o _srdFiltro em memória, senão srdRowsFiltradas() abaixo ainda usaria o valor velho).
+function atualizarSelectsDependentesSRD(){
+  const porConjunto = {}, porAnuncio = {};
+  SRD_IA_LEADS.forEach(r => {
+    if (_srdFiltro.campanha && r.campanha !== _srdFiltro.campanha) return;
+    if (r.conjunto) porConjunto[r.conjunto] = (porConjunto[r.conjunto]||0)+1;
+    if (_srdFiltro.conjunto && r.conjunto !== _srdFiltro.conjunto) return;
+    if (r.anuncio) porAnuncio[r.anuncio] = (porAnuncio[r.anuncio]||0)+1;
+  });
+  const repopular = (id, placeholder, valores, valorAtual) => {
+    const el = document.getElementById(id);
+    if (!el) return true;
+    const ordenados = Object.entries(valores).sort((a,b)=>b[1]-a[1]);
+    const aindaValido = !valorAtual || ordenados.some(([v])=>v===valorAtual);
+    el.innerHTML = `<option value="">${placeholder}</option>` + ordenados.map(([v,n])=>`<option value="${esc(v)}"${v===valorAtual?' selected':''}>${esc(v)} (${n})</option>`).join('');
+    if (!aindaValido) el.value = '';
+    return aindaValido;
+  };
+  const conjuntoValido = repopular('srd-f-conjunto', 'Todo conjunto', porConjunto, _srdFiltro.conjunto);
+  if (!conjuntoValido) _srdFiltro.conjunto = '';
+  const anuncioValido = repopular('srd-f-anuncio', 'Todo anúncio', porAnuncio, _srdFiltro.anuncio);
+  if (!anuncioValido) _srdFiltro.anuncio = '';
+}
 function renderSRDIA(){
+  atualizarSelectsDependentesSRD();
   const rows = srdRowsFiltradas();
+  _srdRowsAtuais = rows;
   const campanha = rows.filter(r => r.isCampanha);
   const naoCampanha = rows.filter(r => !r.isCampanha);
   const mapeados = rows.filter(r => r.campanha);
+  const contatados = rows.filter(r => srdStatusInfo(r.status).tier >= 1);
+  const engajados = rows.filter(r => srdStatusInfo(r.status).tier >= 2);
+  const qualificados = rows.filter(r => srdStatusInfo(r.status).tier >= 3);
+  const rejeitados = rows.filter(r => srdStatusInfo(r.status).exit === 'rejeitado');
+  const nutricao = rows.filter(r => srdStatusInfo(r.status).exit === 'nutricao');
+
+  // ── Trend do KPI principal: só faz sentido comparar contra uma janela anterior de mesmo
+  // tamanho quando há um período selecionado (não dá pra comparar "todo o período" com nada). ──
+  let prevTotal = null;
+  if (_srdFiltro.periodo) {
+    const dias = parseInt(_srdFiltro.periodo,10);
+    const fimAnterior = SRD_REF_DATE - dias*86400000;
+    const inicioAnterior = fimAnterior - dias*86400000;
+    prevTotal = srdRowsComFiltros({ periodo:'', _rangeStart: inicioAnterior, _rangeEnd: fimAnterior }).length;
+  }
 
   document.getElementById('srd-total').textContent = fmt(rows.length);
+  document.getElementById('srd-total-trend').innerHTML = prevTotal!=null ? trendHTML(rows.length, prevTotal) : '';
   document.getElementById('srd-campanha').textContent = fmt(campanha.length);
   document.getElementById('srd-campanha-pct').textContent = rows.length ? (campanha.length/rows.length*100).toFixed(1)+'% do recorte' : '';
   document.getElementById('srd-nao-campanha').textContent = fmt(naoCampanha.length);
   document.getElementById('srd-nao-campanha-pct').textContent = rows.length ? (naoCampanha.length/rows.length*100).toFixed(1)+'% do recorte' : '';
   document.getElementById('srd-mapeados').textContent = fmt(mapeados.length);
   document.getElementById('srd-mapeados-pct').textContent = rows.length ? (mapeados.length/rows.length*100).toFixed(1)+'% do recorte' : '';
-  document.getElementById('srd-filter-count').textContent = rows.length !== SRD_IA_LEADS.length ? `${fmt(rows.length)} de ${fmt(SRD_IA_LEADS.length)} leads` : '';
+  document.getElementById('srd-engaj').textContent = fmt(engajados.length);
+  document.getElementById('srd-engaj-pct').textContent = rows.length ? (engajados.length/rows.length*100).toFixed(1)+'% dos leads do recorte' : '';
+  document.getElementById('srd-qualif').textContent = fmt(qualificados.length);
+  document.getElementById('srd-qualif-pct').textContent = rows.length ? (qualificados.length/rows.length*100).toFixed(1)+'% dos leads do recorte' : '';
+  document.getElementById('srd-rejeitado').textContent = fmt(rejeitados.length);
+  document.getElementById('srd-rejeitado-pct').textContent = rows.length ? (rejeitados.length/rows.length*100).toFixed(1)+'% dos leads do recorte' : '';
+  const campanhasAtivas = new Set(mapeados.map(r=>r.campanha));
+  const conjuntosAtivos = new Set(mapeados.map(r=>r.conjunto).filter(Boolean));
+  // Conta por criativo/adId, não pelo nome do anúncio: a Meta reusa o mesmo nome de anúncio (ex:
+  // "V2_...") em conjuntos diferentes, então contar por nome subestima o nº real de anúncios distintos.
+  const anunciosAtivos = new Set(mapeados.map(r=>r.criativo||r.adId).filter(Boolean));
+  document.getElementById('srd-campanhas-ativas').textContent = fmt(campanhasAtivas.size);
+  document.getElementById('srd-conjuntos-anuncios').textContent = `${fmt(conjuntosAtivos.size)} conjunto(s) · ${fmt(anunciosAtivos.size)} anúncio(s)`;
+  // Só marca "filtrado" quando algum filtro que não seja o período-padrão está ativo — senão o
+  // indicador ficava sempre ligado (o padrão já é 90 dias, então rows.length quase nunca bate com
+  // o total do array) e perdia a função de sinalizar que algo foi restringido pelo usuário.
+  const outrosFiltrosAtivos = !!(_srdFiltro.tipo || _srdFiltro.rastreio || _srdFiltro.status || _srdFiltro.fonte || _srdFiltro.campanha || _srdFiltro.conjunto || _srdFiltro.anuncio);
+  const filterCountEl = document.getElementById('srd-filter-count');
+  if (filterCountEl) {
+    if (outrosFiltrosAtivos) filterCountEl.textContent = `${fmt(rows.length)} de ${fmt(SRD_IA_LEADS.length)} leads (com filtro)`;
+    else if (_srdFiltro.periodo) filterCountEl.textContent = `${fmt(rows.length)} leads nos últimos ${_srdFiltro.periodo} dias do snapshot`;
+    else filterCountEl.textContent = `${fmt(rows.length)} leads (todo o snapshot)`;
+  }
   document.getElementById('srd-tbody-badge').textContent = `${fmt(rows.length)} leads`;
 
-  // ── Resumo por campanha/conjunto/anúncio/criativo (só os que têm Ad ID resolvido) ──
+  // ── Jornada da cadência (funil2, mesmo padrão visual do funil comercial em Oportunidades) ──
+  const funilRows = [
+    { key:'total',       label:'Leads recebidos',  v: rows.length },
+    { key:'contatado',   label:'Contatados',       v: contatados.length },
+    { key:'engajado',    label:'Respondeu',        v: engajados.length },
+    { key:'qualificado', label:'Qualificado/Demo',v: qualificados.length },
+  ];
+  const funilEl = document.getElementById('srd-funil');
+  if (funilEl) {
+    const FUNIL_RAMP = ['var(--fnl-1)','var(--fnl-2)','var(--fnl-3)','var(--fnl-4)'];
+    const maxFunil = Math.max(rows.length, 1);
+    const rowsHTML = funilRows.map((r,i) => {
+      const widthPct = maxFunil>0 && r.v>0 ? Math.max(r.v/maxFunil*100, 3) : 0;
+      const conv = (i>0 && funilRows[i-1].v>0) ? (r.v/funilRows[i-1].v*100) : null;
+      const convTxt = conv!=null ? `${conv.toFixed(1)}% de conversão` : '';
+      const aria = `${r.label}: ${fmt(r.v)}${convTxt ? ', ' + convTxt : ''}. Clique para ver os leads.`;
+      const row = `<div class="funil2-row funnel-seg" role="button" tabindex="0" aria-label="${esc(aria)}" `
+        + `data-action="abrirDetalheSRD" data-arg="${r.key}" `
+        + `data-fnl-label="${esc(r.label)}" data-fnl-val="${esc(fmt(r.v))}" data-fnl-conv="${esc(convTxt)}" `
+        + `style="animation-delay:${i*60}ms">`
+        + `<div class="funil2-name">${esc(r.label)}</div>`
+        + `<div class="funil2-track"><div class="funil2-fill" style="width:${widthPct}%;background:${FUNIL_RAMP[i]}"></div></div>`
+        + `<div class="funil2-val">${esc(fmt(r.v))}</div>`
+        + `</div>`;
+      const proximoConv = (i < funilRows.length-1)
+        ? (funilRows[i].v>0 ? (funilRows[i+1].v/funilRows[i].v*100).toFixed(1) : '0.0')
+        : null;
+      const connector = (i < funilRows.length-1)
+        ? `<div class="funil2-connector"><div></div><div class="funil2-connector-inner"><i class="ti ti-corner-down-right"></i>`
+          + `<b>${proximoConv}%</b> segue para ${esc(funilRows[i+1].label)}</div><div></div></div>`
+        : '';
+      return row + connector;
+    }).join('');
+    funilEl.innerHTML = `<div class="funil2" role="group" aria-label="Jornada da cadência de WhatsApp: leads, contatados, responderam e qualificados">${rowsHTML}</div>`
+      + `<div class="chart-click-hint" style="margin-top:10px;color:var(--muted)">Dentro de "Contatados": <b style="color:var(--red)">${fmt(rejeitados.length)} rejeitado(s)</b> e <b style="color:var(--amber)">${fmt(nutricao.length)} em cadência de nutrição (ebook)</b> — não respondem. "Contato dia N" é tentativa sem resposta; só passa pra "Respondeu" quando o lead de fato responde. Clique num estágio do funil pra ver os leads.</div>`;
+    setupFunilTooltip(funilEl);
+  }
+
+  // ── Série temporal de leads ──
+  const serie = agruparPorPeriodo(rows, r => r.data ? new Date(r.data) : null, 'auto');
+  const serieBadge = document.getElementById('srd-serie-badge');
+  if (serieBadge) serieBadge.textContent = serie.length ? `${serie.length} ponto${serie.length!==1?'s':''}` : 'sem dados no recorte';
+  mkChart('c-srd-serie','line', serie.map(p=>p.bucket), [
+    { label:'Leads', data:serie.map(p=>p.valor), borderColor:CORES[0], backgroundColor:hexToRgba(CORES[0],.12), fill:true, tension:.3, pointRadius:2, borderWidth:2 }
+  ], { scales:scOpts() });
+
+  // ── Campanha × Não-campanha (doughnut) ── cores explícitas: precisam bater com o donut abaixo,
+  // que usa CORES[3]/CORES[2] (roxo/âmbar) pra combinar com os accents dos KPIs .kpi-purple/.kpi-amber
+  // acima — mkLeg por padrão pintaria na ordem CORES[0]/CORES[1] (azul/verde) e destoaria do gráfico.
+  mkLeg(document.getElementById('srd-tipo-leg'), ['Campanha','Não-campanha'], [CORES[3],CORES[2]]);
+  mkChart('c-srd-tipo','doughnut', ['Campanha','Não-campanha'], [{ data:[campanha.length, naoCampanha.length], backgroundColor:[CORES[3],CORES[2]], borderWidth:0 }], {
+    cutout:'62%',
+    onClick:(evt,els)=>{ if(!els.length) return; filtrarTipoSRD(els[0].index===0 ? 'campanha' : 'nao_campanha'); }
+  });
+
+  // ── Por status (barras clicáveis) ──
+  const byStatus = {};
+  rows.forEach(r => { const s = r.status||'Sem status'; byStatus[s] = (byStatus[s]||0)+1; });
+  const statusRows = Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('srd-status-bars'), statusRows.length?statusRows:[{label:'Sem dados no recorte',v:0}], CORES[0], statusRows.length?filtrarPorStatusSRD:null);
+
+  // ── Por origem / LeadSource (barras clicáveis) ──
+  const byFonte = {};
+  rows.forEach(r => { const s = r.fonte||'Sem origem'; byFonte[s] = (byFonte[s]||0)+1; });
+  const fonteRows = Object.entries(byFonte).sort((a,b)=>b[1]-a[1]).map(([label,v])=>({label,v}));
+  mkBars(document.getElementById('srd-fonte-bars'), fonteRows.length?fonteRows:[{label:'Sem dados no recorte',v:0}], CORES[3], fonteRows.length?filtrarPorFonteSRD:null);
+
+  // ── Por campanha (Meta Ads): agrupamento-mestre — conjuntos e anúncios distintos por campanha ──
+  const porCampanha = {};
+  mapeados.forEach(r => {
+    if (!porCampanha[r.campanha]) porCampanha[r.campanha] = { leads:0, qualif:0, rej:0, conjuntos:new Set(), anuncios:new Set() };
+    const g = porCampanha[r.campanha];
+    g.leads++;
+    if (srdStatusInfo(r.status).tier >= 3) g.qualif++;
+    if (srdStatusInfo(r.status).exit === 'rejeitado') g.rej++;
+    if (r.conjunto) g.conjuntos.add(r.conjunto);
+    // Por criativo/adId (não pelo nome do anúncio) — mesmo motivo do Set de KPI acima: nome de
+    // anúncio se repete entre conjuntos da mesma campanha, contar por nome subestima o total.
+    if (r.criativo || r.adId) g.anuncios.add(r.criativo || r.adId);
+  });
+  const campanhaRowsArr = Object.entries(porCampanha).sort((a,b)=>b[1].leads-a[1].leads);
+  document.getElementById('srd-campanha-body').innerHTML = campanhaRowsArr.length ? campanhaRowsArr.map(([nome,g])=>`<tr data-nav role="button" tabindex="0" data-action="filtrarPorCampanhaSRD" data-arg="${esc(nome)}">
+      <td><div class="t-name">${esc(nome)}</div></td>
+      <td>${fmt(g.conjuntos.size)}</td>
+      <td>${fmt(g.anuncios.size)}</td>
+      <td>${fmt(g.leads)}</td>
+      <td>${fmt(g.qualif)}</td>
+      <td>${fmt(g.rej)}</td>
+      <td>${g.leads>0?(g.qualif/g.leads*100).toFixed(1)+'%':'—'}</td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty">Nenhuma campanha mapeada no recorte atual.</td></tr>';
+
+  // ── Por conjunto de anúncios ──
+  const porConjunto = {};
+  mapeados.forEach(r => {
+    if (!r.conjunto) return;
+    if (!porConjunto[r.conjunto]) porConjunto[r.conjunto] = { campanha:r.campanha, leads:0, qualif:0, anuncios:new Set() };
+    const g = porConjunto[r.conjunto];
+    g.leads++;
+    if (srdStatusInfo(r.status).tier >= 3) g.qualif++;
+    if (r.anuncio) g.anuncios.add(r.anuncio);
+  });
+  const conjuntoRowsArr = Object.entries(porConjunto).sort((a,b)=>b[1].leads-a[1].leads);
+  document.getElementById('srd-conjunto-badge').textContent = `${fmt(conjuntoRowsArr.length)} conjunto(s) · clique para ver os anúncios`;
+  document.getElementById('srd-conjunto-body').innerHTML = conjuntoRowsArr.length ? conjuntoRowsArr.map(([nome,g])=>`<tr data-nav role="button" tabindex="0" data-action="filtrarPorConjuntoSRD" data-arg="${esc(nome)}">
+      <td><div class="t-name">${esc(nome)}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(g.campanha)}</td>
+      <td>${fmt(g.anuncios.size)}</td>
+      <td>${fmt(g.leads)}</td>
+      <td>${fmt(g.qualif)}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhum conjunto mapeado no recorte atual.</td></tr>';
+
+  // ── Por anúncio / criativo (nível mais granular) ──
   const grupos = {};
   mapeados.forEach(r => {
     const k = r.criativo || r.adId;
-    if (!grupos[k]) grupos[k] = { campanha:r.campanha, conjunto:r.conjunto, anuncio:r.anuncio, criativo:r.criativo, n:0 };
+    if (!grupos[k]) grupos[k] = { campanha:r.campanha, conjunto:r.conjunto, anuncio:r.anuncio, criativo:r.criativo, n:0, qualif:0 };
     grupos[k].n++;
+    if (srdStatusInfo(r.status).tier >= 3) grupos[k].qualif++;
   });
   const gruposOrdenados = Object.values(grupos).sort((a,b) => b.n-a.n);
-  document.getElementById('srd-porcampanha-badge').textContent = `${fmt(gruposOrdenados.length)} criativo(s) identificado(s)`;
+  document.getElementById('srd-porcampanha-badge').textContent = `${fmt(gruposOrdenados.length)} anúncio(s)/criativo(s) identificado(s)`;
   renderRows(document.getElementById('srd-porcampanha-body'), gruposOrdenados, [
-    g => ({ html: `<span style="white-space:nowrap;padding-right:16px">${esc(g.campanha)}</span>` }),
-    g => ({ html: `<span style="white-space:nowrap;padding-right:16px">${esc(g.conjunto)}</span>` }),
     g => ({ html: `<span style="white-space:nowrap;padding-right:16px">${esc(g.anuncio)}</span>` }),
+    g => ({ html: `<span style="white-space:nowrap;padding-right:16px">${esc(g.conjunto)}</span>` }),
+    g => ({ html: `<span style="white-space:nowrap;padding-right:16px">${esc(g.campanha)}</span>` }),
     g => ({ html: `<span style="font-family:var(--mono);font-size:11px;white-space:nowrap">${esc(g.criativo)}</span>` }),
     g => fmt(g.n),
-  ], 'Nenhum criativo mapeado no recorte atual.');
+    g => fmt(g.qualif),
+  ], 'Nenhum criativo mapeado no recorte atual.', g => `data-nav style="cursor:pointer" role="button" tabindex="0" data-action="filtrarPorAnuncioSRD" data-arg="${esc(g.anuncio)}" data-arg2="${esc(g.conjunto)}"`);
 
   // ── Tabela de detalhe ──
   const ordered = rows.slice().sort((a,b) => new Date(b.data||0) - new Date(a.data||0));
@@ -4529,6 +4916,7 @@ function renderSRDIA(){
     r => ({ html: srdTipoBadgeHTML(r) }),
     r => r.campanha ? { html: `<span style="white-space:nowrap;padding-right:16px">${esc(r.campanha)}</span>` } : { html: `<span style="color:var(--muted);font-size:11px;white-space:nowrap;padding-right:16px">sem rastreamento</span>` },
     r => r.conjunto ? { html: `<span style="white-space:nowrap;padding-right:16px">${esc(r.conjunto)}</span>` } : '—',
+    r => r.anuncio ? { html: `<span style="white-space:nowrap;padding-right:16px">${esc(r.anuncio)}</span>` } : '—',
     r => r.criativo ? { html: `<span style="font-family:var(--mono);font-size:11px;white-space:nowrap">${esc(r.criativo)}</span>` } : '—',
   ], 'Nenhum lead no recorte atual.');
 }
