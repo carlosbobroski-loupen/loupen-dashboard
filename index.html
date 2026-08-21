@@ -296,7 +296,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   <!-- FILTRO OPORTUNIDADES (CRM Comercial) -->
   <div class="global-filters" id="opp-filters">
     <span style="font-size:12px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:5px"><i class="ti ti-filter"></i>Filtros</span>
-    <select class="filter-sel" id="o-segmento" onchange="aplicarFiltrosOpp()" title="Marketing = e-mail bateu com um lead da Central de Leads (veio de mídia paga rastreada). Comercial = lead cadastrado direto no CRM, sem rastreio de mídia.">
+    <select class="filter-sel" id="o-segmento" onchange="aplicarFiltrosOpp()" title="Marketing = e-mail bateu com um lead da Central de Leads (mídia paga rastreada) OU o LeadSource do CRM já é um código de campanha reconhecido (ex: GOTO_INSTITUCIONAL, LOGMEIN_RESCUE-LICENCA-ECO). Comercial = lead cadastrado direto no CRM, sem nenhum dos dois sinais de mídia paga.">
       <option value="">Marketing + Comercial</option>
       <option value="marketing">Só Marketing</option>
       <option value="comercial">Só Comercial</option>
@@ -2832,11 +2832,19 @@ async function loadSalesforce() {
     const isWon = !!valorNF && !isLost;
     const isOpen = isOpportunity && !isLost && !isWon;
     const info = _leadEmailMap[email];
-    const isMarketing = !!info;
+    // Nem todo lead de campanha bate por e-mail na Central de Leads (ex: leads via WhatsApp/CRM
+    // direto, sem passar pela automação) — mas o próprio LeadSource do Salesforce às vezes já vem
+    // com o nome/código da campanha (ex: "GoTo_INSCRIÇÃO", "GOTO_GERAL_LEADS_2601",
+    // "LOGMEIN_RESCUE-LICENCA-ECO_08-26"). Confirmado 2026-08-18: standardizeCampanha(origem) já
+    // reconhece esse padrão (mesmas CAMPANHA_RULES usadas para exibição) — se ele muda o valor,
+    // é campanha, então conta como Marketing mesmo sem match de e-mail.
+    const pareceCampanha = standardizeCampanha(origem) !== origem;
+    const isMarketing = !!info || pareceCampanha;
     // Leads de Marketing usam a nomenclatura padronizada da Central de Leads (o e-mail bateu
-    // com um lead que veio pela automação de anúncios); leads só do Comercial mantêm a origem
-    // como foi digitada no CRM (não passaram pelo rastreio de mídia paga).
-    const origemBase = ORIGEM_OVERRIDE_EMAIL[email] || (isMarketing ? (info.campanha || origem) : origem);
+    // com um lead que veio pela automação de anúncios); os demais mantêm a origem como foi
+    // digitada no CRM antes de standardizeCampanha() rodar embaixo (cobre tanto comercial puro
+    // quanto o caso pareceCampanha acima, que já vai ficar padronizado ali).
+    const origemBase = ORIGEM_OVERRIDE_EMAIL[email] || (info ? (info.campanha || origem) : origem);
     // Padroniza sempre, tenha vindo da Central de Leads (marketing) ou cru do CRM (comercial) —
     // não muda nada em quem já está padronizado, mas corrige quem só existe no Salesforce.
     const origemPadronizada = standardizeCampanha(origemBase);
