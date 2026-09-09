@@ -39,7 +39,21 @@ const LEADS_DETAIL_URL = 'assets/data/mock/leads-detalhe.json';
 // NÃO virar sem o gate de acesso ativo (ADR-018): em modo real o dashboard
 // serve dado de lead com PII, e o que impede acesso anônimo é o Cloudflare
 // Access, não este arquivo.
-const MODO_DADOS = 'mock';
+//
+// ── CUTOVER EM 2026-09-09 (subtask 7.1) ───────────────────────────────────
+// Trocado de 'mock' para 'real'. Autorizado pelo usuário (gate CON-8), mas
+// deliberadamente NÃO no momento em que a autorização veio: naquele instante
+// `lead` tinha 13 registros, todos `source_system = 'seed_test'`, porque
+// nenhum fluxo jamais havia lido a base de leads do RD Station. Virar a chave
+// ali teria trocado 13 leads falsos ROTULADOS como mock por 13 leads falsos
+// NÃO rotulados — estritamente pior.
+//
+// A chave virou depois de a ingestão existir e ser verificada em produção:
+// 500 leads reais do RD Station, 766 eventos de conversão, 39 leads marcados
+// como teste (e portanto fora dos filtros por padrão).
+//
+// Para voltar: trocar por 'mock'. É uma linha, e o fixture segue no repo.
+const MODO_DADOS = 'real';
 
 // Achado real (subtask 5.1): webhook com path dinâmico (:id) é servido com
 // o webhookId do nó PREPENDED à URL — não documentado de forma óbvia na UI
@@ -80,7 +94,40 @@ function _modoTesteLocal() {
   return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host === '';
 }
 
+// Fixar o modo mock por query string, SÓ em host local. Existe porque o
+// cutover para 'real' quebraria os specs Playwright: eles rodam em
+// localhost:8123, não têm chave de API, e passariam a bater em `/api/*`
+// same-origin — que num servidor estático local não existe. Sem isto, virar
+// a chave desativaria silenciosamente a suíte e2e, o que é pior do que a
+// suíte falhar: uma suíte que não exercita nada continua verde.
+//
+// Travado no mesmo host-guard de _modoTesteLocal, e por isso INALCANÇÁVEL em
+// produção. Forçar mock em produção seria inofensivo em termos de dados (o
+// fixture não tem PII), mas mostraria número falso sem rótulo — exatamente o
+// problema que o cutover corrigiu.
+// Avaliado UMA VEZ, na carga do módulo, e não a cada chamada. O motivo é um
+// bug real encontrado pelos specs: `atualizarEstado()` reescreve a query
+// string inteira ao aplicar/limpar filtros, e isso APAGAVA o `dados=mock`
+// junto — a página caía em modo real no meio do teste e passava a buscar
+// `/api/*` num servidor estático local, que não tem esses caminhos.
+//
+// Ler uma vez também é o comportamento correto por natureza: isto é uma
+// chave de sessão de teste, não um filtro. Não deve mudar durante a
+// navegação.
+const _MOCK_FORCADO_LOCAL = (() => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  const local = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host === '';
+  if (!local) return false;
+  try {
+    return new URLSearchParams(window.location.search).get('dados') === 'mock';
+  } catch (e) {
+    return false;
+  }
+})();
+
 function _modoReal() {
+  if (_MOCK_FORCADO_LOCAL) return false;
   return MODO_DADOS === 'real' || _modoTesteLocal();
 }
 
@@ -126,10 +173,30 @@ function _adaptarItemLista(real) {
     segmento: real.segmento,
     estagio_funil: real.estagio_funil,
     data_criacao: real.created_at_source,
-    // TODO conhecido: fn_search_leads só lê a tabela `lead` (Salesforce) —
-    // quando contact/RD Station entrar na busca combinada, isto deixa de
-    // ser um valor fixo.
-    fonte_dados: 'salesforce',
+    // Corrigido em 2026-09-09: era `'salesforce'` FIXO, com um TODO dizendo
+    // que deixaria de ser fixo "quando o RD Station entrar na busca". Entrou
+    // (fn_search_leads v2 lê view_lead_perfil, que cobre as duas fontes), e
+    // o valor fixo passaria a MENTIR — rotularia 125 leads do RD Station como
+    // Salesforce. Agora vem do dado.
+    fonte_dados: real.fonte_dados ?? real.source_system ?? null,
+
+    // Dimensões novas (data-contract.md §1, todas com cobertura medida).
+    data_conversao: real.data_conversao ?? null,
+    trimestre: real.trimestre ?? null,
+    // Eixo A — origem de conversão. NUNCA portadora de investimento (§1.2).
+    origem_conversao: real.origem_conversao ?? null,
+    origem_ultima_conversao: real.origem_ultima_conversao ?? null,
+    qtd_conversoes: Number(real.qtd_conversoes ?? 0),
+    tags: Array.isArray(real.tags) ? real.tags : [],
+    cargo: real.cargo ?? null,
+    cargo_grupo: real.cargo_grupo ?? 'nao_informado',
+    tamanho_empresa: real.tamanho_empresa ?? 'nao_informado',
+    atendido_por: real.atendido_por ?? null,
+    // Eixo B — campanha de mídia paga. Único eixo que pode receber
+    // investimento e ROI (§1.2). Esparso de propósito: 7,6% medido.
+    campanha_midia: real.campanha_midia ?? null,
+    plataforma: real.plataforma ?? null,
+    is_teste: real.is_teste === true,
   };
 }
 
@@ -212,24 +279,66 @@ function _adaptarDetalheReal(real) {
  * um lead só aparece se satisfizer TODOS os critérios informados.
  * @param {{segmento?: string[], canal?: string[], campanha?: string, periodo_inicio?: string, periodo_fim?: string}} filtros
  */
+// Dimensões multivalor do contrato §1. Repetidas na query string
+// (?tag=a&tag=b); o backend combina por OR dentro da dimensão e por AND
+// entre dimensões (AC-1.1: interseção real, nunca substituição).
+const DIMENSOES_MULTI = [
+  'segmento', 'estagio_funil', 'cargo_grupo', 'tamanho_empresa',
+  'atendido_por', 'plataforma', 'trimestre', 'origem_conversao', 'tags',
+];
+
 export async function listarLeads(filtros = {}) {
-  const { segmento, campanha, periodo_inicio, periodo_fim } = filtros;
+  const {
+    segmento, campanha, campanha_midia, periodo_inicio, periodo_fim,
+    incluir_teste, limit, offset,
+  } = filtros;
 
   if (_modoReal()) {
     const params = new URLSearchParams();
-    if (segmento && segmento.length > 0) segmento.forEach((s) => params.append('segmento', s));
+
+    for (const dim of DIMENSOES_MULTI) {
+      const v = filtros[dim];
+      if (v === undefined || v === null || v === '') continue;
+      for (const item of (Array.isArray(v) ? v : [v])) {
+        if (item !== '' && item !== null && item !== undefined) params.append(dim, item);
+      }
+    }
+
+    // TRÊS conceitos distintos, e a primeira versão desta função os
+    // confundiu (tratava `campanha` como apelido de `campanha_midia`, o que
+    // quebrou o pivô campanha→leads e foi pego por 4 specs Playwright):
+    //
+    //   campanha         valor_bruto do sinal de atribuição — o pivô (AC-4.1)
+    //   origem_conversao eixo A, ativo que converteu (cobertura 100%)
+    //   campanha_midia   eixo B, veiculação paga (7,6%) — ÚNICO com ROI
+    //
+    // São independentes e combináveis. Nunca aliasar um no outro.
     if (campanha) params.set('campanha', campanha);
+    if (campanha_midia) params.set('campanha_midia', campanha_midia);
+
+    // Período agora é resolvido no SERVIDOR, sobre data_conversao. Antes era
+    // filtrado no cliente sobre a página já retornada — o que significava
+    // que um período combinado com paginação descartava linhas da página em
+    // vez de reconsultar, e o total exibido não correspondia ao filtro.
+    if (periodo_inicio) params.set('periodo_inicio', periodo_inicio);
+    if (periodo_fim) params.set('periodo_fim', periodo_fim);
+
+    // Dado de teste fica FORA por padrão: 21% da base real é teste, e
+    // incluí-lo por omissão inflaria toda contagem. A aba Qualidade de dados
+    // é quem pede explicitamente.
+    if (incluir_teste) params.set('incluir_teste', 'true');
+
+    if (limit) params.set('limit', String(limit));
+    if (offset) params.set('offset', String(offset));
+
     const res = await _fetchReal(`api/leads?${params.toString()}`);
     if (!res.ok) throw new Error(`data-api (real): falha ao listar leads (HTTP ${res.status})`);
     const body = await res.json();
-    let lista = body.leads.map(_adaptarItemLista);
-    // periodo_inicio/periodo_fim: fn_search_leads ainda não recebe esse
-    // filtro (não fazia parte do contrato original de fn_search_leads,
-    // 3.19) — filtrado aqui, no cliente, sobre a página já retornada. Como
-    // a Etapa A já fazia o mesmo filtro no cliente, isso NÃO é uma
-    // regressão de comportamento, só de onde a linha roda.
-    if (periodo_inicio) lista = lista.filter((l) => l.data_criacao >= periodo_inicio);
-    if (periodo_fim) lista = lista.filter((l) => l.data_criacao <= periodo_fim);
+    const lista = body.leads.map(_adaptarItemLista);
+    // O total vem do servidor (window function em fn_search_leads), então
+    // reflete o filtro inteiro e não só a página. Anexado sem quebrar quem
+    // trata o retorno como array.
+    lista.total = Number(body.total ?? lista.length);
     return lista;
   }
 
@@ -263,6 +372,62 @@ export async function buscarLead(id) {
 
   const detalhes = await _loadDetail();
   return detalhes[id] ?? null;
+}
+
+/**
+ * Opções disponíveis de cada filtro, com contagem de leads — vindas do DADO
+ * (`fn_opcoes_filtro`), nunca de enum embutido no código.
+ *
+ * É a correção estrutural do erro que produziu os 4 filtros inventados da v1
+ * do contrato: a interface não decide mais quais valores existem. Se um campo
+ * está vazio na fonte, ele não aparece como opção; se um cargo novo surgir,
+ * aparece sem alterar código.
+ *
+ * A contagem por opção não é enfeite: é o que permite nunca oferecer uma
+ * opção que devolve zero, e mostrar onde vale filtrar.
+ *
+ * @returns {Promise<object|null>} null quando o backend não expõe (mock).
+ */
+export async function obterOpcoesFiltro() {
+  if (_modoReal()) {
+    const res = await _fetchReal(`api/meta`);
+    if (!res.ok) throw new Error(`data-api (real): falha ao obter opções de filtro (HTTP ${res.status})`);
+    const body = await res.json();
+    return body.opcoes_filtro ?? null;
+  }
+
+  // Modo mock: as opções são derivadas do PRÓPRIO fixture, não devolvidas
+  // como null nem inventadas. O princípio ("a opção vem do dado") vale nos
+  // dois modos — o que muda é qual dado.
+  //
+  // O fixture da Etapa A só tem `segmento` e `estagio_funil`; as dimensões
+  // firmográficas e de atribuição chegaram depois, com a revisão do
+  // contrato. Então aqui elas vêm vazias — e dimensão vazia não é oferecida
+  // como filtro, que é exatamente o comportamento certo.
+  const leads = await _loadList();
+  const contar = (campo) => {
+    const m = new Map();
+    for (const l of leads) {
+      const v = l[campo];
+      if (v === null || v === undefined || v === '') continue;
+      m.set(v, (m.get(v) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .map(([valor, n]) => ({ valor, leads: n }))
+      .sort((a, b) => b.leads - a.leads || String(a.valor).localeCompare(String(b.valor)));
+  };
+
+  return {
+    segmento: contar('segmento'),
+    estagio_funil: contar('estagio_funil'),
+    cargo_grupo: [], tamanho_empresa: [], atendido_por: [],
+    plataforma: [], trimestre: [], campanha_midia: [],
+    tags: [], origem_conversao: [],
+    totais: { leads: leads.length, leads_teste: 0, eventos_conversao: 0,
+              origens_distintas: 0, leads_sem_conversao: leads.length },
+    grao: {},
+    _fonte: 'fixture-mock',
+  };
 }
 
 /**

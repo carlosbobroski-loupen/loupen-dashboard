@@ -6,7 +6,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Filtragem combinável', () => {
   test('Filtros combinados produzem a interseção, não a substituição', async ({ page }) => {
-    await page.goto('/?view=leads-crm');
+    await page.goto('/?view=leads-crm&dados=mock');
     await page.click('.seg-pill[data-seg="comercial"]');
     await page.click('.seg-pill[data-seg="nao_atribuido"]'); // só marketing fica ativo
     const totalMarketing = await page.locator('#crm-lead-rows tr').count();
@@ -25,7 +25,7 @@ test.describe('Filtragem combinável', () => {
   });
 
   test('Combinação de filtros sem resultado: estado vazio explícito com ação de limpar', async ({ page }) => {
-    await page.goto('/?view=leads-crm&segmento=marketing&campanha=LOGMEIN_RESCUE-LICENCA-ECO_09_26_');
+    await page.goto('/?view=leads-crm&segmento=marketing&campanha=LOGMEIN_RESCUE-LICENCA-ECO_09_26_&dados=mock');
     // troca para comercial mantendo a campanha (nenhum lead comercial tem essa campanha)
     await page.click('.seg-pill[data-seg="comercial"]');
     await page.click('.seg-pill[data-seg="marketing"]');
@@ -33,15 +33,21 @@ test.describe('Filtragem combinável', () => {
     await expect(page.locator('#crm-lead-rows tr')).toHaveCount(0);
     const vazio = page.locator('#crm-empty-state');
     await expect(vazio).toBeVisible();
-    await expect(vazio).toContainText('segmento: Comercial');
-    await expect(vazio).toContainText('campanha:');
+    // INSENSÍVEL A CAIXA de propósito. O que este teste garante (INT-1) é que
+    // o estado vazio NOMEIA os filtros ativos em vez de mostrar "0" sem
+    // contexto. A caixa do rótulo é apresentação: a reescrita de 2026-09-09
+    // passou a usar "Segmento:"/"Campanha:" para casar com os rótulos da
+    // barra de filtros, e forçar minúscula aqui deixaria a tela inconsistente
+    // consigo mesma só para satisfazer a letra da asserção.
+    await expect(vazio).toContainText(/segmento:\s*Comercial/i);
+    await expect(vazio).toContainText(/campanha:/i);
 
     await vazio.locator('button').click();
     await expect(page.locator('#crm-lead-rows tr').first()).toBeVisible();
   });
 
   test('Navegar de uma campanha para seus leads, com caminho de volta preservado', async ({ page }) => {
-    await page.goto('/?view=leads-crm&lead=real-mkt-05'); // mesma campanha de real-mkt-03
+    await page.goto('/?view=leads-crm&lead=real-mkt-05&dados=mock'); // mesma campanha de real-mkt-03
     await page.click('.meta-tab[data-tab="related"]');
     await page.click('#crm-view-related [data-ir-campanha]');
 
@@ -54,7 +60,7 @@ test.describe('Filtragem combinável', () => {
   });
 
   test('Campanha sem leads atribuídos: estado vazio explícito, sem contador zerado sem contexto', async ({ page }) => {
-    await page.goto('/?view=leads-crm&campanha=campanha-inexistente-no-fixture');
+    await page.goto('/?view=leads-crm&campanha=campanha-inexistente-no-fixture&dados=mock');
     await expect(page.locator('#crm-empty-state')).toBeVisible();
     await expect(page.locator('#crm-empty-state')).toContainText('campanha-inexistente-no-fixture');
   });

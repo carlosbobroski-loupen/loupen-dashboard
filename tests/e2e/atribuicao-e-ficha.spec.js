@@ -8,7 +8,7 @@ const { test, expect } = require('@playwright/test');
 test.describe('Ficha do lead e jornada', () => {
   test('Ficha de lead convertido: exibe oportunidade vinculada e a razão da classificação', async ({ page }) => {
     // real-mkt-01 tem related.oportunidade preenchido no fixture (Etapa A).
-    await page.goto('/?view=leads-crm&lead=real-mkt-01');
+    await page.goto('/?view=leads-crm&lead=real-mkt-01&dados=mock');
     await expect(page.locator('#crm-p-nome')).toContainText('Camila R.');
     await expect(page.locator('#crm-view-overview')).toContainText('Classificado como Marketing');
 
@@ -19,14 +19,14 @@ test.describe('Ficha do lead e jornada', () => {
 
   test('Lead não convertido: estado vazio explícito, sem tentativa de join por LeadSource', async ({ page }) => {
     // real-mkt-03 tem related.conta=null e related.oportunidade=null no fixture.
-    await page.goto('/?view=leads-crm&lead=real-mkt-03');
+    await page.goto('/?view=leads-crm&lead=real-mkt-03&dados=mock');
     await page.click('.meta-tab[data-tab="related"]');
     await expect(page.locator('#crm-view-related')).toContainText('Sem conta associada');
     await expect(page.locator('#crm-view-related')).toContainText('Lead ainda não convertido');
   });
 
   test('Detalhe endereçável e retomável: filtros A e B continuam aplicados ao voltar', async ({ page }) => {
-    await page.goto('/?view=leads-crm&segmento=marketing&segmento=comercial');
+    await page.goto('/?view=leads-crm&segmento=marketing&segmento=comercial&dados=mock');
     const linhasAntes = await page.locator('#crm-lead-rows tr').count();
     await page.click('tr[data-lead-row="real-mkt-01"]');
     await expect(page).toHaveURL(/lead=real-mkt-01/);
@@ -39,7 +39,7 @@ test.describe('Ficha do lead e jornada', () => {
 
   test('Jornada com fonte indisponível: lacuna declarada, nunca ausência silenciosa', async ({ page }) => {
     // seed-src-01 tem um evento com idade_dado_declarada preenchida (EC-8).
-    await page.goto('/?view=leads-crm&lead=seed-src-01');
+    await page.goto('/?view=leads-crm&lead=seed-src-01&dados=mock');
     await page.click('.meta-tab[data-tab="jornada"]');
     const jornada = page.locator('#crm-view-jornada');
     await expect(jornada).toContainText('Conversão em Landing Page');

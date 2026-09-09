@@ -659,3 +659,386 @@ Registradas porque um roteiro que não bate com a tela faz a pessoa duvidar de s
 ### Restrições respeitadas
 
 GitHub Pages **não** foi desativado (é 4.4, só depois desta verificação); nenhum outro domínio ou zona DNS da conta foi tocado; nenhum arquivo do repositório foi alterado pelo agente do navegador.
+
+### ✅ Verificação independente do gate (feita pelo agente, sem depender do relatório do navegador)
+
+Depois do relatório da execução, confirmei o gate por fora, com `curl` anônimo contra o hostname de produção. **Toda** a superfície responde `302` para o login do Access:
+
+```
+/                          -> HTTP 302 -> ...cloudflareaccess.com/cdn-cgi/access/login/...
+/assets/js/data-api.js     -> HTTP 302 -> (idem)
+/api/meta                  -> HTTP 302 -> (idem)
+/api/leads                 -> HTTP 302 -> (idem)
+```
+
+Três coisas que isso prova, e que são mais fortes do que o que havia sido testado:
+
+1. **O gate cobre os ativos estáticos, não só o HTML.** Um visitante anônimo não consegue nem baixar os `.js`. Isso reduz ainda mais a relevância do achado do item 5 (a string `X-CRM-Api-Key` no bundle): além de não conter valor de chave e de o branch estar travado em host local, o arquivo **não é alcançável** sem sessão válida.
+2. **O gate cobre `/api/*`**, que era o risco R5 (Access não cobrir a API). No desenho novo isso é estrutural — mesma origem, mesmo projeto — e agora está confirmado empiricamente, não só por raciocínio.
+3. **A aplicação foi criada no hostname de PRODUÇÃO**, não só nos previews — que era o objetivo do passo do wildcard. O JWT do redirect trazia `"hostname":"loupen-dashboard.pages.dev"` e `"auth_status":"NONE"`, confirmando qual host o Access está protegendo.
+
+**Efeito colateral útil de notar:** por causa disso, não é possível auditar o conteúdo do JS publicado sem autenticar. Uma tentativa de `grep` no arquivo servido devolve o HTML da tela de login — o que pode ser confundido com "o arquivo não tem o código esperado". Vale lembrar disso em auditorias futuras.
+
+---
+
+## 2026-09-09 — Etapa 8: inventário da fonte e revisão do contrato de filtros
+
+### O erro de método que originou esta etapa
+
+O usuário apontou, corretamente, que o pipeline de spec pesquisou arquitetura, custo e
+integração mas **nunca enumerou os campos que a fonte entrega**. Os 4 filtros do contrato
+(`segmento`, `canal`, `campanha`, `periodo`) saíram de suposição sobre o que o negócio queria,
+não do que o RD Station tem.
+
+Registrado como **regra permanente**: inventariar a fonte é a primeira tarefa de qualquer
+trabalho de dados, antes de contrato, schema ou tela. Nenhum filtro entra no contrato sem uma
+taxa de cobertura **medida** ao lado dele.
+
+### Inventário executado (não revisão de documentação)
+
+Chamadas reais à API de produção do RD Station:
+
+- `contact_custom_fields_list` → **35 campos**, dos quais 3 com enum fechado.
+- `campaigns_search`, `forms_search`, `landing_pages_search` → **todos vazios**. A conta não usa
+  ativos nativos do RD; as conversões vêm de formulários externos. Isso invalidou a hipótese de
+  tirar "tipo de conversão" de metadado de ativo — ele vem do evento.
+- `segmentation_list` → **25 segmentações** (7 padrão de funil + 18 coortes reais de campanha).
+- `get_contact_events` (event_type é enum `CONVERSION | OPPORTUNITY`) → shape real do payload.
+
+### Achado que mudou a modelagem
+
+`traffic_source` chega como `encoded_` + **base64 de um JSON** com `first_session` e
+`current_session`. Decodificado localmente e confirmado: **o RD Station já entrega atribuição de
+primeiro e último toque em todo evento de conversão**, sem instrumentação. Estava 100% sem uso.
+
+Segundo achado, do mesmo payload: a firmografia é **por evento, não por lead**. No mesmo contato
+real, `job_title` vai de `Diretor` para `CEO, Founder, Sócio` e `cf_tamanho_da_empresa` de
+`1 a 19` para `20 a 99`. O cadastro guarda só o último valor. Gravar firmografia apenas em `lead`
+perderia informação que a fonte tem — daí `lead_conversion_event` (migration 045).
+
+### Medição de cobertura — 250 contatos reais, 0 erros
+
+Fluxo de diagnóstico criado no n8n, executado por webhook e **removido no mesmo dia** (não ficou
+resíduo). Credencial RD usada em modo GET apenas, conforme a regra permanente.
+
+**Duas recomendações minhas foram derrubadas pelo dado:**
+
+| Campo | Cobertura | Efeito |
+|---|---|---|
+| `cf_numero_de_funcionarios` | **0,0%** | eu havia recomendado como oficial "porque é lista fechada". Está vazio. |
+| `cf_cargo_profissional` | **0,0%** | descartado |
+| `cf_tamanho_da_empresa` | 36,4% | **vence** por medição |
+| `job_title` | 90,0% | **vence** por medição |
+
+**Três filtros que eu propus e o dado não sustenta** — retirados, não maquiados:
+`city`/`state`/`country` (0,0%), `cf_nome_do_anuncio`/`cf_grupo_de_anuncio` (0,0% — o drill-down
+de mídia tem 2 níveis, não os 4 que eu havia desenhado), `cf_atuacao_da_empresa` (0,4%, enum de
+19 setores efetivamente vazio).
+
+**Duas dimensões melhores que qualquer uma que eu havia proposto:** `tags` (**94,4%**, e é o único
+campo nativamente multivalor) e `cf_falou_com` (**82,0%**, quem atendeu o lead).
+
+**Descoberta de negócio, não de software:** UTM está preenchida em **7,6%** dos contatos e `gclid`
+em 0,8%. O motivo pelo qual ROI por campanha era difícil de montar não é a ferramenta — é que
+92% das conversões não chegam tagueadas.
+
+### Decisões do usuário registradas
+
+1. **Tamanho e cargo decididos por medição** (instrução dele), não por preferência de desenho.
+2. **Exclusão de dado de teste:** critério livre para o agente. Escolhido: marcar com `is_teste`
+   via tabela de regras auditável, **nunca deletar**, com contagem por regra visível na aba
+   Qualidade de dados.
+3. **Grão de contagem:** visão geral conta lead distinto; visão por campanha conta o lead em cada
+   campanha em que converteu. **Consequência que a UI é obrigada a rotular:** a soma da coluna por
+   campanha é legitimamente maior que o total geral.
+4. **Dois eixos de campanha, nunca fundidos** (escolha dele entre 3 opções apresentadas):
+   `origem_conversao` (eixo A, 100%, jamais recebe investimento) e `campanha_midia` (eixo B, 7,6%,
+   único que recebe investimento/ROI). Fundi-los produziria ROI errado sem avisar.
+
+### Estado que impediu o cutover imediato
+
+O usuário autorizou `MODO_DADOS = 'real'`. Consulta ao Postgres de produção mostrou:
+`lead` com **13 registros, todos `source_system = 'seed_test'`**; `lead_touchpoint` com 2;
+`lead_funnel_stage_event` com 0; `ad_campaign` com 33 reais.
+
+Causa: o fluxo `CRM Ingest - RD Station` (20 nós) parte de contatos **já vinculados** no Postgres.
+**Não existe descoberta de leads** — nada nunca leu a base de contatos do RD para dentro do banco.
+Virar a chave agora trocaria 13 leads falsos rotulados por 13 leads falsos não rotulados.
+
+Ordem corrigida: ingestão primeiro, asserção depois, chave por último. A autorização segue válida.
+
+### Verificado por execução
+
+`db/queries/verificacao/normalizacao-perfil-lead.sql` — 5 asserções, todas OK:
+
+```
+ASSERCAO 1 OK: os 13 casos de tamanho_empresa batem
+ASSERCAO 2 OK: distribuicao 72/12/7 confere com data-contract.md 1.4
+ASSERCAO 3 OK: os 7 casos de cargo_grupo batem
+ASSERCAO 4 OK: as 5 regras de cargo sao todas de valor observado
+ASSERCAO 5 OK: as 3 regras de lead_teste_regra estao ativas
+```
+
+**Teste negativo da asserção 2**, porque asserção que nunca falha não vale nada: perturbando o
+esperado de 72 para 73, ela devolveu `FALHOU corretamente (2 divergencia)`. A asserção detecta
+divergência de verdade — não é o antipadrão `SELECT 1/(subquery HAVING count=N)`.
+
+### Pendente desta etapa
+
+Fluxo de descoberta de leads no n8n (a peça que nunca existiu), asserção de ingestão sobre dado
+real, cutover, e os filtros na tela. `cargo_grupo_regra` tem só as 5 regras de valor **observado**;
+as demais devem sair da lista de distintos da primeira ingestão cheia, nunca inventadas.
+
+---
+
+## 2026-09-09 (cont.) — Etapa 8: ingestão de leads do RD Station em produção
+
+### Migrations aplicadas
+
+`045` tabela `lead_conversion_event` + normalizações · `046` `fn_lead_e_teste` e
+`fn_resolve_lead_por_rd_uuid` · `047` v8 com as seções RDLead/LeadConversion ·
+`048` **correção de regressão** · `049` grants de sequência · `050` regras de cargo observadas.
+
+### 🔴 Regressão que eu introduzi e como foi pega
+
+Montei a `047` reaproveitando o corpo da `043` (v7) por substituição de texto. Mas a `044` já
+era a v8 e havia trocado todos os `INSERT INTO ingest_run` por `PERFORM fn_registrar_ingest(...)`,
+que grava `ingest_run` **e** `sync_state`. Reconstruir da v7 reverteu isso: o watermark
+incremental (P-ING-2) pararia de avançar **em silêncio** — sem erro, sem log.
+
+Pega antes de rodar qualquer coisa, ao verificar se alguma migration posterior à minha base
+mexia nas mesmas linhas. Corrigida na `048`, reconstruindo a partir da `044` com verificação
+por contagem antes de escrever o arquivo: 11 chamadas de `fn_registrar_ingest` no código e
+1 único `INSERT` direto (o catch-all `nao_mapeado`, que é `failed` de propósito).
+
+**Regra tirada disto:** reaproveitar corpo de função por substituição de texto exige conferir
+contra a versão **mais recente**, nunca contra a que estava aberta.
+
+### 🔴 Lacuna de privilégio anterior a esta etapa
+
+A ingestão falhou no último nó com `permission denied for sequence lead_conversion_event_id_seq`.
+Causa raiz verificada em `pg_default_acl` (não suposta): existia `ALTER DEFAULT PRIVILEGES` para
+**tabelas** (`crm_ingest=arw`) e **nenhum para sequências**. Toda tabela nova nascia com
+INSERT/SELECT/UPDATE automáticos e a sequência dela nascia sem nada.
+
+Não era específico desta tabela — ia disparar na próxima `bigserial`, quem quer que a criasse.
+A `049` concede nas 26 sequências existentes **e** registra o default privilege para as futuras,
+fechando a classe do problema.
+
+Armadilha encontrada ao escrever a verificação: `relkind='S'` e `has_sequence_privilege()` no
+mesmo `WHERE` falha com `"pg_toast_16618" is not a sequence`, porque o planner pode avaliar a
+função antes do filtro. Resolvido com CTE `MATERIALIZED` como barreira de otimização.
+
+### Três asserções minhas que estavam erradas (o código estava certo)
+
+Em `ingestao-rd-leads.sql`, três asserções falharam por expectativa minha equivocada, não por
+defeito de código. Registradas porque o padrão do erro se repetiu:
+
+1. Contei 1 relato de lote parcial quando o arquivo roda o lote **duas** vezes.
+2. Esperei watermark para `LeadConversion`, mas `fn_registrar_ingest` **só avança em `ok`** e o
+   lote ficou `partial` por causa do evento órfão. É o comportamento correto da `044` — se
+   avançasse num lote parcial, os órfãos seriam pulados para sempre. Virou a **asserção 9**,
+   que agora trava essa propriedade.
+3. Contei 3 versionamentos de classificação como falha, quando são 3 leads com 1 versão cada.
+   O que prova idempotência é nenhum lead ter `version > 1`, não a contagem total.
+
+O arquivo tem 10 asserções, todas OK, e roda dentro de `BEGIN ... ROLLBACK` — o que elimina a
+classe do erro que me custou o watermark de produção numa sessão anterior. A asserção 6 compara
+o watermark de ads antes e depois justamente para provar o isolamento.
+
+### ✅ Ingestão real executada
+
+Fluxo `x1md8DzjX6psKXNR` — `CRM Ingest - RD Station Leads (descoberta + conversoes)`.
+
+**Primeiro obstáculo:** `helpers.httpRequestWithAuthentication` **não é suportado no Code Node**
+desta instância (roda em task-runner isolado). Reestruturado para nós HTTP.
+
+**Segundo obstáculo, de desenho:** o endpoint de eventos do RD **não devolve o uuid do contato**,
+e o nó HTTP divide array de resposta em vários items, destruindo o item-linking do n8n. Resolvido
+com junção explícita por **e-mail** (identificador primário do contato no RD), que é
+determinística e não depende de `pairedItem`.
+
+**Resultado em produção:**
+
+| | |
+|---|---|
+| Leads reais do RD ingeridos | **125** (antes: 0 — só 13 de `seed_test`) |
+| Marcados como teste pelas regras | **26** (21% da base) |
+| Eventos de conversão | **134** |
+| Duplicatas de fonte colapsadas | **18** (136→120 num lote, 16→14 no outro) |
+| Origens de conversão distintas (eixo A) | 7 |
+
+A deduplicação da §1.7 **confirmou-se em dado real**: 18 eventos com mesmo lead, mesma origem e
+mesmo `event_timestamp` ao segundo.
+
+### Cobertura medida na ingestão real vs. na amostra de 250
+
+| Campo | Amostra (250) | Ingestão real (99 não-teste) | Veredito |
+|---|---|---|---|
+| `tags` | 94,4% | **97,0%** | confirma |
+| `cargo` | 90,0% | **85,9%** | confirma |
+| `atendido_por` | 82,0% | **79,8%** | confirma |
+| `tamanho_empresa` | 36,4% | **17,2%** | ⚠️ **divergiu** |
+
+**A divergência de tamanho de empresa é material e precisa constar.** A amostra de 250 cobria a
+base toda; esta fatia são os contatos mais **recentes** (corte 2026-04-01, ordenado por última
+conversão). Contato recente tem menos enriquecimento firmográfico. Ou seja: no período que o
+dashboard olha, `tamanho_empresa` fica em `nao_informado` para 82 de 99 leads. O filtro existe e
+é honesto, mas vai ser pouco útil até a captação melhorar.
+
+### Atribuição: correção da minha própria empolgação
+
+Dos 134 eventos reais: **96 sem `traffic_source` decodificável**, 35 com `(none)`, 2 com UTM,
+1 com URL de página. Ou seja ~28% dos eventos têm sessão de origem legível.
+
+Eu havia apresentado a atribuição de primeiro/último toque como "de graça e nativa". É nativa,
+mas **não é universal** — e no dado real ela cobre menos de um terço dos eventos. Falta
+distinguir "campo ausente no payload" de "falha de decodificação": o decodificador atual devolve
+`null` nos dois casos. Pendência registrada.
+
+### `cargo_grupo` semeado por evidência (migration 050)
+
+A ingestão produziu **31 valores distintos** de `job_title`. As 14 regras novas saem todas de
+valor observado, com a contagem no comentário de cada uma. Resultado: **0 de 111 cargos
+preenchidos seguem em `outros`**.
+
+Duas distinções que o dado revelou:
+
+- `Outro`/`outro` (10x) é a pessoa **tendo escolhido "Outro"** no formulário — resposta, não
+  lacuna. Vai para `outro_declarado`, e `outros` volta a significar só "nenhuma regra casou",
+  que é o sinal que a aba Qualidade de dados usa para pedir regra nova.
+- `Fundador`/`Fundadora` é a forma portuguesa de Founder, e as regras da `045` só cobriam
+  `Founder` — 5 sócios-fundadores estavam caindo em `outros`.
+
+Distribuição real (99 leads não-teste): c_level 42 · nao_informado 14 · gerencia 11 ·
+outro_declarado 10 · analista 8 · diretoria 7 · operacional 3 · consultor 2 · coordenacao 2.
+
+### Pendente
+
+View de perfil + `fn_search_leads` com os filtros novos; cutover de `MODO_DADOS`; filtros na
+tela. E investigar por que 72% dos eventos não trazem `traffic_source` legível.
+
+---
+
+## 2026-09-09 (cont.) — Etapa 8: camada de leitura, cutover e filtros na tela
+
+### Carga completa de Q2/Q3
+
+| | |
+|---|---|
+| Leads reais do RD Station | **500** |
+| Eventos de conversão | **766** |
+| Duplicatas de fonte colapsadas | **145** só no último lote (777→632) |
+| Origens de conversão distintas | **23** |
+| Leads marcados como teste | 39 (26 por regra + 13 seeds meus) |
+| Leads visíveis por padrão | **474** |
+
+### Migrations 051–054
+
+`051` `view_lead_perfil` + `view_campanha_lead` + `fn_search_leads` v2 · `052` tradução de
+segmento e marcação dos seeds · `053` `fn_opcoes_filtro` · `054` **restauração de filtro que eu
+removi por engano**.
+
+**Duas views e não uma, de propósito.** O grão de contagem depende da visão (§1.7):
+`view_lead_perfil` é um registro por lead; `view_campanha_lead` é um por (origem, lead). Separar
+torna difícil somar a coluna errada — quem lê a segunda sabe que está num grão multiplicado,
+porque o nome diz.
+
+**`cargo_grupo` e `tamanho_empresa` NÃO são materializados.** São funções puras sobre tabela de
+regra, e materializá-los ficaria obsoleto no instante em que uma regra nova entrasse — que é
+exatamente o que a `050` acabou de fazer. Derivados na view, a próxima regra vale
+retroativamente sem reprocessar ingestão.
+
+### 🔴 O contrato estava errado sobre `segmento`
+
+O contrato dizia 3 valores minúsculos (`marketing | comercial | nao_atribuido`). A view devolveu
+`NaoAtribuido`. Investigado: `lead_origin_classification` tem CHECK constraint com **4** valores
+em CamelCase, incluindo `Parceiro`.
+
+**Quem estava errado era o contrato.** Colapsar `Parceiro` em um dos outros três para "caber"
+destruiria informação de negócio. Resolvido com `fn_segmento_contrato()` — um único ponto de
+tradução, com asserção que falha se a CHECK ganhar valor novo e a função não.
+
+### 🔴 Regressão que eu introduzi e que os testes pegaram
+
+Ao escrever `fn_search_leads` v2 eu listei as 13 dimensões novas e **não recoloquei o filtro
+`campanha`** (match contra `valor_bruto` da atribuição), que sustenta o pivô campanha→leads
+(AC-4.1). Pior: no cliente tratei `campanha` como **apelido** de `campanha_midia`, que é o eixo B
+(UTM de mídia paga, 7,6% de cobertura). São conceitos diferentes — aliasá-los faria o pivô
+devolver vazio quase sempre.
+
+**Pego por 4 specs Playwright, todos os quatro sobre campanha.** Minha primeira leitura foi
+"os specs quebraram por efeito esperado do cutover" — se eu tivesse aceitado isso, a regressão
+teria passado. Corrigido na `054`, e agora os três conceitos convivem sem se misturar:
+
+| Filtro | Significado | Recebe investimento? |
+|---|---|---|
+| `campanha` | `valor_bruto` do sinal de atribuição (o pivô) | não |
+| `origem_conversao` | eixo A — ativo que converteu (100%) | **nunca** |
+| `campanha_midia` | eixo B — veiculação paga (7,6%) | **sim, só ele** |
+
+### 🔴 Bug no meu próprio mecanismo de teste
+
+Para o cutover não desativar a suíte e2e (que roda em localhost sem chave de API), criei um
+override `?dados=mock`, travado em host local. Os specs passaram a falhar num ponto novo:
+`atualizarEstado()` reescreve a query string inteira ao limpar filtros e **apagava o
+`dados=mock`** junto — a página caía em modo real no meio do teste.
+
+Corrigido lendo o override **uma vez, na carga do módulo**. Também é o comportamento correto por
+natureza: é chave de sessão de teste, não filtro, e não deve mudar durante a navegação.
+
+### Uma asserção de teste que eu afrouxei, e por quê
+
+Um spec exigia literalmente `'segmento: Comercial'` em minúscula no estado vazio. A reescrita
+usa `Segmento:` para casar com os rótulos da barra de filtros. Tornei a asserção insensível a
+caixa, com o motivo escrito no próprio teste: o que ela garante (INT-1 — o estado vazio NOMEIA os
+filtros ativos em vez de mostrar "0" sem contexto) continua valendo; forçar minúscula deixaria a
+tela inconsistente consigo mesma só para satisfazer a letra.
+
+### Correções na interface que eram dívida real
+
+1. **`fonte_dados` era `'salesforce'` FIXO** em `_adaptarItemLista`, com um TODO dizendo que
+   deixaria de ser fixo "quando o RD Station entrar na busca". Entrou — e o valor fixo passaria a
+   **mentir**, rotulando 500 leads do RD Station como Salesforce.
+2. **KPIs faziam 1 chamada de detalhe POR LEAD** (`_carregarDetalhesParaKpis`). O próprio
+   comentário dizia que não era padrão para escala. Com 474 leads seriam 474 chamadas por render.
+   Removido — os KPIs saem da lista já retornada.
+3. **Período era filtrado no CLIENTE** sobre a página retornada: com paginação isso descartava
+   linhas em vez de reconsultar, e o total exibido não correspondia ao filtro. Agora é servidor.
+4. **Inconsistência que eu mesmo criei:** as pills de segmento aparecem todas acesas (ausência de
+   filtro = sem restrição), mas minha primeira lógica fazia clicar numa **selecionar só ela**.
+   Corrigido para desligar a partir do baseline, seguindo o que o visual promete. Os checkboxes
+   dos dropdowns mantêm semântica de marcar/desmarcar — controles com aparência diferente devem
+   ter interação diferente.
+
+### As opções de filtro vêm do dado, não de enum
+
+`fn_opcoes_filtro()` devolve as opções de cada dimensão **com contagem de leads**, e a interface
+monta os controles a partir disso. Dimensão sem dado **não é oferecida** — foi assim que
+`cf_atuacao_da_empresa` (0,4%) quase entrou como filtro.
+
+No modo mock as opções são derivadas do próprio fixture, não devolvidas como null: o princípio
+("a opção vem do dado") vale nos dois modos, muda só qual dado.
+
+### ✅ Cutover executado
+
+`MODO_DADOS = 'real'`. Feito **depois** de a ingestão existir e ser verificada — não no momento
+da autorização, quando `lead` tinha 13 registros de `seed_test` e virar a chave teria trocado
+13 leads falsos rotulados por 13 leads falsos não rotulados.
+
+### Verificação
+
+- Playwright: **8 passam**, 2 skipped (já bloqueados antes, por limitação de contrato em 5.11).
+- Contrato (node): **11 passam**.
+- `fn_search_leads` verificado contra dado real: 42 c_level; **10** ao cruzar com `pequena`
+  (interseção, menor); **60** no multi-select de 3 cargos (OR interno, maior); `campanha`
+  restaurada devolve 17; campanha inexistente devolve 0.
+
+### Pendente
+
+- **Deploy**: exige commit + push (push é @devops-exclusivo, Artigo II — o usuário empurra).
+- Aba Qualidade de dados ainda não mostra a contagem de exclusão POR REGRA, que o contrato §1.6
+  promete. As regras e o `teste_regra` por lead já existem no banco; falta a tela.
+- 72% dos eventos sem `traffic_source` legível — falta distinguir "campo ausente" de "falha de
+  decodificação".
+- Aba de oportunidades (cruzamento com Salesforce) segue bloqueada no consentimento OAuth.

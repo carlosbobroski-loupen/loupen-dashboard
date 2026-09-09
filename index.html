@@ -302,43 +302,52 @@
   <div class="view" id="view-leads-crm">
     <div class="kpi-grid-4" id="crm-kpis">
       <div class="kpi blue">
-        <div class="kpi-label"><i class="ti ti-users"></i>Total de leads</div>
+        <div class="kpi-label"><i class="ti ti-users"></i>Leads</div>
         <div class="kpi-value" id="crm-kpi-total">—</div>
-        <div class="kpi-footer">no fixture (Etapa A)</div>
-      </div>
-      <div class="kpi amber">
-        <div class="kpi-label"><i class="ti ti-target"></i>Cobertura de atribuição</div>
-        <div class="kpi-value" id="crm-kpi-cobertura">—</div>
-        <div class="kpi-footer">exclui leads semeados sintéticos</div>
+        <div class="kpi-footer" id="crm-kpi-total-foot">—</div>
       </div>
       <div class="kpi green">
-        <div class="kpi-label"><i class="ti ti-arrow-up-right"></i>Com oportunidade</div>
-        <div class="kpi-value" id="crm-kpi-oport">—</div>
-        <div class="kpi-footer">related.oportunidade != null</div>
+        <div class="kpi-label"><i class="ti ti-click"></i>Conversões</div>
+        <div class="kpi-value" id="crm-kpi-conv">—</div>
+        <div class="kpi-footer" id="crm-kpi-conv-foot">—</div>
+      </div>
+      <div class="kpi amber">
+        <div class="kpi-label" title="Leads que converteram mais de uma vez — separa curioso de engajado."><i class="ti ti-repeat"></i>Multi-conversão</div>
+        <div class="kpi-value" id="crm-kpi-multi">—</div>
+        <div class="kpi-footer" id="crm-kpi-multi-foot">—</div>
       </div>
       <div class="kpi purple">
-        <div class="kpi-label"><i class="ti ti-affiliate"></i>Vínculos de identidade</div>
-        <div class="kpi-value" id="crm-kpi-vinculos">—</div>
-        <div class="kpi-footer">prováveis + conflitos (EC-7)</div>
+        <div class="kpi-label" title="Leads com sinal de campanha de mídia paga (UTM). É o único eixo que pode receber investimento e ROI."><i class="ti ti-speakerphone"></i>Com mídia paga</div>
+        <div class="kpi-value" id="crm-kpi-paga">—</div>
+        <div class="kpi-footer" id="crm-kpi-paga-foot">—</div>
       </div>
     </div>
 
-    <div class="filter-bar" id="crm-filter-bar">
+    <!-- Barra de filtros: montada a partir de /api/meta (fn_opcoes_filtro),
+         nunca de enum embutido. Cada opção mostra a contagem de leads, para
+         que ninguém escolha um filtro que devolve zero. -->
+    <div class="filter-bar" id="crm-filter-bar" style="flex-wrap:wrap;gap:8px">
       <span class="filter-glabel">Segmento</span>
-      <button class="seg-pill seg-mkt" data-on="1" data-seg="marketing"><span class="b-dot" style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span>Marketing</button>
-      <button class="seg-pill seg-com" data-on="1" data-seg="comercial"><span class="b-dot" style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span>Comercial</button>
-      <button class="seg-pill seg-na" data-on="1" data-seg="nao_atribuido"><span class="b-dot" style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span>Não atribuído</button>
+      <span id="crm-pills-segmento" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span>
       <button class="filter-clear" id="crm-filter-clear" style="margin-left:auto;background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer"><i class="ti ti-x"></i> Limpar</button>
     </div>
-    <div id="crm-active-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+
+    <div class="filter-bar" id="crm-filter-bar-2" style="flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+
+    <div id="crm-active-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 14px"></div>
 
     <div style="display:grid;grid-template-columns:1fr 448px;gap:16px;align-items:start" id="crm-work-grid">
       <div class="card">
         <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Leads</div><div class="section-badge" id="crm-row-count">—</div></div>
+        <div style="overflow-x:auto">
         <table class="tbl">
-          <thead><tr><th>Lead</th><th>Origem</th><th>Estágio</th><th>Data</th></tr></thead>
+          <thead><tr>
+            <th>Lead</th><th>Origem de conversão</th><th>Cargo</th>
+            <th>Tamanho</th><th>Conv.</th><th>Data</th>
+          </tr></thead>
           <tbody id="crm-lead-rows"></tbody>
         </table>
+        </div>
         <div id="crm-empty-state" style="display:none"></div>
       </div>
 
