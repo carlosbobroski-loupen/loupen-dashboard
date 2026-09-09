@@ -63,8 +63,21 @@ const API_DETAIL_WEBHOOK_ID = '855a5444-c212-4c84-b993-ef082e35f999';
 //
 // (1) tem precedência sobre (2) para que um teste local continue possível
 // mesmo depois do cutover.
+// TRAVADO EM HOST LOCAL (endurecido em 2026-09-09, após auditoria da borda
+// em produção). Antes bastava a variável existir, em qualquer host. O risco
+// não era vazamento — a chave nunca esteve no bundle, e quem injetasse a
+// variável precisaria já conhecer um valor válido para conseguir algo. O
+// problema era outro: com MODO_DADOS='real', este caminho tem PRECEDÊNCIA
+// sobre o caminho seguro, então quem conseguisse injetar script na página
+// (XSS, extensão maliciosa) poderia forçar o dashboard a abandonar as
+// chamadas same-origin e passar a bater direto no n8n. Degradação evitável,
+// custo de evitar ~zero: em produção este branch agora é inalcançável.
+// Não quebra nada: os specs Playwright rodam em localhost:8123 e nenhum
+// deles usa esta variável (o uso foi manual, uma vez, na subtask 7.1).
 function _modoTesteLocal() {
-  return typeof window !== 'undefined' && !!window.__CRM_API_KEY__;
+  if (typeof window === 'undefined' || !window.__CRM_API_KEY__) return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host === '';
 }
 
 function _modoReal() {

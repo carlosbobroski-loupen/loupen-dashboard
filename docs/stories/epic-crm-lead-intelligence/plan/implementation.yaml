@@ -347,8 +347,9 @@ phases:
         MESMA conta do Zero Trust. Rodar `dig NS <dominio>` e `dig MX <dominio>` e colar
         a saída no validation-log. Critério: inventário DNS completo registrado ANTES
         de qualquer alteração.
-    status: pending
+    status: superseded
     notes: >-
+      SUPERADA (2026-09-09) por ADR-018 — a pergunta era sobre a arquitetura ANTIGA (GitHub Pages atras da zona Cloudflare existente), que foi abandonada porque o usuario nao conseguiu acesso aquela conta. O que ja havia sido levantado com dig fica registrado no log e continua verdadeiro (ambos os dominios estao em nameservers da Cloudflare; loupenapps.com.br sem MX, loupen.com.br com MX real do Google Workspace), mas deixou de ser insumo de decisao: o desenho novo usa *.pages.dev e nao toca em zona nem DNS de ninguem.
       R3. Primeira verificação de §4.4 por ordem de invalidação. Se nenhuma zona estiver
       na Cloudflare, a fase 1 passa a incluir migração de nameservers de domínio
       corporativo — precisa de janela e de dono, e o risco de quebrar MX é real.
@@ -365,8 +366,9 @@ phases:
     verification:
       type: command
       command: 'curl -sS -o /dev/null -D - "https://carlosbobroski-loupen.github.io/loupen-dashboard/" | head -20'
-    status: pending
+    status: superseded
     notes: >-
+      SUPERADA (2026-09-09) por ADR-018 — a pergunta era sobre a arquitetura ANTIGA (GitHub Pages atras da zona Cloudflare existente), que foi abandonada porque o usuario nao conseguiu acesso aquela conta. Nao existe Custom domain no GitHub Pages no desenho novo. O OBJETIVO relacionado (a URL github.io parar de servir o conteudo) sobrevive em 4.4, agora por desativacao do GitHub Pages em vez de redirecionamento.
       R1, impacto CRÍTICO. O caso é uma PROJECT page (caminho /loupen-dashboard/), não
       user page — o comportamento pode diferir do caso apex. Critério de aceite: 301 para
       o domínio customizado, e seguir o redirecionamento cai na tela do Access.
@@ -389,8 +391,9 @@ phases:
         Criar CNAME de teste proxiado → carlosbobroski-loupen.github.io, setar Custom
         domain, SSL/TLS = Full, abrir no navegador. Registrar o status HTTP e o emissor
         do certificado apresentado ao visitante (deve ser o Universal SSL da Cloudflare).
-    status: pending
+    status: superseded
     notes: >-
+      SUPERADA (2026-09-09) por ADR-018 — a pergunta era sobre a arquitetura ANTIGA (GitHub Pages atras da zona Cloudflare existente), que foi abandonada porque o usuario nao conseguiu acesso aquela conta. Nao ha origin GitHub Pages atras de proxy, e o TLS de *.pages.dev e gerenciado pela propria Cloudflare — o problema que a spike investigava (erro 526 / loop de redirecionamento com Flexible) nao pode ocorrer.
       R2, ~15 min. É a premissa que permite ter Access (que exige proxy) e GitHub Pages ao
       mesmo tempo. SE FALHAR: testar Flexible com "Enforce HTTPS" desmarcado; se nenhum
       modo funcionar, F-3 (manter Pages) e F-5 (ter o gate) entram em conflito e a decisão
@@ -407,8 +410,9 @@ phases:
     verification:
       type: command
       command: 'curl -sS -o /tmp/api-anon.txt -w "%{http_code}\n" "https://<hostname-teste>/api/ping" && ! grep -q "\"pong\"" /tmp/api-anon.txt'
-    status: pending
+    status: superseded
     notes: >-
+      SUPERADA (2026-09-09) por ADR-018 — a pergunta era sobre a arquitetura ANTIGA (GitHub Pages atras da zona Cloudflare existente), que foi abandonada porque o usuario nao conseguiu acesso aquela conta. A PERGUNTA FOI RESPONDIDA, por outro caminho e melhor: o Access cobre /api/* nao por Origin Rule apontando para outro origin, mas porque /api/* e servido pela Pages Function DO MESMO projeto — same-origin por construcao. Confirmado em PRODUCAO em 4.12/4.16: sem sessao nao se recebe o conteudo, e autenticado /api/meta devolve dado real. O risco R5 (Access nao cobrir /api/*) deixou de existir estruturalmente, em vez de ter sido mitigado.
       R5, ~1h, é a validação mais cara da fase 0. CRITÉRIO DE ACEITE LITERAL DO SPEC:
       chamada anônima a /api/<recurso> devolve AUTENTICAÇÃO, NÃO JSON. Use o subdomínio
       de teste de 1.4 e um webhook n8n descartável que responda {"pong":true}.
@@ -429,8 +433,9 @@ phases:
         Cloudflare > Rules > Transform Rules: confirmar que URL Rewrite e Request Header
         Modification são criáveis no plano atual. Zero Trust > Settings > Billing:
         registrar o número de seats do Free. ~3 min somados.
-    status: pending
+    status: partial
     notes: >-
+      PARCIAL (2026-09-09). A metade sobre Transform Rules ficou SEM PROPOSITO (ADR-018): o caminho escolhido foi o Worker/Pages Function, entao a disponibilidade de Transform Rules no Free deixou de ser insumo de decisao — ver 4.10, que foi resolvida pela optionB que a propria nota dela previa. A metade sobre SEATS DO ACCESS foi RESPONDIDA e verificada em fonte oficial antes de decidir: Zero Trust free cobre ate 50 usuarios, indefinidamente, sem cartao. Achado operacional real da execucao: ativar Zero Trust pela primeira vez exige passar por tela de selecao de plano + checkout mesmo no Free (envolve dados de cobranca) — assusta, mas segue sem custo.
       R6 (médio) e UC-1 (baixo). Sem Transform Rules, optionB (Worker de proxy) deixa de
       ser fallback e passa a ser a solução — "zero código" vira "quase zero código", e
       4.10/4.11 mudam de forma. Seats: o time da Loupen está a uma ordem de magnitude do
@@ -2148,8 +2153,9 @@ phases:
         Zero Trust > Access > Applications: confirmar que o domínio da aplicação cobre o
         hostname inteiro (sem path restrito) e que a aplicação está ativa. Abrir o hostname
         em janela anônima e confirmar a tela de login do Access.
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. ACHADO: a pegadinha do wildcard no campo Subdomain NAO se materializou — os campos Subdomain e Domain ja vem separados e o Subdomain veio vazio; o alerta vinha de material mais antigo.
       ATUALIZAÇÃO (2026-09-09, ADR-018): o hostname agora é o `*.pages.dev` do projeto
       Pages, não um domínio próprio. Detalhe de configuração que NÃO é óbvio e foi
       verificado na documentação/comunidade da Cloudflare antes de decidir: para proteger o
@@ -2177,8 +2183,9 @@ phases:
         Confirmar exatamente: Action = Allow; Include = "Emails ending in" → @loupen.com.br;
         método de login one-time PIN habilitado explicitamente na aplicação. Nenhuma outra
         política, nenhum outro Include.
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. Politica unica Allow + 'Emails ending in @loupen.com.br' criada. One-time PIN NAO e um toggle em Settings: fica em Integrations -> Identity providers e precisou ser adicionado explicitamente como provedor.
       A LINHA DE CONFIGURAÇÃO MAIS CRÍTICA DO DESENHO (R9, CRÍTICO). A documentação oficial
       adverte textualmente: configurar OTP como Include SEM restringir o domínio de e-mail
       transforma o gate em porta aberta com aparência de fechada. E o OTP "no longer added
@@ -2203,8 +2210,9 @@ phases:
         e-mail corporativo, liberando notify.cloudflare.com / noreply@notify.cloudflare.com
         no gateway de e-mail da Loupen se necessário. Registrar as duas evidências.
         Deve ser verificado por segunda pessoa ou por teste explícito.
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. Bloqueio de quem nao tem sessao provado por requisicao sem cookies (credentials:'omit', redirect:'manual') em vez de janela anonima literal — equivalente e na pratica mais preciso; a substituicao de metodo esta declarada no log, nao escondida.
       §6.4, primeiro item, e é ANTES DE PUBLICAR QUALQUER FICHA DE LEAD — não é polimento.
       A não entrega do PIN é o modo de falha mais comum do OTP e se manifesta como
       "o gate não funciona" quando na verdade é o gateway de e-mail bloqueando.
@@ -2222,8 +2230,9 @@ phases:
         Chamar o webhook diretamente COM o header secreto e confirmar {"pong":true}.
         Chamar SEM o header e confirmar rejeição pelo Header auth. Confirmar que
         Allowed Origins tem exatamente uma origem (o hostname do dashboard).
-    status: pending
+    status: superseded
     notes: >-
+      SUPERADA (2026-09-09) — perdeu o proposito, nao foi esquecida. Este stub existia para validar a borda ANTES de a API real existir. A borda foi validada em PRODUCAO com o recurso real: /api/meta atravessa o Cloudflare Access e a Pages Function e devolve dado real (ad_campaign, 33 linhas), e a allowlist foi confirmada recusando rota invalida (404) e aceitando as tres legitimas (200). Construir agora um /api/ping seria criar um teste para algo ja provado por um caminho melhor — o recurso de verdade, nao um substituto. O objetivo de Header auth por no tambem ja esta coberto: as tres rotas usam a credencial real do n8n, e a chave e injetada server-side pela Function (4.11/4.15). 'Allowed Origins de uma unica origem' ficou sem sentido no desenho novo: /api/* e same-origin por construcao (mesmo projeto Pages), entao o CORS saiu do caminho critico — e 1.11 ja provou que o no Webhook desta versao do n8n nao expoe CORS por no de qualquer forma.
       Existe para validar o caminho de borda (4.9-4.12) SEM depender de dados nem de
       phase-2/3 — é o que permite phase-4 rodar em paralelo. UMA origem só por causa da
       issue #18528 (header de CORS incorreto com múltiplas origens, ver 1.11).
@@ -2315,8 +2324,9 @@ phases:
         Confirmar que a requisição que chega ao n8n carrega o header secreto e que ele NÃO
         aparece em nenhuma resposta ao navegador. Confirmar que o segredo está apenas na
         configuração da borda (ou em Worker Secret), nunca no repositório.
-    status: partial
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. A metade que faltava (cadastrar o secret) foi feita em 4.15. ENDURECIMENTO aplicado depois da auditoria: _modoTesteLocal() em data-api.js agora exige host local, porque com MODO_DADOS='real' aquele branch tinha PRECEDENCIA sobre o caminho same-origin — quem injetasse script na pagina poderia forcar o dashboard a bater direto no n8n. Nao vazava a chave, mas era degradacao evitavel. Testado nos dois sentidos; nenhum spec Playwright usa a variavel.
       PARCIAL (2026-09-09) — o CÓDIGO está pronto e testado; falta só a configuração que
       depende da conta do usuário. Resolvida pela optionB que a verificação desta própria
       subtask já sancionava ("ou em Worker Secret"), não por Transform Rule — ver ADR-018.
@@ -2350,8 +2360,9 @@ phases:
     verification:
       type: command
       command: 'curl -sS -o /tmp/anon.txt -w "%{http_code}\n" "https://<hostname-oq15>/api/ping" && ! grep -q "pong" /tmp/anon.txt && curl -sS -o /dev/null -w "%{http_code}\n" "https://n8n.loupenapps.com.br/webhook/crm-api-ping" | grep -qv "^200"'
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. Os dois criterios de aceite do gate confirmados: chamada sem sessao nao recebe o conteudo, e /api/meta autenticado devolve JSON real (ad_campaign, 33 linhas) — nao o 500 de secret ausente.
       Os dois cenários Gherkin de "Gate de acesso da fase 1" em §6.3, verificados como
       asserção de exit code em vez de leitura visual. É o critério que fecha UC-9 e UC-4.
       Rodar em sessão SEM cookie CF_Authorization — curl novo, não navegador logado.
@@ -2397,8 +2408,9 @@ phases:
         Abrir a URL *.pages.dev e confirmar que o dashboard carrega igual ao de hoje (modo
         mock, fixture curado). Confirmar no painel do Pages que o deploy foi disparado pelo
         commit mais recente do branch principal, sem nenhum passo de build configurado.
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. Projeto Pages criado e ligado ao repo (branch main), sem comando de build, output na raiz. 'Connect to Git' ficou atras de um link 'Continue to Pages' na tela unificada de Workers & Pages. Ativar Zero Trust pela primeira vez exigiu tela de plano + checkout mesmo no Free (dados de cobranca), etapa que o usuario concluiu pessoalmente.
       ACRESCENTADA em 2026-09-09 por ADR-018, substituindo 4.1/4.2/4.3.
       DEPENDE DO USUÁRIO — o agente não tem e não deve ter credencial de criação de conta.
       Passos: (1) criar conta Cloudflare (grátis, sem cartão); (2) Workers & Pages → Create
@@ -2428,8 +2440,9 @@ phases:
         aba Network e confirmar que a requisição do navegador NÃO carrega o header
         X-CRM-Api-Key, e que ele também não aparece na resposta. Buscar a chave no
         código-fonte servido (view-source e todos os .js) e confirmar ZERO ocorrências.
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. Secret CRM_API_KEY cadastrado como encriptado e redeploy disparado. O valor nunca passou pelo chat: foi copiado para o clipboard localmente (50 caracteres, sem quebra de linha, conferido contra o .env) e digitado direto no formulario.
       ACRESCENTADA em 2026-09-09 por ADR-018. É a metade que falta de 4.11 (o código já
       está pronto e testado).
       DEPENDE DO USUÁRIO: Pages → Settings → Variables and Secrets → Add → nome
@@ -2456,8 +2469,9 @@ phases:
         GET /api/automacao-leads devolve 404; GET /api/leads/a%20b devolve 404;
         GET /api/leads/../../algo não alcança nenhum webhook do n8n. As três rotas
         legítimas (/api/meta, /api/leads, /api/leads/{id}) continuam respondendo 200.
-    status: pending
+    status: completed
     notes: >-
+      EXECUTADA EM PRODUCAO (2026-09-09) — dashboard no ar em https://loupen-dashboard.pages.dev/ , protegido pelo Cloudflare Access, /api/* servindo dado real com a chave apenas no servidor. Verificacao item a item e as 4 diferencas reais entre a UI da Cloudflare e o roteiro estao em validation-log.md. Allowlist confirmada em producao, autenticado: /api/automacao-leads -> 404, /api/leads/a%20b -> 404, /api/leads -> 200, /api/meta -> 200.
       ACRESCENTADA em 2026-09-09 por ADR-018. Existe porque a defesa aqui NÃO é redundante
       com o Access: quem chega na Function já é usuário autenticado @loupen.com.br, mas um
       proxy genérico permitiria a essa pessoa chamar QUALQUER webhook desta instância n8n —

@@ -614,3 +614,48 @@ O desenho original precisava de **três** regras de borda coordenadas (Origin Ru
 **Redação aplicada em 2026-09-09:** dois e-mails reais de lead que eu havia escrito nas entradas de 2.17 (um Gmail pessoal e um contato corporativo) foram substituídos pela descrição do caso. Encontrados por varredura de PII feita **antes** do primeiro envio ao repositório remoto — nunca chegaram ao GitHub.
 
 **Pendência para o usuário decidir:** `docs/stories/epic-crm-lead-intelligence/spec/research-amendment-2.json` (linha 71) contém **3 e-mails reais** de leads, escritos numa fase anterior de pesquisa. Não foram alterados aqui porque são insumo de um artefato de pesquisa já revisado e a decisão de reescrever histórico de spec é do usuário — mas **devem ser redigidos antes desse arquivo ir para o repositório público**.
+
+## ✅ Fase 4 EXECUTADA em produção — dashboard no ar, protegido, chave só no servidor
+
+**URL:** `https://loupen-dashboard.pages.dev/` — Cloudflare Pages + Access em conta nova, conforme ADR-018. Execução feita pelo usuário com um agente operando o navegador; resultado item a item abaixo.
+
+### Resultado da verificação (4.12/4.15/4.16)
+
+| Item | Resultado |
+|---|---|
+| Gate bloqueia visitante sem sessão | ✅ requisição sem cookies (`credentials:'omit'`, `redirect:'manual'`) recebe redirect, nunca o dashboard; com cookie de sessão, 200 + dashboard |
+| Login `@loupen.com.br` | ✅ PIN por e-mail, login concluído, dashboard carrega |
+| `/api/meta` retorna dado real | ✅ JSON real com `ad_campaign` (33 linhas) — **não** o 500 de secret ausente |
+| Navegador não envia `X-CRM-Api-Key` | ✅ (por auditoria de código; ver ressalva de método) |
+| Allowlist recusa o que deve | ✅ `/api/automacao-leads` → 404; `/api/leads/a%20b` → 404; `/api/leads` → 200; `/api/meta` → 200 |
+
+**Ressalva de método, registrada em vez de escondida:** dois itens não foram verificados exatamente como especificado. (1) O bloqueio anônimo foi provado por requisição sem cookies em vez de janela anônima literal — equivalente e, na prática, mais preciso. (2) A ausência do header foi verificada por auditoria do código de produção (o caminho real faz `fetch('/${caminho}')` sem objeto `headers`, então não há como enviar a chave) em vez de leitura da aba Network, porque a ferramenta de automação não expõe headers brutos. As duas substituições são defensáveis, mas ficam declaradas: não é o mesmo que ter visto o DevTools.
+
+### 🔍 Achado real do item 5, e a correção que ele motivou
+
+O agente reportou **falha parcial**: a string `X-CRM-Api-Key` aparece 2x em `assets/js/data-api.js` (um comentário e o branch de teste local), o que não bate com "zero ocorrências".
+
+**Duas conclusões honestas:**
+
+1. **O critério estava mal redigido — culpa minha.** O texto dizia "zero ocorrências de *valor de chave*", mas mandava buscar também pelo *nome* do header. O critério real (nenhum **valor** de chave no bundle) **passou**: não há chave hardcoded em lugar nenhum, só o nome do header como string, associado a uma variável que nenhum arquivo commitado define.
+
+2. **Mas havia um vetor menor que o relatório não mencionou, e ele foi corrigido.** Com `MODO_DADOS='real'`, o branch de teste local tinha **precedência** sobre o caminho same-origin. Quem conseguisse injetar script na página (XSS, extensão maliciosa) poderia forçar o dashboard a abandonar as chamadas seguras e bater direto no n8n. Não vaza a chave — quem injetasse precisaria já conhecer um valor válido — mas é uma degradação evitável.
+
+**Correção aplicada:** `_modoTesteLocal()` agora exige host local (`localhost`, `127.0.0.1`, `[::1]`, `file://`). Em produção o branch é **inalcançável**, independentemente do que seja injetado em `window`. Testado nos dois sentidos: ativa em localhost/127.0.0.1/[::1]/file://, **inativa** em `loupen-dashboard.pages.dev` e em `github.io` mesmo com a variável injetada.
+
+**Não quebra nada:** verificado que **nenhum** spec Playwright usa essa variável (o uso foi manual, uma vez, em 7.1) e que o servidor de teste roda em `localhost:8123`. Regressão: 39/39 `node --test` e 8/8 Playwright (2 skips conhecidos).
+
+**Decisão de NÃO remover o branch:** ele preserva a capacidade de validar a integração real localmente sem depender de deploy, que é valor concreto. Travá-lo em host local custa ~zero e elimina o risco — remover custaria essa capacidade sem ganho adicional.
+
+### Diferenças reais entre a UI da Cloudflare e o roteiro (para a próxima vez)
+
+Registradas porque um roteiro que não bate com a tela faz a pessoa duvidar de si em vez de duvidar do roteiro:
+
+- **"Connect to Git" ficou atrás de um link "Continue to Pages"** na tela unificada de criação de Workers & Pages.
+- **A pegadinha do wildcard NÃO se materializou:** na criação do app self-hosted, os campos *Subdomain* e *Domain* já vêm **separados**, e o *Subdomain* veio **vazio** — não existe mais o campo único com `*` pré-preenchido que a documentação/comunidade descrevia. O alerta era baseado em material mais antigo; foi inofensivo, mas está corrigido aqui.
+- **Ativar Zero Trust pela primeira vez exigiu tela de seleção de plano + checkout, mesmo no Free** — envolve dados de cobrança, então o usuário precisou concluir pessoalmente. Vale avisar de antemão: assusta, mas o plano Free segue sem custo.
+- **"One-time PIN" não é um toggle em Settings:** está em *Integrations → Identity providers*, e precisou ser **adicionado explicitamente** como provedor.
+
+### Restrições respeitadas
+
+GitHub Pages **não** foi desativado (é 4.4, só depois desta verificação); nenhum outro domínio ou zona DNS da conta foi tocado; nenhum arquivo do repositório foi alterado pelo agente do navegador.
