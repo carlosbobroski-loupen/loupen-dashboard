@@ -382,6 +382,33 @@
       <div class="section-row"><div class="section-title"><i class="ti ti-alert-triangle"></i>Lacunas declaradas</div><div class="section-badge" id="qd-lacunas-count">—</div></div>
       <div id="qd-lacunas-list" style="padding:16px;display:flex;flex-direction:column;gap:10px"></div>
     </div>
+
+    <!-- Cobertura dos campos que sustentam os filtros. Existe para que
+         ninguém use um filtro sem saber de quantos leads ele fala. -->
+    <div class="card" style="margin-top:16px">
+      <div class="section-row"><div class="section-title"><i class="ti ti-percentage"></i>Cobertura dos campos de filtro</div><div class="section-badge" id="qd-cob-badge">—</div></div>
+      <div id="qd-cobertura" style="padding:16px"></div>
+    </div>
+
+    <!-- Contrato de dados §1.6: exclusão de dado de teste NUNCA silenciosa.
+         Cada regra com o que ela pegou e por que existe. -->
+    <div class="card" style="margin-top:16px">
+      <div class="section-row"><div class="section-title"><i class="ti ti-flask"></i>Dados de teste excluídos, por regra</div><div class="section-badge" id="qd-teste-badge">—</div></div>
+      <div id="qd-teste" style="padding:16px"></div>
+    </div>
+
+    <!-- Contrato de dados §1.3: os valores que nenhuma regra classificou,
+         para a tabela de regras evoluir com evidência em vez de palpite. -->
+    <div class="card" style="margin-top:16px">
+      <div class="section-row"><div class="section-title"><i class="ti ti-help-circle"></i>Valores sem regra de classificação</div><div class="section-badge" id="qd-semregra-badge">—</div></div>
+      <div id="qd-semregra" style="padding:16px"></div>
+    </div>
+
+    <!-- Atribuição: quantos eventos têm sessão de origem legível. -->
+    <div class="card" style="margin-top:16px">
+      <div class="section-row"><div class="section-title"><i class="ti ti-route"></i>Atribuição de origem</div><div class="section-badge" id="qd-atrib-badge">—</div></div>
+      <div id="qd-atribuicao" style="padding:16px"></div>
+    </div>
   </div>
 
   <!-- LEADS RD STATION (legado — sem alteração) -->

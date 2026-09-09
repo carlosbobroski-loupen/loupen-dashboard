@@ -36,6 +36,10 @@ DECLARE
     'account', 'ad_campaign', 'automation_workflow', 'campaign', 'contact',
     'conversion_event', 'lead', 'marketing_asset', 'opportunity', 'owner',
     'lead_touchpoint', 'lead_funnel_stage_event',
+    -- Acrescentada em 2026-09-09 (migration 045). Tabela de FATO com
+    -- proveniência própria (source_system + collected_at): cada linha é um
+    -- evento de conversão vindo do RD Station.
+    'lead_conversion_event',
     'stg_ads', 'stg_rdstation', 'stg_salesforce', 'stg_sheets'
   ];
   -- Tabelas ISENTAS, cada uma por um motivo real (não por conveniência):
@@ -46,10 +50,18 @@ DECLARE
   --                           lead_origin_classification
   --   infra de ingestão (é o próprio registro de proveniência) ...........
   --                           ingest_run, sync_state, schema_migrations
+  --   REGRA DE NEGÓCIO escrita por nós, não ingerida de fonte nenhuma
+  --   (migrations 045/046/050/056) ......................................
+  --                           cargo_grupo_regra, lead_teste_regra
+  --     Estas duas não têm proveniência porque não vêm de fonte externa: são
+  --     decisões nossas, versionadas em migration e auditáveis pela coluna
+  --     `observado`/`motivo`. Dar-lhes um `source_system` fictício seria
+  --     inventar origem para satisfazer o formato da checagem.
   v_isentas text[] := ARRAY[
     'attribution_ruleset', 'channel_source', 'funnel_stage', 'leadsource_crosswalk',
     'identity_candidate', 'identity_edge', 'person', 'lead_origin_classification',
-    'ingest_run', 'sync_state', 'schema_migrations'
+    'ingest_run', 'sync_state', 'schema_migrations',
+    'cargo_grupo_regra', 'lead_teste_regra'
   ];
   v_sem_proveniencia text;
   v_sem_coleta       text;

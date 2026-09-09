@@ -441,7 +441,11 @@ export async function obterQualidadeDados() {
     const porFonte = (body.fontes ?? []).map((f) => ({
       fonte: f.source,
       totalLeads: f.rows_target,
-      ultimaAtividadeObservada: f.last_run_at,
+      // Pode ser null quando a fonte nunca completou uma execução íntegra
+      // (o watermark só avança em status=ok). A view trata null; antes ela
+      // chamava .slice() direto e quebrava a aba inteira.
+      ultimaAtividadeObservada: f.last_run_at ?? null,
+      objeto: f.object ?? null,
     }));
     // TODO conhecido: /api/meta reporta falha por EXECUÇÃO de ingestão
     // (granularidade de lote), não por EVENTO individual como o fixture
@@ -458,7 +462,11 @@ export async function obterQualidadeDados() {
         ultimoEventoValidoTitulo: null,
         ultimoEventoValidoTimestamp: e.started_at,
       }));
-    return { porFonte, lacunas };
+    // Bloco novo: contagem de exclusão POR REGRA (contrato §1.6 — exclusão
+    // silenciosa é proibida) e os cargos que nenhuma regra classificou (§1.3,
+    // para a tabela de regras evoluir com evidência). Vem de
+    // fn_qualidade_dados; null quando o ramo de /api/meta não respondeu.
+    return { porFonte, lacunas, qualidade: body.qualidade ?? null };
   }
 
   const lista = await _loadList();
@@ -491,7 +499,11 @@ export async function obterQualidadeDados() {
     }
   }
 
-  return { porFonte: Object.values(porFonte), lacunas };
+  // `qualidade: null` no mock, de propósito: o fixture não tem regra de dado
+  // de teste nem cargo livre para classificar, e fabricar números aqui faria
+  // a aba mostrar uma auditoria que não existe. A view trata null mostrando
+  // que a seção depende do backend real.
+  return { porFonte: Object.values(porFonte), lacunas, qualidade: null };
 }
 
 /** Limpa o cache em memória — só usado por testes. */

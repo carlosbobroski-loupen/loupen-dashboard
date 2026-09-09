@@ -1042,3 +1042,197 @@ da autorização, quando `lead` tinha 13 registros de `seed_test` e virar a chav
 - 72% dos eventos sem `traffic_source` legível — falta distinguir "campo ausente" de "falha de
   decodificação".
 - Aba de oportunidades (cruzamento com Salesforce) segue bloqueada no consentimento OAuth.
+
+---
+
+## 2026-09-09 (cont.) — Etapa 8: aba de qualidade e atribuição mensurável
+
+Trabalho autônomo depois do push de `f75d3d4`. Nada aqui exigiu decisão do usuário.
+
+### Migrations 055–059
+
+`055` `fn_qualidade_dados` · `056` 2ª rodada de regras de cargo e tamanho ·
+`057` coluna `atribuicao_status` + v10 · `058` backfill do status + v11 ·
+`059` `fn_qualidade_dados` usando a coluna nova.
+
+### 🔴 A aba de qualidade encontrou um bug meu em 5 minutos
+
+`fn_qualidade_dados` lista os cargos que nenhuma regra classificou. Primeira execução:
+**`Outros` com 27 leads** no topo. Minha regra da `050` era `'Outro'` em **match exato** — o valor
+real na base é `Outros`, plural. 27 leads caíam em "sem regra" por uma letra.
+
+Mais dois do mesmo tipo, também revelados pela lista:
+
+- `%Gerente%` não pega `Gestor De Marketing`. Funcionava para `Gestor/Gerente` (que contém
+  "Gerente"), e isso me deu falsa confiança de que "Gestor" estava coberto.
+- `%Head de%` não pega `Head` sozinho — regra escrita a partir de UM valor observado, estreita
+  demais.
+
+**Efeito das correções:** cargos em `outros` caíram de **92 para 10** de 439 preenchidos.
+
+### Uma dimensão que o campo escondia
+
+`TI / Tecnologia` (17 leads), `Comercial / Vendas` (8), `Marketing`, `Comunicação`: não são
+respostas de senioridade, são **áreas**. O formulário mistura duas perguntas no mesmo campo
+`job_title`. Colapsá-las em algum nível de cargo inventaria senioridade que a pessoa não informou,
+então foram para `area_declarada` — 27 leads que antes poluiriam qualquer filtro de nível.
+
+O que fica em `outros` de propósito: a cauda de cargos livres com n=1 (`Apresentadora`,
+`Psicóloga`, `Engenheiro de plataforma`…). Escrever regra a partir de um único caso seria
+construir taxonomia por palpite. `outros` com 10 de 439 é estado saudável, e a aba mostra quais são.
+
+### Tamanho de empresa: respostas por palavra
+
+A função só extraía números, então devolvia `nao_informado` para `Grande`,
+`Sou autônomo / Profissional independente` e `ste` — misturando "não informou" com "informou e
+não entendemos". Agora há um ramo por palavra: ilegíveis caíram de 3 para 1 (só o `ste`, que é
+lixo mesmo).
+
+### 🔴 Duas asserções latentes desde as migrations 050 e 052
+
+Ao rodar `normalizacao-perfil-lead.sql` depois da `056`, duas asserções falharam — e as duas
+estavam quebradas **desde antes**, porque eu acrescentei regras e não reexecutei a asserção que
+cobria aquele comportamento:
+
+1. Travava `Analista de TI -> outros`, verdade quando o arquivo nasceu (5 regras) e obsoleta
+   desde a `050`, que acrescentou `%Analista%`.
+2. Exigia **exatamente 3** regras de teste ativas; a `052` acrescentou uma quarta legitimamente.
+
+**Lição concreta:** acrescentar regra é mudar comportamento coberto por asserção, e a asserção tem
+de rodar no mesmo passo. A asserção 5 foi reescrita para verificar o **invariante** do contrato
+§1.6 (toda regra ativa tem campo, padrão e motivo — exclusão auditável) em vez de uma quantidade.
+Foi o **quarto** erro do mesmo tipo neste projeto: travar valor absoluto em vez do invariante.
+
+### Atribuição: separando limitação da fonte de bug nosso
+
+O coletor devolvia `null` tanto quando `traffic_source` vinha **ausente** do payload quanto quando
+a **decodificação falhava**. Somados, viravam um número só ("332 eventos sem sessão decodificável"),
+escondendo a única distinção acionável.
+
+`atribuicao_status` (057) tem 4 estados: `ok`, `ausente` (limitação da fonte, sem ação nossa),
+`ilegivel` (**bug nosso, tem correção** — é o número a vigiar) e `NULL` (evento anterior à coluna).
+
+O `NULL` **não foi retroagido**: sem reingerir não há como saber qual caso era, e um palpite
+apagaria a lacuna. A `058` permite que uma reingestão complete o status **sem tocar nenhum outro
+campo** (`COALESCE` + `WHERE ... IS NULL`, nenhuma outra coluna no `SET`).
+
+### 🔴 Armadilha que a 058 criou e que eu quase deixei passar
+
+O contador de eventos gravados usava `IF FOUND`. Com `DO UPDATE` condicional, `FOUND` passa a ser
+true também quando o conflito apenas **preencheu o status** de um evento pré-existente — o que
+inflaria `rows_target` e **destruiria a prova de idempotência**: reprocessar o mesmo lote passaria
+a reportar linhas novas que não existem.
+
+A v11 distingue pelo `ingested_at` da linha contra o início do lote, e reporta o preenchimento
+como objeto separado (`LeadConversion_StatusPreenchido`) em vez de somar. Verificado: execução 2
+do mesmo lote segue reportando `LeadConversion 5 → 0`.
+
+É o mesmo tipo de erro da `042` (PERFORM descartando o retorno que servia de contador): **a
+métrica mente enquanto o dado está certo**. Métrica que mente é pior que métrica ausente, porque
+ninguém desconfia dela.
+
+### Aba Qualidade de dados — quatro seções novas
+
+Cumpre o que o contrato prometia e não tinha:
+
+- **Cobertura dos campos de filtro** — barra por dimensão com semáforo (<40% vermelho, 40–79%
+  âmbar, 80%+ verde). Existe para ninguém usar um filtro sem saber de quantos leads ele fala.
+- **Dados de teste excluídos, por regra** (§1.6) — cada regra com o que pegou, o padrão e **o
+  motivo pelo qual existe**. Regra com 0 leads também aparece: ou o padrão está errado, ou o
+  problema parou de ocorrer.
+- **Valores sem regra de classificação** (§1.3) — os cargos e tamanhos que ninguém classificou.
+- **Atribuição de origem** — os 4 estados, com destaque no `ilegivel`.
+
+Também corrigidos dois bugs de exibição que só apareceriam em modo real: `_formatarData(null)`
+chamava `.slice()` em null e derrubava a aba inteira (o watermark É null quando a fonte nunca
+completou execução íntegra), e `leadNome` null era renderizado como a string "null".
+
+### Fluxo de estágio de funil — a razão de `estagio_funil` estar vazio
+
+O ramo de funil do fluxo agendado nunca rodou: a query `Contatos Vinculados` exigia vínculo
+`identity_edge` → lead do **Salesforce**, e sem Salesforce ela devolve zero linhas. Correto quando
+foi escrita; obsoleto desde que existem leads nativos do RD.
+
+Ampliada com a mesma precedência de `fn_resolve_lead_por_rd_uuid` (Salesforce canônico, RD nativo
+como fallback), leads de teste fora, e **batching adicionado** (não havia: 500 chamadas de uma vez
+tomariam 429).
+
+**Não ativei o fluxo agendado do usuário.** Ativá-lo para rodar um webhook ativaria também o
+`Schedule Trigger`, que foi deixado inativo de propósito aguardando revisão. Criei um fluxo
+dedicado de carga sob demanda (`i9lwcRFRddo3cAec`) e deixei o agendado intocado, exceto pelas duas
+melhorias acima, que são corretas de qualquer forma.
+
+### 🔴 O achado que justifica a instrumentação inteira
+
+A coluna `atribuicao_status` foi criada para separar "a fonte não mandou" de "não conseguimos
+ler". Na primeira medição real: 434 `ok`, 270 `ausente` e **61 `ilegivel`**.
+
+Fui olhar os 61 e eles eram os **melhor atribuídos da base**: 47 com `utm_campaign`, 45 com
+`midia`. Isso não fazia sentido como falha de leitura. Consultando a API para um deles, a causa:
+
+**O RD Station usa DUAS formas para `traffic_source`, e o coletor conhecia só uma.**
+
+| Forma | Conteúdo | Origem |
+|---|---|---|
+| A | `encoded_<base64>` com `first_session`/`current_session` | conversão de site |
+| B | string simples (`"facebook"`) + `traffic_medium`/`traffic_campaign`/`traffic_value` | Facebook Lead Ads |
+
+Eu tentava decodificar B como base64, falhava, e marcava `ilegivel` — **jogando fora a atribuição
+de mídia paga**, que é exatamente a que sustenta ROI. Dos 61, **14 ficaram sem nenhuma atribuição
+capturada**.
+
+**Resultado da correção (migrations 060/061 + coletor):**
+
+| | Antes | Depois |
+|---|---|---|
+| `ilegivel` | 61 | **0** |
+| Eventos com plataforma | 45 | **61** |
+| Eventos com campanha (nos 61) | 47 | **50** |
+
+**Consequência que corrige um número que eu reportei:** os 7,6% de cobertura do eixo B foram
+medidos sobre `cf_utm_*` do cadastro. A forma plana é fonte **adicional** de atribuição paga, então
+a cobertura real do eixo B é maior do que eu disse.
+
+**A lição está no nome, não no bug.** A `057` corrigiu misturar "ausente" com "falha" e, na mesma
+correção, criou uma versão menor do mesmo erro: chamei `ilegivel` tanto uma falha real quanto um
+formato que eu não conhecia. `ilegivel` **afirma que o dado está errado** quando o errado era o
+leitor. Estado de erro deve nomear o que se sabe, não acusar a fonte.
+
+### Enumerar valores no código, terceira ocorrência
+
+A `059` contava atribuição com um `FILTER (WHERE status = 'ok')` por valor conhecido. Bastou a
+`060` criar `ok_plano` para a aba **deixar de contá-lo** — o valor existia no banco e não aparecia
+na tela. A `061` passou a **agrupar** por status dinamicamente, e a interface mostra status
+desconhecido com o valor cru: visível e feio é melhor que invisível.
+
+É a mesma família dos 4 filtros inventados do contrato: código decidindo quais valores existem em
+vez de perguntar ao dado.
+
+### ✅ Estágio de funil preenchido
+
+Fluxo dedicado `i9lwcRFRddo3cAec`, executado: **475 contatos consultados, 475 gravados, status ok**.
+
+`estagio_funil` saiu de vazio para: **434 `Lead`, 41 `Qualified Lead`**. O vocabulário veio da
+fonte (`Client`, `Lead`, `Qualified Lead` upsertados dinamicamente), nunca de enum adivinhado —
+`ordem` segue NULL até o usuário decidir uma ordenação real.
+
+Cruzamento já possível: dos 41 qualificados, **19 são C-level**.
+
+### 🔒 Exposição que eu criei e fechei
+
+Os webhooks de ingestão que eu criei estavam **sem autenticação**. Quem descobrisse o caminho
+dispararia centenas de chamadas à API do RD Station e escritas no banco. Não é vazamento de dado
+(são endpoints de escrita interna), mas é abuso de quota e de recurso.
+
+Ambos passaram a exigir o header `X-CRM-Api-Key`, com a credencial que já existia. Verificado por
+`curl` anônimo: `/crm-rd-leads-ingest` → **403**; `/crm-rd-funil-carga` → **404** (inativo).
+
+O fluxo de funil ficou **desativado** de propósito: é carga sob demanda, não precisa de webhook
+aberto permanentemente.
+
+### O fluxo agendado do usuário segue intocado
+
+Não ativei `3l8hobRXtjbzodZc`. Ativá-lo para rodar um webhook ativaria também o `Schedule
+Trigger`, deixado inativo aguardando revisão. Recebeu só duas melhorias corretas de qualquer
+forma: a query de contatos ampliada (antes exigia vínculo com Salesforce e devolvia zero linhas) e
+batching no nó HTTP (não havia — 500 chamadas de uma vez tomariam 429).

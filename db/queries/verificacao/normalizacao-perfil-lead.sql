@@ -90,12 +90,29 @@ FROM (
 -- vazio) são estados DISTINTOS de propósito — a aba Qualidade de dados
 -- precisa diferenciar "não sabemos" de "não sabemos classificar".
 -- ---------------------------------------------------------------------------
+-- ATUALIZADO em 2026-09-09 (2ª vez). Este bloco travava
+-- `Analista de TI -> outros`, o que era verdade quando o arquivo nasceu (com
+-- a migration 045, que tinha só 5 regras). A migration 050 acrescentou
+-- `%Analista%` e a expectativa ficou OBSOLETA — e eu só descobri agora,
+-- porque depois da 050 eu conferi a distribuição de cargos mas NÃO reexecutei
+-- este arquivo. Lição concreta: acrescentar regra é mudar comportamento
+-- coberto por asserção, e a asserção tem de rodar no mesmo passo.
+--
+-- O caso de `outros` agora usa um valor REAL da base que segue sem regra de
+-- propósito (`Psicóloga`, n=1) — a cauda de cargos livres idiossincráticos
+-- que o contrato §1.3 decidiu não classificar a partir de n=1.
 WITH casos(cargo, esperado) AS (VALUES
   ('Diretor',             'diretoria'),
   ('Diretor Comercial',   'diretoria'),
   ('CEO, Founder, Sócio', 'c_level'),
+  ('Partner',             'c_level'),
   ('Gerente',             'gerencia'),
-  ('Analista de TI',      'outros'),
+  ('Gestor De Marketing', 'gerencia'),
+  ('Head',                'diretoria'),
+  ('Analista de TI',      'analista'),
+  ('TI / Tecnologia',     'area_declarada'),
+  ('Outros',              'outro_declarado'),
+  ('Psicóloga',           'outros'),
   ('',                    'nao_informado'),
   (NULL,                  'nao_informado')
 )
@@ -108,13 +125,16 @@ FROM casos;
 -- ASSERÇÃO 3 — nenhuma divergência de cargo
 -- ---------------------------------------------------------------------------
 SELECT CASE WHEN count(*) = 0
-            THEN 'ASSERCAO 3 OK: os 7 casos de cargo_grupo batem'
+            THEN 'ASSERCAO 3 OK: os 13 casos de cargo_grupo batem'
             ELSE '*** ASSERCAO 3 FALHOU: ' || count(*) || ' divergencia(s) ***'
        END AS resultado
 FROM (VALUES
   ('Diretor','diretoria'),('Diretor Comercial','diretoria'),
-  ('CEO, Founder, Sócio','c_level'),('Gerente','gerencia'),
-  ('Analista de TI','outros'),('','nao_informado'),(NULL,'nao_informado')
+  ('CEO, Founder, Sócio','c_level'),('Partner','c_level'),
+  ('Gerente','gerencia'),('Gestor De Marketing','gerencia'),
+  ('Head','diretoria'),('Analista de TI','analista'),
+  ('TI / Tecnologia','area_declarada'),('Outros','outro_declarado'),
+  ('Psicóloga','outros'),('','nao_informado'),(NULL,'nao_informado')
 ) AS t(cargo, esperado)
 WHERE fn_cargo_grupo(cargo) IS DISTINCT FROM esperado;
 
@@ -131,10 +151,47 @@ SELECT CASE WHEN count(*) FILTER (WHERE NOT observado) = 0
 FROM cargo_grupo_regra;
 
 -- ---------------------------------------------------------------------------
--- ASSERÇÃO 5 — as 3 regras de dado de teste do contrato §1.6 estão ativas
+-- ASSERÇÃO 5 — o INVARIANTE das regras de teste, não a quantidade delas.
+--
+-- A primeira versão exigia exatamente 3 regras ativas. A migration 052
+-- acrescentou uma quarta (seed_test) legitimamente, e a asserção passou a
+-- falhar por um número que nunca foi a propriedade que importava. Foi o
+-- QUARTO erro do mesmo tipo neste projeto: travar valor absoluto em vez do
+-- invariante.
+--
+-- O invariante real do §1.6 é: toda regra ativa tem de ser AUDITÁVEL — nome,
+-- campo, padrão e MOTIVO preenchidos. Uma regra sem motivo é exclusão
+-- silenciosa com etapa extra, que é justamente o que o contrato proíbe. E o
+-- número de regras pode e deve crescer conforme a base revela dado de teste
+-- novo.
 -- ---------------------------------------------------------------------------
-SELECT CASE WHEN count(*) = 3
-            THEN 'ASSERCAO 5 OK: as 3 regras de lead_teste_regra estao ativas'
-            ELSE '*** ASSERCAO 5 FALHOU: esperado 3 regras ativas, encontrado ' || count(*) || ' ***'
-       END AS resultado
+SELECT CASE
+  WHEN count(*) = 0 THEN '*** ASSERCAO 5 FALHOU: nenhuma regra de teste ativa — a exclusao de dado de teste esta desligada ***'
+  WHEN count(*) FILTER (WHERE btrim(COALESCE(motivo,'')) = '') > 0
+       THEN '*** ASSERCAO 5 FALHOU: ' || count(*) FILTER (WHERE btrim(COALESCE(motivo,'')) = '')
+            || ' regra(s) ativa(s) sem motivo — exclusao nao auditavel, proibida pelo contrato 1.6 ***'
+  WHEN count(*) FILTER (WHERE btrim(COALESCE(padrao,'')) = '') > 0
+       THEN '*** ASSERCAO 5 FALHOU: regra ativa sem padrao ***'
+  ELSE 'ASSERCAO 5 OK: as ' || count(*) || ' regras de teste ativas tem campo, padrao e motivo'
+END AS resultado
 FROM lead_teste_regra WHERE ativo;
+
+-- ---------------------------------------------------------------------------
+-- ASSERÇÃO 6 — tamanho por PALAVRA (migration 056). Valores reais que a
+-- versão numérica da função não conseguia ler.
+-- ---------------------------------------------------------------------------
+SELECT CASE WHEN count(*) = 0
+            THEN 'ASSERCAO 6 OK: os 5 casos de tamanho por palavra batem'
+            ELSE '*** ASSERCAO 6 FALHOU: ' || count(*) || ' divergencia(s) ***'
+       END AS resultado
+FROM (VALUES
+  ('Grande',                                   'grande'),
+  ('Sou autônomo / Profissional independente', 'pequena'),
+  ('Média',                                    'media'),
+  ('Pequena',                                  'pequena'),
+  -- Lixo real observado na base: informou algo ilegível. Continua
+  -- nao_informado, e fn_qualidade_dados é quem expõe a diferença entre
+  -- "não informou" e "não sabemos ler".
+  ('ste',                                      'nao_informado')
+) AS t(bruto, esperado)
+WHERE fn_normalizar_tamanho_empresa(bruto) IS DISTINCT FROM esperado;
