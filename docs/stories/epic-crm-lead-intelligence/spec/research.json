@@ -1,0 +1,1394 @@
+{
+  "storyId": "epic-crm-lead-intelligence",
+  "researchedAt": "2026-09-03T20:05:00Z",
+  "researchedBy": "@analyst",
+  "complexity": "COMPLEX",
+
+  "researchScope": {
+    "note": "Fase 3 do Spec Pipeline executada com escopo AMPLIADO por exigência de FR-13 (pesquisa multidisciplinar em 5 perspectivas), não apenas verificação de bibliotecas.",
+    "toolsAvailable": ["WebSearch", "WebFetch", "codebase"],
+    "toolsUnavailable": ["context7", "exa"],
+    "toolNote": "Context7 e EXA não estavam conectados nesta sessão. Toda pesquisa externa foi feita via WebSearch/WebFetch, com URL registrada por claim (Artigo IV — No Invention). Claims sem fonte rastreável estão em unverifiedClaims.",
+    "lockedDecisions": [
+      "Escopo somente leitura/análise — Salesforce e RD Station permanecem os únicos sistemas de operação (resolve OQ-6, confirma ASM-2). Nenhuma pesquisa de escrita bidirecional foi conduzida.",
+      "Sem orçamento para ferramenta paga (resolve OQ-1) — caminho build é o principal; buy pesquisado apenas como benchmark de features/custo.",
+      "Múltiplos usuários e perfis (marketing, comercial, direção) desde a primeira fase (resolve OQ-3, confirma ASM-4, eleva NFR-3).",
+      "A regra de atribuição Marketing/Comercial/Não-atribuído deve ser PROPOSTA nesta fase (resolve OQ-7) — ver attributionModelProposal."
+    ]
+  },
+
+  "dependencies": [
+    {
+      "name": "n8n (instância self-hosted da Loupen)",
+      "type": "service",
+      "version": "self-hosted em n8n.loupenapps.com.br",
+      "verified": true,
+      "source": "codebase",
+      "decisionHierarchy": "REUSE",
+      "existing": {
+        "installed": true,
+        "currentVersion": "em produção",
+        "usageLocations": [
+          "index.html:1209 — ADS_API_URL = https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff8e85ea49e64",
+          "index.html:1210-1211 — comentário confirmando que GA4 passou a ser buscado pelo mesmo backend n8n",
+          "index.html:1840, 2560, 2893, 4379 — as 4 chamadas fetch() do artefato"
+        ]
+      },
+      "documentation": {
+        "url": "https://blog.n8n.io/etl-pipeline/",
+        "relevantSections": [
+          "ETL Pipeline Patterns for Reliable Workflow Automation",
+          "Trigger nodes: Cron, Webhook, Schedule, App triggers"
+        ],
+        "additionalUrls": [
+          "https://triumphoid.com/syncing-salesforce-to-postgresql-via-n8n-the-no-duplicates-blueprint/",
+          "https://lumadock.com/blog/tutorials/n8n-etl-pipeline/",
+          "https://www.wednesday.is/writing-articles/building-real-time-data-pipelines-with-n8n"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Ingestão idempotente com upsert",
+          "description": "Padrão obrigatório para FR-8/AC-8.1. Fonte n8n: 'Using Postgres with INSERT ... ON CONFLICT DO UPDATE prevents duplicates and is key to making ETL idempotent'. Permite reexecutar a ingestão sem duplicar nem perder a contagem de reconciliação.",
+          "codeExample": "INSERT INTO lead (source_system, source_id, ...) VALUES (...) ON CONFLICT (source_system, source_id) DO UPDATE SET ... , ingested_at = now();",
+          "source": "https://blog.n8n.io/etl-pipeline/"
+        },
+        {
+          "name": "Watermark de sincronização incremental",
+          "description": "Guardar o timestamp da última execução bem-sucedida em tabela própria no Postgres e consultar a fonte só pelo delta. Resolve diretamente o padrão de falha do EC-6/FR-8 (44 de 236 linhas).",
+          "codeExample": "-- tabela sync_state(source, object, last_run_at, rows_source, rows_target)\n-- query SF: SELECT Id, ... FROM Opportunity WHERE SystemModstamp > :last_run_at",
+          "source": "https://getbruin.com/blog/sync-salesforce-data-to-warehouse/"
+        },
+        {
+          "name": "Execute Query em transação única",
+          "description": "O nó Postgres do n8n processa todos os itens de entrada em uma única transação na operação 'Execute Query', significativamente mais rápido que upserts individuais.",
+          "codeExample": null,
+          "source": "https://triumphoid.com/syncing-salesforce-to-postgresql-via-n8n-the-no-duplicates-blueprint/"
+        },
+        {
+          "name": "Provenance metadata por evento",
+          "description": "Fonte n8n: workflows devem etiquetar eventos com metadata de proveniência e validar schema na ingestão. Atende AC-9.1 (cada registro carrega identificação de fonte e timestamp de coleta) e NFR-4.",
+          "codeExample": null,
+          "source": "https://blog.n8n.io/etl-pipeline/"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["Airbyte", "Fivetran", "Windsor.ai scheduled syncs", "cron + script próprio"],
+        "conflicts": [],
+        "idsJustification": "CON-9 + ASM-3: o padrão já está implementado e rodando. Construir nova camada de ingestão do zero seria violação injustificada de REUSE > ADAPT > CREATE (flag explícita em complexity.json)."
+      }
+    },
+    {
+      "name": "Supabase (Postgres gerenciado + Auth + RLS)",
+      "type": "infrastructure",
+      "version": "plano Free para desenvolvimento; Pro (USD 25/mês) para produção",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "CREATE",
+      "existing": {
+        "installed": false,
+        "currentVersion": null,
+        "usageLocations": []
+      },
+      "documentation": {
+        "url": "https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac",
+        "relevantSections": [
+          "Custom Access Token Auth Hook",
+          "Row Level Security policies",
+          "authorize() helper lendo role do JWT"
+        ],
+        "additionalUrls": [
+          "https://supabase.com/docs/guides/database/postgres/row-level-security",
+          "https://supabase.com/features/role-based-access-control",
+          "https://makerkit.dev/blog/saas/supabase-pricing",
+          "https://designrevision.com/blog/supabase-vs-neon"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "RBAC por custom claims no JWT + RLS",
+          "description": "Cobre NFR-3 (múltiplos perfis marketing/comercial/direção desde a primeira fase). Um Custom Access Token Auth Hook roda antes da emissão do token e injeta a claim user_role; as políticas RLS leem essa claim via uma função authorize(). A autorização vive como política SQL na tabela, não reimplementada em cada rota de API — este é o argumento decisivo frente a Postgres puro.",
+          "codeExample": "create policy \"marketing_le_leads\" on lead for select using ( authorize('lead.select') );",
+          "source": "https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac"
+        },
+        {
+          "name": "Extensões de fuzzy match no mesmo banco",
+          "description": "pg_trgm (similaridade por trigramas, índice GIN/GiST) e fuzzystrmatch (levenshtein, soundex, metaphone) permitem resolver EC-7 dentro do próprio Postgres, sem serviço externo de identity resolution.",
+          "codeExample": "create extension if not exists pg_trgm;\nselect similarity('Joao Silva','Joäo Silva') > 0.6;",
+          "source": "https://www.freecodecamp.org/news/fuzzy-string-matching-with-postgresql/"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["Neon", "Railway Postgres", "Postgres em VPS junto do n8n", "Fly.io Postgres"],
+        "conflicts": [
+          "Plano Free pausa projetos inativos após 7 dias e limita a 2 projetos ativos / 500 MB — inadequado para o artefato de produção; usar Free só para ambiente de desenvolvimento.",
+          "No Pro não há scale-to-zero: a instância de compute é cobrada 24/7."
+        ],
+        "costEvidence": "Pro: USD 25/mês, inclui 8 GB de banco, 100k MAU, 100 GB de storage, 500 conexões realtime e USD 10 de crédito de compute (cobre uma instância Micro: 2 vCPU ARM / 1 GB RAM).",
+        "costSources": [
+          "https://makerkit.dev/blog/saas/supabase-pricing",
+          "https://www.nocode.mba/articles/supabase-pricing",
+          "https://uibakery.io/blog/supabase-pricing"
+        ]
+      }
+    },
+    {
+      "name": "Neon (serverless Postgres)",
+      "type": "infrastructure",
+      "version": "avaliado, não recomendado para esta epic",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "REJECTED",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://designrevision.com/blog/supabase-vs-neon",
+        "relevantSections": ["Free tier", "Auth suite (beta, julho 2026)", "Scale-to-zero e branching"],
+        "additionalUrls": [
+          "https://klymentiev.com/blog/supabase-vs-neon",
+          "https://codelesssync.com/blog/supabase-vs-neon-vs-railway-postgresql-for-saas"
+        ]
+      },
+      "patterns": [],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["Supabase"],
+        "conflicts": [
+          "Neon é 'a database', não 'a backend'. Em julho de 2026 lançou auth gerenciado, storage e functions próprios, mas ainda em BETA — apostar em auth beta contraria NFR-3, que exige autenticação e permissão por perfil já na primeira fase utilizável.",
+          "Sem RLS integrado a um sistema de auth pronto, a autorização por perfil teria de ser reimplementada na camada de API — exatamente o custo que Supabase elimina."
+        ],
+        "rejectionReason": "Free tier é mais generoso (até 100 projetos, 0,5 GB cada) e scale-to-zero reduz custo, mas o diferencial que este projeto precisa é auth+RBAC maduro acoplado ao banco, não branching."
+      }
+    },
+    {
+      "name": "Windsor.ai",
+      "type": "service",
+      "version": "MCP já conectado à conta Loupen",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "REUSE",
+      "existing": {
+        "installed": true,
+        "currentVersion": "MCP ativo nesta sessão (350+ conectores, leitura e escrita)",
+        "usageLocations": ["CON-9 — integração de anúncios pagos já existente"]
+      },
+      "documentation": {
+        "url": "https://windsor.ai/destination-guides/",
+        "relevantSections": ["Destinations: PostgreSQL, MySQL, BigQuery, Snowflake, Redshift, Azure SQL, S3, Databricks, Google Sheets"],
+        "additionalUrls": ["https://windsor.ai/pricing/", "https://windsor.ai/documentation/"]
+      },
+      "patterns": [
+        {
+          "name": "Destination task com sync agendado para PostgreSQL",
+          "description": "Windsor.ai suporta PostgreSQL como destination, o que permite que a camada de ads (Meta/Google/LinkedIn Ads, GA4) escreva DIRETAMENTE na base consolidada sem que o n8n precise intermediar. Isso reduz o escopo de construção de ingestão de FR-9 de 4 famílias de fonte para 3 (Salesforce, RD Station, SDR IA WhatsApp).",
+          "codeExample": null,
+          "source": "https://windsor.ai/destination-guides/"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["padrão n8n Meta Ads já implementado (index.html:1209)"],
+        "conflicts": [
+          "Limite de plano: no plano Basic são no máximo 5 scheduled syncs ativos, cada sync = uma tabela atualizada 1x/dia. Planos a partir do Standard dão destination tasks ilimitadas e sync horário/diário. O plano atual da Loupen NÃO foi verificado — ver unverifiedClaims."
+        ],
+        "costEvidence": "Todos os conectores e destinations estão em todos os planos, sem conector premium; para data warehouses o consumo é medido em Monthly Active Rows (MAR).",
+        "costSources": ["https://windsor.ai/pricing/"]
+      }
+    },
+    {
+      "name": "Salesforce REST / Bulk API 2.0",
+      "type": "api",
+      "version": "Bulk API 2.0 (guia versão 67.0, Summer '26)",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "ADAPT",
+      "existing": {
+        "installed": false,
+        "currentVersion": "hoje o acesso é via conector MCP em chat, que CON-1 proíbe como backend vivo",
+        "usageLocations": ["index.html:698 — fatos do Salesforce (RecordType.Name, Amount como MRR, ConvertedAccountId) já materializados no artefato atual"]
+      },
+      "documentation": {
+        "url": "https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/bulk_api_2_0.htm",
+        "relevantSections": ["Bulk API 2.0 overview", "Step 5: Bulk Upsert", "Query jobs assíncronos"],
+        "additionalUrls": [
+          "https://getbruin.com/blog/sync-salesforce-data-to-warehouse/",
+          "https://community.n8n.io/t/salesforce-node-bulk-api-2-0-upsert/35819"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Delta por SystemModstamp",
+          "description": "A maioria dos objetos padrão do Salesforce carrega SystemModstamp (e LastModifiedDate); é o campo pelo qual se sincroniza, de forma que cada execução puxe só os registros alterados desde a última. Este é o mecanismo que fecha o gap de 44/236 linhas do EC-6.",
+          "codeExample": "SELECT Id, Name, StageName, Amount, AccountId, RecordType.Name, SystemModstamp FROM Opportunity WHERE SystemModstamp > 2026-09-01T00:00:00Z",
+          "source": "https://getbruin.com/blog/sync-salesforce-data-to-warehouse/"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["conector Salesforce do Windsor.ai (listado entre CRM/e-mail/e-commerce)"],
+        "conflicts": [
+          "Usuários da comunidade n8n relatam que o nó Salesforce nativo NÃO expõe as operações da Bulk API 2.0, exigindo montar as chamadas via nó HTTP Request. Isso aumenta o esforço de FR-9 e deve entrar no Plan como tarefa explícita, não como configuração trivial.",
+          "CON-1: o MCP Salesforce do Claude é read/write via chat e não pode servir de backend em runtime."
+        ]
+      }
+    },
+    {
+      "name": "RD Station Marketing API + Webhook Service",
+      "type": "api",
+      "version": "API pública documentada em developers.rdstation.com",
+      "verified": false,
+      "source": "exa",
+      "decisionHierarchy": "ADAPT",
+      "existing": {
+        "installed": true,
+        "currentVersion": "hoje acessado via MCP majoritariamente para leitura (CON-2)",
+        "usageLocations": []
+      },
+      "documentation": {
+        "url": "https://developers.rdstation.com/reference/webhooks",
+        "relevantSections": [
+          "Webhook Service (criar/atualizar/listar/remover webhooks)",
+          "GET /platform/contacts/{uuid}/events — consultar eventos associados ao contato"
+        ],
+        "additionalUrls": [
+          "https://developers.rdstation.com/reference/get_platform-contacts-uuid-events",
+          "https://rollout.com/integration-guides/rd-station/api-essentials"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Webhook de conversão + pull de eventos por contato",
+          "description": "Existe endpoint dedicado para consultar os eventos associados a um contato (GET /platform/contacts/{uuid}/events), que é exatamente o insumo de DM-10/FR-3 (átomos da jornada). Webhooks cobrem o fluxo incremental: até 10 webhooks por conta do RD Station Marketing, payload JSON com dados do lead, disparáveis por conversões específicas ou quando o lead é marcado como oportunidade.",
+          "codeExample": null,
+          "source": "https://developers.rdstation.com/reference/webhooks"
+        },
+        {
+          "name": "Limitação estrutural do webhook",
+          "description": "Fonte de terceiro (Kondado) alerta: 'Only conversion events in RD Station cause leads to be sent to the webhook and thus replicated into your destination'. Ou seja, webhook NÃO cobre mudança de estágio de funil nem entrada/saída de workflow — esses precisam de pull agendado, coerente com CON-3/NFR-4 (atualização 1x/dia na origem).",
+          "codeExample": null,
+          "source": "https://kondado.io/wiki/en/a/rdstation"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["MCP RD Station (somente em runtime de chat, não como backend)"],
+        "conflicts": [
+          "CON-2/EC-9: a API expõe ações de escrita reais (criar/atualizar contato, mudar estágio de funil, inscrever em workflow). O escopo é leitura (Decisão 5), portanto a credencial usada pela ingestão deve ter o menor privilégio possível — tratar 'nenhuma escrita a partir de caminho de leitura' como invariante de arquitetura.",
+          "Limites de rate e janela de histórico dos endpoints não foram verificados nesta sessão — ver unverifiedClaims."
+        ]
+      }
+    },
+    {
+      "name": "Next.js (App Router)",
+      "type": "library",
+      "version": "16.2.6 (stable, publicado em 2026-05-07)",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "CREATE",
+      "existing": {
+        "installed": false,
+        "currentVersion": null,
+        "usageLocations": [],
+        "note": "complexity.json (knowledge, score 4) registra que o preset nextjs-react é ASPIRACIONAL: nada no repositório o exercita. Não há package.json, tooling de build, testes nem CI."
+      },
+      "documentation": {
+        "url": "https://nextjs.org/learn/dashboard-app/adding-search-and-pagination",
+        "relevantSections": ["App Router", "React Server Components", "Search e paginação via searchParams"],
+        "additionalUrls": [
+          "https://dev.to/getcraftly/nextjs-16-app-router-the-complete-guide-for-2026-2hi3",
+          "https://meisteritsystems.com/news/next-js-app-router-in-any-js-app-router-in-2026-is-it-ready-for-production/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Rotas endereçáveis para a ficha de lead",
+          "description": "Atende FR-6/AC-6.1 diretamente: /leads/[id] é endereçável e retomável, ao contrário do popup que já falhou. O detalhe deixa de ser estado efêmero de componente e passa a ser rota.",
+          "codeExample": null,
+          "source": "https://nextjs.org/learn/dashboard-app/adding-search-and-pagination"
+        },
+        {
+          "name": "Server Components lendo o banco direto",
+          "description": "'A Server Component can be async, can await a database query, can read environment variables' — permite que a consulta filtrada rode no servidor com a sessão do usuário, mantendo RLS efetiva sem expor o banco ao cliente.",
+          "codeExample": null,
+          "source": "https://dev.to/getcraftly/nextjs-16-app-router-the-complete-guide-for-2026-2hi3"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["SvelteKit", "Remix/React Router", "Vite + React SPA + API separada"],
+        "conflicts": [
+          "NFR-5: o design system atual (kpi-grid, funil2, badge, mono, t-name) é CSS artesanal embutido em um único bloco <style> do index.html (5.014 linhas / 429 KB). Reescrevê-lo em Tailwind é reescrita, não evolução — viola o espírito de NFR-5. Recomendação: extrair o <style> para CSS com custom properties e importar como camada base, adotando Tailwind (se adotado) apenas para layout novo."
+        ],
+        "presetNote": "O preset nextjs-react é o DEFAULT genérico do framework AIOX (.aiox-core/data/technical-preferences.md:46), não uma escolha do usuário para este projeto. CON-7 proíbe assumir stack antes desta fase — a recomendação aqui é a primeira vez que a stack é justificada com evidência."
+      }
+    },
+    {
+      "name": "nuqs",
+      "type": "library",
+      "version": "compatível com App Router (Next 13-16)",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "CREATE",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/",
+        "relevantSections": ["useQueryStates", "type-safe search params", "integração com Zod"],
+        "additionalUrls": [
+          "https://aurorascharff.no/posts/managing-advanced-search-param-filtering-next-app-router/",
+          "https://www.robinwieruch.de/next-search-params/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Filtros combináveis persistidos na URL",
+          "description": "Resolve AC-1.2 (estado do filtro preservado ao navegar para a ficha e voltar) de forma estrutural. A fonte descreve exatamente o antipadrão a evitar: 'the user applies a filter, the results update, they share the URL with a colleague — and the colleague lands on an empty page because the filter lived in useState and died with the component'. nuqs expõe useQueryStates para sincronizar filtros, ordenação e paginação com query params.",
+          "codeExample": "const [filtros, setFiltros] = useQueryStates({ segmento: parseAsString, canal: parseAsString, campanha: parseAsString });",
+          "source": "https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["URLSearchParams manual + useRouter", "Zustand com persistência em localStorage"],
+        "conflicts": []
+      }
+    },
+    {
+      "name": "Zustand",
+      "type": "library",
+      "version": "presente no preset nextjs-react",
+      "verified": true,
+      "source": "codebase",
+      "decisionHierarchy": "REJECTED (para a fase 1)",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": { "url": null, "relevantSections": [] },
+      "patterns": [],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["searchParams via nuqs (estado de filtro)", "Server Components (estado de dados)"],
+        "conflicts": [
+          "Estado global de cliente não é necessário para os requisitos declarados: o estado que precisa persistir é filtro (AC-1.2 → URL) e o restante é dado de servidor (FR-7 → Server Components + cache). Introduzir Zustand na fase 1 adiciona uma segunda fonte de verdade de estado sem requisito que a justifique."
+        ],
+        "rejectionReason": "Faz parte do preset genérico, não de uma necessidade rastreável a FR/NFR. Reavaliar apenas se surgir estado de UI compartilhado entre rotas (ex.: comparador multi-lead)."
+      }
+    },
+    {
+      "name": "pg_trgm + fuzzystrmatch (extensões PostgreSQL)",
+      "type": "infrastructure",
+      "version": "extensões nativas do PostgreSQL",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "CREATE",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://www.freecodecamp.org/news/fuzzy-string-matching-with-postgresql/",
+        "relevantSections": ["pg_trgm similarity", "índices GIN/GiST", "levenshtein, soundex, metaphone"],
+        "additionalUrls": [
+          "https://www.pgref.dev/functions/fuzzymatch",
+          "https://medium.com/@techybob/fuzzy-matching-in-postgresql-taming-messy-text-with-pg-trgm-bc3af9335f2f"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Camada probabilística da resolução de identidade (EC-7)",
+          "description": "pg_trgm quebra strings em trigramas e compara sobreposição; 'John' e 'Jon' compartilham trigramas suficientes para pontuar acima de 0,3 numa escala 0-1. Índice GIN/GiST resolve o problema de performance em tabelas grandes. fuzzystrmatch adiciona levenshtein (distância de edição) e soundex/metaphone (equivalência fonética). É a camada 2 do desenho de identidade: aplica-se SÓ quando a camada determinística falha, e o vínculo resultante é marcado como provável, nunca confirmado (exigência literal de EC-7).",
+          "codeExample": "create index lead_nome_trgm on lead using gin (nome_normalizado gin_trgm_ops);\n-- candidato a merge, nunca merge automático:\nselect a.id, b.id, similarity(a.nome_normalizado, b.nome_normalizado) as score\nfrom lead a join lead b on a.id < b.id\nwhere a.nome_normalizado % b.nome_normalizado and similarity(a.nome_normalizado,b.nome_normalizado) >= 0.6;",
+          "source": "https://www.freecodecamp.org/news/fuzzy-string-matching-with-postgresql/"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["RudderStack Profiles id_stitcher", "serviço externo de identity resolution (BlueConic, Redpoint, GrowthLoop)"],
+        "conflicts": [
+          "Nenhuma fonte encontrada nesta pesquisa cobre normalização de telefone para E.164 dentro do Postgres — a normalização de telefone precisa acontecer na camada de ingestão (n8n) antes do insert. Ver unverifiedClaims."
+        ]
+      }
+    },
+    {
+      "name": "RudderStack Profiles (id_stitcher)",
+      "type": "service",
+      "version": "referência conceitual, não adotado",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "REFERENCE_ONLY",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://www.rudderstack.com/blog/the-profiles-handbook-profiles-overview/",
+        "relevantSections": ["Identity stitching", "id_stitcher model", "Customer 360"],
+        "additionalUrls": [
+          "https://www.rudderstack.com/learn/customer-360/what-is-identity-resolution/",
+          "https://www.rudderstack.com/blog/deterministic-vs-probabilistic/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Identity graph com identificador canônico",
+          "description": "RudderStack Profiles implementa identity stitching via um modelo id_stitcher configurado em YAML, onde o time declara tipos de identificador (user_id, anonymous_id, email) e quais tabelas de evento servem como edge sources. A saída é 'a canonical identifier that becomes the key used to pull together behavioral history across tables' — é literalmente o desenho que DM-1/DM-2 precisam para unir Lead (Salesforce), Contact (RD Station) e conversa WhatsApp. Vale copiar o MODELO (tabela de arestas identidade→registro + identificador canônico), não a ferramenta.",
+          "codeExample": "-- identity_edge(identifier_type, identifier_value, source_system, source_record_id, confidence)\n-- person(canonical_id) <- resolvido a partir das arestas determinísticas",
+          "source": "https://www.rudderstack.com/blog/the-profiles-handbook-profiles-overview/"
+        }
+      ],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["implementação própria em Postgres (recomendado)"],
+        "conflicts": [
+          "Adotar um CDP introduz um terceiro sistema de registro. Como Decisão 5 fixa Salesforce e RD Station como únicos sistemas de operação, um CDP adicionaria um novo problema de identidade em vez de resolver o existente."
+        ]
+      }
+    },
+    {
+      "name": "Appsmith (Community Edition) / Metabase",
+      "type": "service",
+      "version": "Appsmith CE self-hosted (MIT), gratuito para usuários ilimitados",
+      "verified": true,
+      "source": "exa",
+      "decisionHierarchy": "CONSIDER (acelerador de fase, não superfície final)",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://queryplane.com/blog/top-retool-alternatives/",
+        "relevantSections": ["Appsmith open source self-host", "conectores PostgreSQL"],
+        "additionalUrls": [
+          "https://queryplane.com/blog/best-internal-tool-builder-for-postgresql/",
+          "https://www.superblocks.com/retool-alternatives"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Superfície de validação antes da superfície de produto",
+          "description": "Appsmith CE é MIT-licensed, self-hostável e gratuito para usuários ilimitados no self-host (Cloud gratuito até 5 usuários; edição Business a USD 40/usuário/mês para SSO/audit log/controles granulares). Serve para validar o modelo de dados e a regra de atribuição contra a realidade ANTES de investir no frontend próprio — reduz o risco crítico apontado em complexity.json (risk 5/5, ausência de rede de segurança).",
+          "codeExample": null,
+          "source": "https://queryplane.com/blog/top-retool-alternatives/"
+        }
+      ],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["Metabase", "ToolJet", "Retool (comercial)"],
+        "conflicts": [
+          "NFR-5 não é satisfeito por builder de ferramenta interna: kpi-grid, funil2, badge, mono e t-name não existem nesses produtos. Portanto NÃO pode ser a superfície entregue ao usuário final — só ferramenta interna de verificação de dados.",
+          "Especificações de permissão em nível de linha nesses builders não foram detalhadas nas fontes consultadas — ver unverifiedClaims."
+        ]
+      }
+    }
+  ],
+
+  "researchByPerspective": {
+    "1_desenvolvimento_arquitetura": {
+      "question": "O preset nextjs-react serve? Que banco/backend para um time pequeno sem infra? Como reaproveitar n8n + Windsor.ai? Como resolver identidade cross-fonte?",
+      "findings": [
+        {
+          "finding": "O preset nextjs-react serve, mas por razões diferentes das declaradas no preset. O que o projeto precisa é: (a) rotas endereçáveis para a ficha de lead (FR-6), (b) filtros persistidos e compartilháveis (FR-1), (c) consulta ao banco com a sessão do usuário para RLS valer (NFR-3). Next.js 16 App Router com Server Components entrega os três; Zustand e React Query do preset não são exigidos por nenhum FR/NFR na fase 1.",
+          "evidence": "Next.js 16.2.6 é o stable atual (publicado 2026-05-07), com Turbopack default, React 19.2 e Cache Components. App Router é default no 16 e considerado pronto para produção em 2026.",
+          "sources": [
+            "https://dev.to/getcraftly/nextjs-16-app-router-the-complete-guide-for-2026-2hi3",
+            "https://meisteritsystems.com/news/next-js-app-router-in-2026-is-it-ready-for-production/"
+          ],
+          "confidence": "medium",
+          "confidenceNote": "A versão 16.2.6 aparece em fonte secundária (blog), não em release notes oficiais do Vercel — verificar no npm antes de fixar no Plan."
+        },
+        {
+          "finding": "Para um time pequeno sem infraestrutura, a escolha de banco NÃO deve ser decidida por performance ou branching, e sim por quem já traz autenticação com perfis acoplada ao banco. Supabase é a resposta; Neon não.",
+          "evidence": "'Every Postgres decision in 2026 comes down to the same question: do you want a database, or do you want a backend? Neon was the database. Supabase was the backend.' Supabase entrega auth (email/senha, magic link, OTP, SSO, 20+ social) integrada ao Postgres via RLS, e 'this is the single biggest reason teams pick Supabase over raw Postgres: authorization logic lives in the database as RLS policies instead of being re-implemented in every API route'. Neon lançou auth/storage/functions em julho de 2026, ainda em beta.",
+          "sources": [
+            "https://designrevision.com/blog/supabase-vs-neon",
+            "https://codelesssync.com/blog/supabase-vs-neon-vs-railway-postgresql-for-saas"
+          ],
+          "confidence": "high"
+        },
+        {
+          "finding": "n8n + Postgres gerenciado É suficiente como backend de ingestão — não é preciso construir camada de ingestão do zero. E a camada de ads pode sair do escopo de construção por completo: Windsor.ai suporta PostgreSQL como destination, escrevendo direto na base consolidada.",
+          "evidence": "Windsor.ai suporta destination tasks para Google Sheets, BigQuery, Snowflake, S3, Redshift, Azure SQL, Azure Blob, PostgreSQL, MySQL e Databricks. n8n tem nós de trigger Cron/Webhook/Schedule/App e o padrão documentado de ETL idempotente com INSERT ... ON CONFLICT DO UPDATE em Postgres. Delta incremental do Salesforce por SystemModstamp com watermark guardado em tabela própria do Postgres.",
+          "sources": [
+            "https://windsor.ai/destination-guides/",
+            "https://blog.n8n.io/etl-pipeline/",
+            "https://triumphoid.com/syncing-salesforce-to-postgresql-via-n8n-the-no-duplicates-blueprint/",
+            "https://getbruin.com/blog/sync-salesforce-data-to-warehouse/"
+          ],
+          "confidence": "high",
+          "implication": "FR-9 encolhe de 4 famílias de fonte a construir para 3 (Salesforce, RD Station, SDR IA WhatsApp), com ads via Windsor.ai/n8n já existente. Isso é o achado com maior impacto de esforço desta pesquisa."
+        },
+        {
+          "finding": "Resolução de identidade cross-fonte (EC-7) deve ser híbrida em duas camadas, determinística primeiro, e o resultado probabilístico NUNCA deve fazer merge automático.",
+          "evidence": "Matching determinístico 'connects records by searching for exact equality across identifiers such as email, phone number, or login credentials... It is precise and transparent — every match can be explained by a specific rule', mas 'misses valid matches when data is inconsistent, misspelled, or incomplete'. Matching probabilístico 'catch more true matches but introduce the risk of false positives (merging records that are actually different entities)'. O padrão adotado por sistemas modernos de entity resolution: 'Deterministic rules handle high-confidence matches (same email or loyalty ID), while probabilistic models resolve ambiguous cases where no single identifier is shared.' A implementação em Postgres é viável com pg_trgm (GIN/GiST) + fuzzystrmatch (levenshtein/soundex/metaphone).",
+          "sources": [
+            "https://www.blueconic.com/resources/probabilistic-and-deterministic-matching-explained",
+            "https://cdp.com/glossary/entity-resolution/",
+            "https://www.growthloop.com/resources/university/deterministic-vs-probabilistic-matching",
+            "https://www.freecodecamp.org/news/fuzzy-string-matching-with-postgresql/"
+          ],
+          "confidence": "high"
+        }
+      ],
+      "proposedIdentityResolutionDesign": {
+        "model": "identity graph com identificador canônico (padrão copiado do id_stitcher do RudderStack Profiles, implementado em Postgres próprio)",
+        "tables": [
+          "person(canonical_id) — a pessoa resolvida, entidade de exibição da ficha 360",
+          "identity_edge(identifier_type, identifier_value, source_system, source_record_id, confidence, resolved_at) — cada aresta liga um identificador a um registro de origem",
+          "identity_candidate(person_a, person_b, score, signal, status) — pares prováveis, revisão humana, nunca merge automático"
+        ],
+        "tier1_deterministic": [
+          "T1.1 — e-mail normalizado (lowercase, trim, remoção de sufixo +tag do Gmail). Chave mais forte e a única que já é usada hoje no código (ORIGEM_OVERRIDE_EMAIL / match com a Central de Leads, index.html:2923).",
+          "T1.2 — telefone normalizado para E.164 (crítico para o canal WhatsApp do SDR IA, onde o telefone é o identificador primário e o e-mail frequentemente não existe). A normalização deve ocorrer no n8n antes do insert — ver unverifiedClaims.",
+          "T1.3 — Salesforce ConvertedAccountId (liga Lead convertido → Account → Opportunity). CON-4 é explícito: nunca por LeadSource.",
+          "T1.4 — UUID do contato do RD Station (chave estável do lado marketing, usada em GET /platform/contacts/{uuid}/events)."
+        ],
+        "tier2_probabilistic": [
+          "T2.1 — pg_trgm similarity(nome) >= 0.6 combinado com igualdade de domínio de e-mail corporativo OU igualdade de empresa/Account.",
+          "T2.2 — fuzzystrmatch levenshtein/metaphone para nomes com grafia divergente (acentuação, abreviação)."
+        ],
+        "invariants": [
+          "Registro de origem NUNCA é destruído (exigência literal de EC-7: 'preservar os registros de origem').",
+          "Vínculo Tier 2 grava confidence < 1 e status = 'provável'; a UI exibe como provável, não confirmado.",
+          "Conflito (mesmo e-mail em dois registros com telefones diferentes e nomes distantes) vai para identity_candidate com status 'conflito', não é resolvido automaticamente.",
+          "Complexity.json recomenda spike dedicado para EC-7 antes do Plan — este desenho é insumo do spike, não substituto dele."
+        ]
+      }
+    },
+    "2_marketing_revops": {
+      "question": "Como ferramentas de RevOps/CDP modelam atribuição de origem multi-touch e o conceito de lead 360?",
+      "findings": [
+        {
+          "finding": "Exemplo 1 — HubSpot: os modelos de atribuição são escalonados por tier e existem três TIPOS de relatório, não só modelos. Isso importa porque a Loupen precisa dos três tipos e teria de comprar o tier mais alto.",
+          "evidence": "O tier Professional inclui apenas first touch e last touch; Enterprise adiciona U-shaped, W-shaped, linear, time-decay e full-path (com um modelo 'Empirical' substituindo U/W/J-shaped). Os tipos de relatório incluem 'Contact create attribution', que mostra quais atividades de marketing produzem os contatos mais novos. Pré-requisito estrutural: 'every contact that HubSpot should track for attribution purposes needs to enter HubSpot through a tracked method' — form submission, chatbot ou pageview com consentimento de cookie.",
+          "sources": [
+            "https://www.pedowitzgroup.com/blog/hubspot-marketing-hub-multi-touch-attribution-blog",
+            "https://knowledge.hubspot.com/reports/create-attribution-reports",
+            "https://blog.hubspot.com/marketing/attribution-reports-definition"
+          ],
+          "confidence": "high",
+          "implicationForLoupen": "O pré-requisito de 'entrar por método rastreado' é exatamente o que a Loupen NÃO tem no canal WhatsApp do SDR IA (~15% de cobertura de Ad ID). Nenhuma ferramenta comprada resolve isso: a lacuna é na origem, não na ferramenta. Isso é o argumento mais forte contra buy neste caso concreto."
+        },
+        {
+          "finding": "Exemplo 2 — taxonomia normalizada de lead source com 12 categorias canônicas, hierarquia tracked > self-reported, e 'não atribuído' com threshold de governança.",
+          "evidence": "Framework de 12 categorias: Paid Search, Organic Search, Paid Social, Organic Social, Email Marketing, Website, Webinar/Event (Digital), Event (In-Person), Partner/Referral, Outbound (SDR/Sales), Direct/Unknown, Other (Requires Note). Regra de prioridade: 'Self-reported data is directional, not authoritative; people misremember, and reps sometimes pre-fill it to make their pipeline look better.' Tratamento do desconhecido: Direct/Unknown é 'no discernible referral source and no self-reported data; last resort, not a dumping ground'. Regra de governança: 'If either category exceeds roughly 15% of new leads, that's a signal your tracking has a gap.' E o valor bruto é preservado em campo separado 'Lead Source Detail' para fins forenses.",
+          "sources": ["https://www.williamflaiz.com/blog/lead-source-taxonomy"],
+          "confidence": "high",
+          "implicationForLoupen": "Duas transposições diretas: (a) 'last resort, not a dumping ground' é a formulação canônica do bug do EC-1 — hoje o código usa Comercial como dumping ground (!isMarketing, index.html:3049); (b) o threshold de 15% converte a cobertura de ~15% do Campanha_LinkedIn__c de 'característica dos dados' para 'falha de rastreamento diagnosticada' — insumo direto para OQ-11."
+        },
+        {
+          "finding": "Exemplo 3 — modelo de 4 níveis com first-touch imutável e stamping por workflow.",
+          "evidence": "Estrutura hierárquica de quatro níveis: Category (Inbound, Outbound, Referral, Event) → Sub-Category (Paid Social, Organic Search, ZoomInfo) → Detail (LinkedIn, Google, nome do evento) → Campaign. Sistema de duas camadas temporais: 'First Touch (acquisition): Set once at contact creation, never changes' e 'Last Touch (conversion): Stamped when Lead/Pre-pipeline opportunity is created'. A imutabilidade é garantida por critério de enrolamento: 'only enroll contacts that don't have a value in First Touch Source'. E sobre o desconhecido: 'The Direct Traffic Black Hole: Clients often see high volumes of Direct Traffic... which usually indicates broken tracking', com auditoria mensal dos contatos com origem Unknown/Other para refinar a lógica.",
+          "sources": ["https://www.revblack.com/guides/lead-source-tracking-attribution-playbook"],
+          "confidence": "high"
+        },
+        {
+          "finding": "Não force uma única fonte de verdade de atribuição; rode 2-3 modelos em paralelo e documente a definição de 'sourced' vs 'influenced'.",
+          "evidence": "'Rather than forcing a single source of truth, choose 2-3 models to run in parallel (e.g., first-touch, multi-touch linear, and pipeline influence) rather than forcing a single truth that no one trusts.' E: 'Document exactly what qualifies an opportunity as SDR-sourced (e.g., outbound sequence initiated contact before any inbound signal) versus influenced (e.g., SDR touched an account already in-market).' Governança: 'RevOps sets the rules; sales and marketing sign off on lifecycle stage ownership and attribution definitions.'",
+          "sources": [
+            "https://www.revblack.com/guides/lead-source-tracking-attribution-playbook",
+            "https://www.apollo.io/insights/what-does-good-outbound-pipeline-attribution-look-like-for-a-mid-market-sales-org",
+            "https://levelupleads.io/blog/b2b-marketing-attribution-outbound-inbound-overlap/"
+          ],
+          "confidence": "medium",
+          "confidenceNote": "Fontes são conteúdo de vendor/consultoria (Apollo, LevelUpLeads, RevBlack), não pesquisa independente — direcionalmente consistentes entre si, mas com interesse comercial."
+        },
+        {
+          "finding": "Conceito de lead 360 / Customer 360 na literatura de CDP: é a SAÍDA da resolução de identidade, não uma tela.",
+          "evidence": "'The output of identity stitching is a canonical identifier that becomes the key used to pull together behavioral history across tables and build a complete customer profile. This unified profile is commonly called a Customer 360, and it serves as the single source of truth for customer-facing workflows.'",
+          "sources": ["https://www.rudderstack.com/blog/the-profiles-handbook-profiles-overview/"],
+          "confidence": "high",
+          "implicationForLoupen": "Sequenciamento obrigatório: FR-2 (ficha 360) e FR-3 (jornada) NÃO são construíveis antes de EC-7 estar resolvido. O spike de identidade precede a superfície, não o contrário — reforça a recomendação de fases do Plan."
+        }
+      ]
+    },
+    "3_dashboard_ux": {
+      "question": "Padrões de UX de lead 360 / contact timeline em produtos reais; filtros combináveis persistentes; navegação lead↔conta↔oportunidade↔campanha.",
+      "findings": [
+        {
+          "finding": "O padrão canônico é UMA timeline cronológica única que agrega todos os touchpoints, com filtros para isolar tipos de interação.",
+          "evidence": "'A key CRM design pattern is a single, chronological timeline view that aggregates every touchpoint with a customer, including emails, calls, meetings, support tickets, page views, and deal stage changes, all in one scrollable feed. Filters allow users to isolate specific types of interactions.' Características de feeds eficazes: timestamps claros, ícones/avatares para identificar tipo de evento, layout consistente para varredura e progressive disclosure para manter o feed compacto permitindo expansão do detalhe.",
+          "sources": [
+            "https://www.eleken.co/blog-posts/timeline-ui-design",
+            "https://www.coders.dev/blog/great-examples-of-enterprise-applications-crm-ui-ux-design-patterns.html"
+          ],
+          "confidence": "medium",
+          "implicationForLoupen": "Progressive disclosure é a resposta para AC-6.2 (leitura não pode depender de modal com rolagem confinada) e para o volume heterogêneo da jornada. Os ícones por tipo de evento resolvem AC-3.1 (fonte de origem identificada por evento) sem poluir com rótulos textuais."
+        },
+        {
+          "finding": "Attio é o modelo mais próximo do que FR-4 pede: objetos, atributos e ATRIBUTOS DE RELACIONAMENTO que ligam tipos de registro diferentes, com a página de registro dividida em Overview / Activity / Related records.",
+          "evidence": "'A record represents a company, person, deal, or anything else you're tracking in Attio, and contains a set of attributes... It is the equivalent of a row in a spreadsheet.' Relacionamentos: People ↔ Companies, Companies ↔ Deals, com o registro de empresa exibindo membros do time e o registro de pessoa exibindo suas empresas. Estrutura da página: aba Overview (atributos destacados), aba Activity ('a timeline of activity involving the record inside your CRM'), abas de registros relacionados, e sidebar esquerda configurável com detalhes do registro e pertencimento a listas. Views: 'Attio allows customization of how records are displayed by creating views, applying filters, sorting data, and choosing which attributes are visible.'",
+          "sources": [
+            "https://attio.com/help/reference/attio-101/attios-data-model/understanding-records",
+            "https://attio.com/help/reference/managing-your-data/records/create-and-view-records",
+            "https://www.saasui.design/application/attio"
+          ],
+          "confidence": "high",
+          "implicationForLoupen": "Transposição direta: a ficha do lead (FR-2) = Overview (perfil + classificação de origem com razão auditável, NFR-7) + Activity (jornada, FR-3) + Related (oportunidades via ConvertedAccountId, campanha, workflows — FR-4). O conceito de 'saved view' (filtro + ordenação + colunas nomeados e salvos) é a evolução natural de FR-1 além de filtros ad hoc, e casa com a persistência em URL."
+        },
+        {
+          "finding": "Filtro deve morar na URL, não em estado de componente — é requisito estrutural, não conveniência.",
+          "evidence": "'Every data table, search page, and filtered list in a real app has the same problem: the user applies a filter, the results update, they share the URL with a colleague — and the colleague lands on an empty page because the filter lived in useState and died with the component.' Benefício adicional: 'Since the search parameters are in the URL, users can bookmark the current state of the application... URL parameters can be directly consumed on the server to render the initial state.'",
+          "sources": [
+            "https://stacknotice.com/blog/nuqs-nextjs-url-state-2026",
+            "https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/"
+          ],
+          "confidence": "high",
+          "implicationForLoupen": "Cobre AC-1.2 e AC-6.1 com a mesma decisão. Também habilita o fluxo INT-4 (campanha → leads → oportunidade → volta) porque cada passo da navegação é um endereço."
+        },
+        {
+          "finding": "NFR-5 é a restrição mais subestimada desta perspectiva.",
+          "evidence": "Verificado no repositório (complexity.json, scope): o index.html tem 5.014 linhas / 429 KB com 1 único bloco <style> e 16 views. O design system (kpi-grid, funil2, badge, mono, t-name) está embutido nesse bloco.",
+          "sources": ["docs/stories/epic-crm-lead-intelligence/spec/complexity.json"],
+          "confidence": "high",
+          "implicationForLoupen": "Recomendação: a primeira tarefa de frontend do Plan deve ser EXTRAIR o <style> para um arquivo CSS com custom properties (o código já usa custom properties no :root — index.html:1213-1216 comenta a leitura de custom property resolvida para o Chart.js), transformando o design system em ativo reutilizável. Sem isso, NFR-5 é retórico. Nenhum builder de ferramenta interna (Appsmith/Metabase/Retool) satisfaz NFR-5."
+        }
+      ]
+    },
+    "4_planejamento_brownfield": {
+      "question": "Estratégia de migração de um HTML estático monolítico para arquitetura com backend, mantendo o index.html funcionando até o corte (CON-6, EC-12, OQ-10).",
+      "findings": [
+        {
+          "finding": "Strangler Fig é o padrão nomeado e documentado para exatamente este cenário; a variante aplicável aqui é a de fachada/roteamento.",
+          "evidence": "Padrão cunhado por Martin Fowler, inspirado no crescimento das figueiras estranguladoras. Mecânica: 'you put a façade or proxy in front of the existing system, keep the client-facing interface stable, and gradually route individual capabilities from the old implementation to the new one until the legacy piece can be shut off. Old and new implementations coexist behind a stable boundary, and traffic (or calls) moves gradually.' Utiliza 'a routing layer, such as an API gateway, to manage requests between legacy and modern components'. Contraste explícito com big-bang: 'Unlike a big-bang rewrite, the strangler method enables incremental modernization — small, safe deployments that deliver immediate value and feedback.' Alerta sobre coexistência: 'During this coexistence period, it's essential to ensure data consistency between the old and new components, which often involves shared data stores or synchronisation mechanisms to keep both systems aligned.'",
+          "sources": [
+            "https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig",
+            "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/strangler-fig.html",
+            "https://www.future-processing.com/blog/strangler-fig-pattern/",
+            "https://stevekinney.com/courses/enterprise-ui/strangler-fig-introduction"
+          ],
+          "confidence": "high"
+        },
+        {
+          "finding": "[RACIOCÍNIO PRÓPRIO — não é claim de fonte externa] Aplicação concreta ao loupen-dashboard: a unidade de estrangulamento é a VIEW, e há 16 delas nomeadas no index.html.",
+          "evidence": "Derivado de complexity.json (16 views enumeradas: view-overview, view-campanhas, view-criativos, view-ga4, view-gads, view-leads, view-linkedin, view-lp, view-mdfs, view-meta, view-oportunidades, view-oportunidades_v2, view-rdstation, view-srd_ia, view-utm) combinado com a mecânica de fachada do padrão.",
+          "sources": ["docs/stories/epic-crm-lead-intelligence/spec/complexity.json"],
+          "proposedSequence": [
+            "Passo 0 — Congelar e rotular: o index.html atual continua servido como está, com um banner declarando 'snapshot congelado em {data}' (atende EC-12 e NFR-4 sem escrever uma linha de backend). Isso resolve metade de OQ-10 independentemente da resposta do usuário.",
+            "Passo 1 — Base e ingestão em paralelo, zero mudança de UI: Supabase provisionado, n8n ingerindo Salesforce + RD Station, Windsor.ai escrevendo ads no Postgres. Critério de saída: reconciliação origem↔destino passando (FR-8/AC-8.1) — isto é, os 236 registros de Oportunidades(SF), não 44.",
+            "Passo 2 — Verificação com ferramenta interna: Appsmith/Metabase sobre a mesma base para conferir números contra o index.html congelado, ANTES de existir frontend próprio. Encontra divergência sem custo de UI.",
+            "Passo 3 — Primeira view estrangulada: a nova app Next.js nasce com UMA rota (/leads + /leads/[id]), a que carrega FR-1/FR-2/FR-3/FR-6 juntos e é onde está a dor declarada. As outras 15 views continuam no legado.",
+            "Passo 4 — Roteamento: fachada decide por caminho quem serve o quê (nova app em /leads*, legado no restante). Não há necessidade de API gateway dedicado — um reverse proxy ou regra de rewrite basta nessa escala.",
+            "Passo 5..N — Uma view por vez, do maior valor ao menor, com ponto de decisão do usuário entre cada uma (CON-8). Corte final quando a última view migrar."
+          ],
+          "confidence": "high",
+          "confidenceNote": "A sequência é raciocínio de arquitetura derivado do padrão + fatos verificados do repositório, não uma prática citada por fonte externa. Deve ser validada pelo @architect na Fase 6 (Plan)."
+        },
+        {
+          "finding": "[RACIOCÍNIO PRÓPRIO] O risco de 'dois números para a mesma métrica' (EC-12) tem solução de governança, não técnica: declarar fonte da verdade por fase.",
+          "evidence": "Coerente com a exigência de consistência de dados no período de coexistência apontada pelas fontes do padrão, e com o handling já escrito em EC-12 ('definir a fonte da verdade por fase e sinalizar na superfície legada que ela é um snapshot congelado').",
+          "sources": ["https://www.future-processing.com/blog/strangler-fig-pattern/"],
+          "confidence": "high"
+        }
+      ]
+    },
+    "5_performance_growth": {
+      "question": "Que métricas um time de growth/RevOps prioriza ao juntar marketing + ads + CRM, e quais são viáveis com os dados de hoje?",
+      "findings": [
+        {
+          "finding": "Métricas priorizadas pela literatura de benchmark B2B SaaS 2026 e seus valores de referência.",
+          "evidence": "Visitor-to-Lead médio 1,5-2,5% (top 10%: 8-15%). MQL-to-SQL (equivalente a lead-to-opportunity) média 32-40% em SaaS, contra média B2B geral de 13%. SQL-to-Close média 20-25%, top performers acima de 30%. Pipeline Velocity = (Nº de Oportunidades × Ticket Médio × Win Rate) ÷ Ciclo de Vendas em dias, expressa em valor por dia. CAC payback mediano de 16 meses no relatório Aleph × Benchmarkit 2026 (baseado em fechamento de 2025 de 342 empresas B2B SaaS), melhoria de 11% sobre a mediana de 18 meses de 2024. Diretriz de ação: 'The fix requires segmenting CAC by acquisition channel and reallocating budget to channels with the shortest payback.'",
+          "sources": [
+            "https://www.saashero.net/strategy/b2b-saas-conversion-benchmarks-journey/",
+            "https://konabayev.com/blog/b2b-saas-conversion-benchmarks-2026/",
+            "https://www.saashero.net/strategy/b2b-saas-gtm-conversion-metrics/",
+            "https://konabayev.com/blog/b2b-marketing-benchmarks-2026/"
+          ],
+          "confidence": "low",
+          "confidenceNote": "Todas as fontes de benchmark encontradas são blogs de agência/consultoria que citam relatórios primários (Aleph × Benchmarkit) sem link direto ao relatório. Os NÚMEROS não devem ser usados como meta da Loupen — devem servir apenas para escolher QUAIS métricas construir. Ver unverifiedClaims."
+        },
+        {
+          "finding": "[RACIOCÍNIO PRÓPRIO — viabilidade cruzada com os dados reais da Loupen] Triagem das métricas por viabilidade, considerando as limitações já documentadas.",
+          "viabilityMatrix": [
+            {
+              "metric": "Lead-to-Opportunity rate por origem",
+              "viability": "VIÁVEL após FR-8 + FR-5",
+              "blockers": "Depende da ingestão completa (hoje 44/236 em Oportunidades(SF), EC-6) e do join correto por ConvertedAccountId (CON-4). Só é confiável para o subconjunto com origem atribuída — o denominador tem de excluir explicitamente os Não atribuídos, ou a taxa fica inflada.",
+              "priority": "P0 — é a métrica que traduz diretamente a pergunta do usuário (marketing gera oportunidade ou não?)"
+            },
+            {
+              "metric": "MRR e valor de contrato por origem / Produto-Serviço",
+              "viability": "VIÁVEL",
+              "blockers": "Regras já fixadas e validadas: Amount é MRR; valor de contrato só quando Ganho e com duração conhecida (FR-10, EC-5); agrupamento por RecordType.Name, nunca LeadSource (FR-11, EC-11).",
+              "priority": "P0 — é o único caminho de receita já semanticamente correto no projeto"
+            },
+            {
+              "metric": "Tempo médio até conversão (lead → oportunidade → Ganho)",
+              "viability": "VIÁVEL PARCIALMENTE",
+              "blockers": "Exige data confiável de criação do lead e de mudança de estágio. AC-3.2 já prevê evento sem data confirmada; esses casos precisam sair do cálculo, não receber data arbitrária. Eventos de workflow do RD Station atualizam 1x/dia (CON-3), então a granularidade do ciclo é diária, não intradiária.",
+              "priority": "P1"
+            },
+            {
+              "metric": "Pipeline Velocity",
+              "viability": "VIÁVEL após as três acima",
+              "blockers": "É derivada (Nº oportunidades × ticket × win rate ÷ ciclo). Herda todas as fragilidades anteriores e amplifica erro — não construir antes de FR-8 fechar.",
+              "priority": "P2"
+            },
+            {
+              "metric": "CAC por canal",
+              "viability": "PARCIALMENTE VIÁVEL — este é o achado desconfortável desta perspectiva",
+              "blockers": "O numerador (gasto de mídia por canal) É disponível via Windsor.ai/n8n. O denominador (clientes adquiridos atribuíveis àquele canal) é o problema: com ~15% de cobertura de Ad ID nos leads WhatsApp (CON-5) e oportunidades sem lead de origem rastreável (EC-3), qualquer CAC por canal calculado hoje superestima o CAC dos canais rastreados e subestima o volume atribuído. NÃO deve ser exibido como número único; deve vir acompanhado da métrica de cobertura de atribuição (AC-12.2) na mesma superfície.",
+              "priority": "P1, com trava — só publicar junto da cobertura"
+            },
+            {
+              "metric": "CAC payback",
+              "viability": "NÃO VIÁVEL na fase 1",
+              "blockers": "Exige custo total de aquisição (mídia + pessoas + ferramentas), e apenas o custo de mídia está nas fontes conectadas. Nenhum FR do projeto pede ingestão de custo de time.",
+              "priority": "fora de escopo — registrar como não construível para evitar expectativa"
+            },
+            {
+              "metric": "Visitor-to-Lead",
+              "viability": "NÃO VIÁVEL como métrica de funil integrado",
+              "blockers": "Exige tráfego de site correlacionado a lead. GA4 está disponível (via Windsor.ai e já pelo backend n8n — index.html:1210), mas GA4 é agregado e não identifica a pessoa; ligar sessão a lead exigiria tracking próprio de first-party, que nenhum FR pede e que Decisão 5 (somente leitura) não contempla.",
+              "priority": "fora de escopo"
+            },
+            {
+              "metric": "Cobertura de atribuição (% de leads e oportunidades com origem determinada)",
+              "viability": "VIÁVEL IMEDIATAMENTE e é pré-requisito das demais",
+              "blockers": "Nenhum. Calculável a partir do próprio motor de atribuição proposto. Já é exigida por AC-12.2 e é a aplicação direta do threshold de 15% de governança da taxonomia de lead source.",
+              "priority": "P0 — deve ser a PRIMEIRA métrica entregue, porque é a que qualifica a confiança em todas as outras"
+            }
+          ],
+          "sources": ["docs/stories/epic-crm-lead-intelligence/spec/requirements.json", "docs/stories/epic-crm-lead-intelligence/spec/complexity.json"],
+          "confidence": "high",
+          "confidenceNote": "A matriz é raciocínio de análise sobre fatos verificados do projeto, não claim de fonte externa."
+        },
+        {
+          "finding": "[RACIOCÍNIO PRÓPRIO] Inversão de prioridade recomendada: a inteligência de verdade na fase 1 não é uma métrica nova, é a métrica de confiança.",
+          "evidence": "Deriva de dois fatos: (a) a regra de governança de que Direct/Unknown acima de ~15% sinaliza falha de rastreamento; (b) os dados da Loupen hoje têm ~85% de não atribuição no canal WhatsApp e 44/236 de sincronização em oportunidades. Qualquer CAC ou taxa de conversão publicado antes de expor a cobertura é um número que parece preciso e não é — e complexity.json (risk 5/5, item d) já registra que erro silencioso na atribuição 'corrompe decisão sem sinal visível'.",
+          "sources": [
+            "https://www.williamflaiz.com/blog/lead-source-taxonomy",
+            "docs/stories/epic-crm-lead-intelligence/spec/complexity.json"
+          ],
+          "confidence": "high"
+        }
+      ]
+    }
+  },
+
+  "buildVsBuyComparison": {
+    "requirement": "FR-13 (P0) — AC-13.1 (comparativo com prós/contras e implicações de custo/esforço) e AC-13.2 (as cinco perspectivas explicitamente representadas)",
+    "context": "OQ-1 resolvido em 2026-09-03: sem orçamento para ferramenta paga. O caminho buy é registrado aqui como benchmark de features e custo, conforme instruído, e NÃO como recomendação a perseguir. CON-7 permanece válido caso o cenário de orçamento mude.",
+
+    "buildPath": {
+      "name": "Construção customizada reaproveitando os ativos existentes",
+      "stack": "n8n (existente, self-hosted) + Windsor.ai (existente) para ingestão → Supabase (Postgres + Auth + RLS) como base e controle de acesso → Next.js 16 App Router + nuqs como superfície → design system extraído do index.html atual",
+      "pros": [
+        "Reaproveita 2 ativos já em produção: o webhook n8n de ads (index.html:1209) e o Windsor.ai com destination PostgreSQL — reduz FR-9 de 4 famílias de fonte a construir para 3. Cumpre REUSE > ADAPT > CREATE, que complexity.json marca como violação injustificada se ignorado.",
+        "Preserva Salesforce e RD Station como sistemas de registro (Decisão 5) sem introduzir um terceiro sistema de registro.",
+        "Endereça o único problema que nenhuma ferramenta comprada resolve: a semântica proprietária da Loupen (Amount = MRR, RecordType.Name = Produto/Serviço, join por ConvertedAccountId, canal WhatsApp do SDR IA com Ad ID em Campanha_LinkedIn__c).",
+        "Cumpre NFR-5 (evoluir o design system existente) — impossível em qualquer produto de terceiro.",
+        "Cumpre NFR-7 (atribuição auditável lead a lead) porque a regra é código próprio e inspecionável, não caixa-preta de vendor.",
+        "Custo recorrente marginal: a ingestão já é paga (n8n e Windsor.ai já existem)."
+      ],
+      "cons": [
+        "Infraestrutura 100% nova: complexity.json pontua infrastructure 5/5 (nenhum servidor, banco, runtime, package.json, migration, CI ou suíte de testes existe hoje).",
+        "Sem rede de segurança: a estratégia de testes tem de ser criada junto com a infra, especialmente para as regras de receita (FR-10/EC-5) e de atribuição (FR-5/EC-1).",
+        "Passa a armazenar PII (nome, e-mail, telefone/WhatsApp) fora de Salesforce e RD Station, com OQ-8 (LGPD) ainda em aberto — responsabilidade que hoje é do vendor passa a ser da Loupen.",
+        "Duas frentes genuinamente não resolvidas exigem spike antes do Plan: resolução de identidade cross-fonte (EC-7) e prova de ingestão verificável do Salesforce sem MCP em runtime (CON-1).",
+        "Esforço de manutenção contínua recai sobre o time (efetivamente uma pessoa hoje)."
+      ],
+      "estimatedRecurringCost": {
+        "supabase": "USD 25/mês (plano Pro: 8 GB banco, 100k MAU, 100 GB storage, crédito de compute de USD 10 cobrindo instância Micro). Free (500 MB, 2 projetos, pausa após 7 dias inativos) só serve para desenvolvimento.",
+        "hosting_frontend": "USD 0-20/mês. Não verificado nesta sessão qual provedor será usado — OQ-4 segue aberto.",
+        "n8n": "USD 0 incremental — instância self-hosted já existe e roda em produção.",
+        "windsor_ai": "USD 0 incremental — assinatura já existe. Atenção ao limite de plano: Basic permite no máximo 5 scheduled syncs (1 tabela/dia cada); plano atual da Loupen não verificado.",
+        "total": "aprox. USD 25-45/mês recorrente",
+        "sources": [
+          "https://makerkit.dev/blog/saas/supabase-pricing",
+          "https://www.nocode.mba/articles/supabase-pricing",
+          "https://windsor.ai/pricing/"
+        ]
+      },
+      "estimatedEffort": "complexity.json estima '3+ dias' e sinaliza que o artefato deve ser tratado como epic/programa multi-story, não como uma story. Com CON-8 (fases com ponto de decisão do usuário) e ASM-6 (multi-sessão), a leitura realista é multi-semana em fases, não 3 dias corridos."
+    },
+
+    "buyPath": {
+      "name": "Adotar plataforma de mercado (benchmark, não recomendação)",
+      "candidatesEvaluated": [
+        {
+          "tool": "HubSpot Operations Hub / Data Hub",
+          "cost": "Starter USD 20/mês (field mappings customizados, listas, dashboards adicionais); Professional USD 800/mês (programmable automation, data quality, webhooks, custom-coded actions); Enterprise USD 2.000/mês (datasets, sandboxes, permissões avançadas, Snowflake data sharing). Preço por conta, não por usuário.",
+          "featureBenchmark": "O que interessa como referência: sincronização com mapeamento de campos customizados (o plano gratuito só sincroniza campos padrão), automação programável e data quality automation.",
+          "fitGap": "Ops Hub é camada de dados/sincronização, NÃO de atribuição. Atribuição multi-touch (U-shaped, W-shaped, linear, time-decay, full-path, Empirical) exige Marketing Hub Enterprise, um SKU diferente e mais caro. Além disso, o pré-requisito estrutural da atribuição HubSpot é que 'every contact... needs to enter HubSpot through a tracked method' — precisamente o que falha no canal WhatsApp do SDR IA. Comprar não fecha a lacuna de 15% de Ad ID.",
+          "sources": [
+            "https://automationatlas.io/answers/hubspot-operations-hub-pricing-2026/",
+            "https://blog.hubspot.com/marketing/hubspot-operations-hub-pricing",
+            "https://www.pedowitzgroup.com/blog/hubspot-marketing-hub-multi-touch-attribution-blog",
+            "https://knowledge.hubspot.com/reports/create-attribution-reports"
+          ]
+        },
+        {
+          "tool": "Attio",
+          "cost": "Free até 3 assentos; pago por assento — as fontes divergem: uma reporta USD 35 (Plus) e USD 79 (Pro) por usuário/mês no anual após aumento de preço em julho de 2026; outra reporta USD 29 e USD 69. Cobrança mensal adiciona ~24% sobre o anual. Ver unverifiedClaims.",
+          "featureBenchmark": "MELHOR REFERÊNCIA DE UX desta pesquisa: modelo de objetos/atributos/atributos de relacionamento, página de registro com Overview + Activity timeline + Related records, e views salvas com filtro/ordenação/colunas configuráveis. É o alvo visual e estrutural a imitar em FR-2/FR-3/FR-4.",
+          "fitGap": "Attio é um CRM — seria um segundo CRM ao lado do Salesforce, contrariando Decisão 5 e ASM-2. Não ingere Salesforce + RD Station + SDR IA WhatsApp com a semântica proprietária da Loupen sem trabalho customizado equivalente ao caminho build.",
+          "sources": [
+            "https://marketbetter.ai/blog/attio-crm-pricing-breakdown-2026/",
+            "https://www.coffee.ai/articles/attio-crm-pricing-2026",
+            "https://attio.com/help/reference/attio-101/attios-data-model/understanding-records"
+          ]
+        },
+        {
+          "tool": "Clay",
+          "cost": "Launch USD 185/mês (USD 167 no anual); Growth USD 495/mês (USD 446 no anual), após reformulação de preços em 11/03/2026. Assentos ilimitados; o preço escala por uso (Data Credits e Actions), não por assento.",
+          "featureBenchmark": "Referência de enriquecimento e orquestração de dados GTM.",
+          "fitGap": "É plataforma de dados GTM/prospecção, não de atribuição de funil integrado nem de ficha 360 sobre CRM existente. Não endereça FR-2/FR-3/FR-5.",
+          "sources": ["https://www.warmly.ai/p/blog/clay-pricing", "https://www.landbase.com/blog/clay-pricing"]
+        },
+        {
+          "tool": "Common Room",
+          "cost": "Entrada publicada: plano Essential a USD 2.500/mês faturado anualmente (USD 30.000/ano antes de add-ons), incluindo 5 assentos, até 100.000 contatos, 5k créditos RoomieAI, 2,5k créditos Prospector. Contratos mid-market (10-25 assentos) tipicamente USD 20k-60k/ano.",
+          "featureBenchmark": "Referência de unificação de sinais de múltiplas fontes em pessoa/conta.",
+          "fitGap": "Ordem de grandeza incompatível com OQ-1 (sem orçamento). Registrado apenas para dimensionar o teto do mercado.",
+          "sources": [
+            "https://www.11x.ai/guides/common-room-pricing",
+            "https://salesmotion.io/blog/common-room-pricing"
+          ]
+        }
+      ],
+      "pros": [
+        "Time-to-value muito menor para funcionalidades genéricas (filtros, views salvas, timeline de registro, permissões por perfil já prontas).",
+        "Manutenção, segurança e conformidade da plataforma são responsabilidade do vendor — mitigaria parte do risco de PII de NFR-3/OQ-8.",
+        "Atribuição multi-touch pronta e testada, com múltiplos modelos disponíveis sem implementação própria.",
+        "Autenticação, RBAC e auditoria maduros, resolvendo NFR-3 sem construção."
+      ],
+      "cons": [
+        "Custo recorrente incompatível com OQ-1: a combinação que cobriria a necessidade real (sincronização de dados + atribuição multi-touch) fica acima de USD 1.000/mês, contra USD 25-45/mês do caminho build.",
+        "Nenhum candidato resolve o problema-raiz: a lacuna de ~15% de Ad ID nos leads WhatsApp é falha de instrumentação na ORIGEM. Ferramenta comprada herda o mesmo dado incompleto.",
+        "Semântica proprietária da Loupen (Amount = MRR não valor de contrato; RecordType.Name como Produto/Serviço; join por ConvertedAccountId) exigiria configuração/customização de qualquer forma — o esforço não desaparece, migra.",
+        "Introduz um terceiro sistema de registro, criando um novo problema de resolução de identidade (EC-7) em vez de resolver o existente. Contraria Decisão 5 e ASM-2.",
+        "NFR-5 fica insatisfeito por definição: nenhum produto de terceiro reutiliza kpi-grid, funil2, badge, mono ou t-name.",
+        "NFR-7 (auditabilidade da razão de classificação lead a lead) fica limitado ao que o vendor expõe."
+      ]
+    },
+
+    "perspectives": [
+      {
+        "perspective": "Marketing / RevOps",
+        "buildVerdict": "BUILD favorecido. O problema declarado (FR-5: leads de campanha classificados como Comercial) é de MODELO, não de ferramenta. A literatura de taxonomia de lead source dá a receita pronta (12 categorias, tracked > self-reported, Direct/Unknown como último recurso e não depósito, threshold de 15%) — é conhecimento transferível, não software a comprar.",
+        "buyBenchmark": "HubSpot como referência de quais modelos de atribuição existem (first/last touch, linear, time-decay, full-path, Empirical) e de quais TIPOS de relatório importam (contact create attribution). Vale copiar o vocabulário, não comprar a licença.",
+        "sources": ["https://www.williamflaiz.com/blog/lead-source-taxonomy", "https://www.revblack.com/guides/lead-source-tracking-attribution-playbook", "https://www.pedowitzgroup.com/blog/hubspot-marketing-hub-multi-touch-attribution-blog"]
+      },
+      {
+        "perspective": "Dashboard / UX",
+        "buildVerdict": "BUILD obrigatório por NFR-5. Nenhum produto de terceiro nem builder de ferramenta interna reutiliza o design system existente. A boa notícia: os padrões a implementar são bem estabelecidos (timeline cronológica única com progressive disclosure, página de registro em Overview/Activity/Related, filtros na URL) e o esforço é de composição, não de invenção.",
+        "buyBenchmark": "Attio é o alvo de referência mais próximo do que FR-2/FR-3/FR-4 descrevem, incluindo o conceito de saved views que vale absorver como evolução de FR-1.",
+        "sources": ["https://attio.com/help/reference/attio-101/attios-data-model/understanding-records", "https://www.eleken.co/blog-posts/timeline-ui-design", "https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/"]
+      },
+      {
+        "perspective": "Desenvolvimento / Arquitetura",
+        "buildVerdict": "BUILD viável, e mais leve do que complexity.json sugere na camada de ingestão — porque n8n e Windsor.ai já cobrem ads e o padrão de ETL idempotente com upsert e watermark é documentado. O peso real está em autenticação com perfis (resolvida ao escolher Supabase em vez de Postgres puro) e em resolução de identidade (EC-7), que continua exigindo spike.",
+        "buyBenchmark": "RudderStack Profiles como modelo conceitual de identity graph (id_stitcher, identificador canônico, edge sources) a reimplementar em Postgres com pg_trgm/fuzzystrmatch — copiar o modelo, não contratar o CDP.",
+        "sources": ["https://blog.n8n.io/etl-pipeline/", "https://windsor.ai/destination-guides/", "https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac", "https://www.rudderstack.com/blog/the-profiles-handbook-profiles-overview/"]
+      },
+      {
+        "perspective": "Planejamento",
+        "buildVerdict": "BUILD é compatível com CON-8 (entrega faseada com ponto de decisão entre fases) de um jeito que buy não é: migração para plataforma comprada é evento de corte, não sequência incremental. Strangler Fig permite estrangular uma das 16 views por vez mantendo o index.html no ar.",
+        "buyBenchmark": "Nenhum. A adoção de plataforma implicaria big-bang de dados, exatamente o que o padrão Strangler Fig existe para evitar.",
+        "sources": ["https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig", "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/strangler-fig.html"]
+      },
+      {
+        "perspective": "Performance / Growth",
+        "buildVerdict": "BUILD, com a ressalva mais importante desta pesquisa: nem build nem buy entregam CAC por canal confiável com os dados de hoje. Ferramenta comprada apenas apresentaria o mesmo dado incompleto com mais confiança visual — o que é pior. A primeira entrega de valor é a métrica de cobertura de atribuição (AC-12.2), não uma métrica de performance.",
+        "buyBenchmark": "Os benchmarks de mercado (MQL-to-SQL 32-40%, SQL-to-Close 20-25%, CAC payback mediano 16 meses) servem para escolher QUAIS métricas construir, não como metas da Loupen — as fontes são secundárias.",
+        "sources": ["https://www.saashero.net/strategy/b2b-saas-conversion-benchmarks-journey/", "https://konabayev.com/blog/b2b-marketing-benchmarks-2026/", "https://www.williamflaiz.com/blog/lead-source-taxonomy"]
+      }
+    ],
+
+    "finalRecommendation": {
+      "decision": "BUILD",
+      "confidence": "high",
+      "rationale": "Três razões independentes, cada uma suficiente por si. (1) ECONÔMICA: USD 25-45/mês contra acima de USD 1.000/mês para a combinação que cobriria a necessidade real, contra orçamento zero declarado (OQ-1). (2) ESTRUTURAL: o escopo é somente leitura/análise com Salesforce e RD Station como únicos sistemas de operação (Decisão 5); qualquer plataforma comprada seria um terceiro sistema de registro e CRIARIA um novo problema de identidade em vez de resolver o existente (EC-7). (3) DIAGNÓSTICA — a mais decisiva: os problemas que doem hoje não são falta de features. São (a) ingestão parcial (44/236 linhas, EC-6), (b) instrumentação faltando na origem (~15% de Ad ID no WhatsApp, CON-5) e (c) uma regra de classificação com Comercial como bucket residual (index.html:2923 e :3049, FR-5/EC-1). Nenhuma compra corrige nenhum dos três. Comprar apenas moveria os mesmos dados incompletos para uma interface mais bonita, o que aumenta o risco em vez de reduzir — e complexity.json já registra (risk 5/5, item d) que erro silencioso de atribuição corrompe decisão de investimento sem sinal visível.",
+      "conditionsToRevisit": [
+        "Se o orçamento mudar E o número de usuários crescer além de ~10 perfis, o custo de manutenção próprio passa a competir com licença — reabrir CON-7.",
+        "Se surgir requisito de escrita bidirecional (reverteria Decisão 5), o argumento estrutural contra buy se enfraquece.",
+        "Se OQ-8 (LGPD) trouxer exigência de conformidade que a Loupen não possa atender em infraestrutura própria, terceirizar o armazenamento de PII volta à mesa."
+      ],
+      "hybridRecommendation": "Considerar Appsmith CE ou Metabase self-hosted sobre a MESMA base Supabase como ferramenta interna de verificação de dados nas fases 1-2 (antes de existir frontend próprio). Appsmith CE é MIT, self-hostável e gratuito para usuários ilimitados. Objetivo: validar o modelo de dados e a regra de atribuição contra a realidade antes de investir em UI — ataca diretamente a ausência de rede de segurança apontada em complexity.json. NÃO é a superfície final (NFR-5 não é satisfeito) e não deve ser exposta a usuários de negócio."
+    }
+  },
+
+  "attributionModelProposal": {
+    "resolves": "OQ-7 (resolvido em 2026-09-03: o usuário não tem a regra definida; Research/Spec devem PROPOR)",
+    "addresses": ["FR-5", "DM-7", "NFR-7", "EC-1", "EC-4", "AC-5.1", "AC-5.2", "AC-5.3", "AC-12.1", "AC-12.2"],
+    "status": "PROPOSTA — sujeita a validação do usuário. Não é fato estabelecido nem regra dada pelo usuário.",
+
+    "currentRuleDiagnosis": {
+      "code": "const pareceCampanha = standardizeCampanha(origem) !== origem;\nconst isMarketing = !!info || pareceCampanha;   // index.html:2923\n// ...\nelse if (fSegmento === 'comercial') rows = rows.filter(row => !row.isMarketing);  // index.html:3049",
+      "verifiedAt": "index.html:2923 (classificação) e index.html:3049 (filtro por segmento)",
+      "defects": [
+        "D1 — Comercial é bucket residual: `!isMarketing`. Todo lead que não disparou um sinal de Marketing é contado como Comercial, mesmo sem nenhum sinal positivo de prospecção ativa. É exatamente o antipadrão que a literatura de taxonomia descreve como 'last resort, not a dumping ground'.",
+        "D2 — Booleano binário: não existe terceiro estado. 'Não atribuído' não tem onde morar, então vaza para Comercial (EC-1, severidade critical).",
+        "D3 — Sinal implícito e não auditável: a classificação depende do efeito colateral de `standardizeCampanha(origem) !== origem`, ou seja, 'se a função de exibição mudou o valor, então é campanha'. Funciona, mas não é declarativo nem inspecionável — NFR-7 (100% dos leads expõem o sinal que determinou a classificação) é inatingível assim.",
+        "D4 — Sem hierarquia: `!!info || pareceCampanha` é um OU. Se os dois sinais discordarem, não há regra de precedência declarada e o resultado depende da ordem de avaliação.",
+        "D5 — Sinal de anúncio não participa: `Campanha_LinkedIn__c` (Ad ID do Meta), que é o identificador de plataforma MAIS forte disponível, não entra na classificação de origem.",
+        "D6 — Sem imutabilidade de first-touch: a classificação é recalculada a cada render a partir do estado atual do LeadSource, então uma edição no CRM reescreve retroativamente a origem histórica."
+      ]
+    },
+
+    "designPrinciples": [
+      {
+        "id": "P1",
+        "principle": "Marketing/Comercial/Não atribuído NÃO é um campo — é a projeção do nível 1 de uma taxonomia de 4 níveis.",
+        "source": "https://www.revblack.com/guides/lead-source-tracking-attribution-playbook",
+        "rationale": "Guardar diretamente o rótulo Marketing/Comercial repete o erro de perder o motivo. Guardar a taxonomia e DERIVAR o segmento mantém a razão disponível (NFR-7) e permite reclassificar sem perder o dado bruto."
+      },
+      {
+        "id": "P2",
+        "principle": "Dado rastreado tem precedência sobre dado autodeclarado ou digitado por pessoa.",
+        "source": "https://www.williamflaiz.com/blog/lead-source-taxonomy",
+        "rationale": "'Self-reported data is directional, not authoritative; people misremember, and reps sometimes pre-fill it to make their pipeline look better.' Aplicado à Loupen: um Ad ID de plataforma (Campanha_LinkedIn__c) vale mais que um LeadSource digitado no CRM."
+      },
+      {
+        "id": "P3",
+        "principle": "Comercial exige sinal POSITIVO. Nunca é o complemento de Marketing.",
+        "source": "https://www.williamflaiz.com/blog/lead-source-taxonomy",
+        "rationale": "Corrige D1 e D2 e atende AC-5.2 literalmente. Ausência de sinal produz Não atribuído, jamais Comercial."
+      },
+      {
+        "id": "P4",
+        "principle": "Não atribuído é resultado de primeira classe, com threshold de governança de 15%.",
+        "source": "https://www.williamflaiz.com/blog/lead-source-taxonomy",
+        "rationale": "'If either category exceeds roughly 15% of new leads, that's a signal your tracking has a gap.' Transforma o número de resultado passivo em alarme operacional. Consequência imediata: o canal WhatsApp do SDR IA, com ~85% sem Ad ID, já está em estado de alarme — o que dá base objetiva para responder OQ-11."
+      },
+      {
+        "id": "P5",
+        "principle": "First-touch é imutável; last-touch e influência são separados.",
+        "source": "https://www.revblack.com/guides/lead-source-tracking-attribution-playbook",
+        "rationale": "'First Touch Source (Set once on the contact record, never changes)', garantido por 'only enroll contacts that don't have a value in First Touch Source'. Corrige D6: a origem histórica não é reescrita por edição posterior no CRM."
+      },
+      {
+        "id": "P6",
+        "principle": "O valor bruto é sempre preservado ao lado da classificação.",
+        "source": "https://www.williamflaiz.com/blog/lead-source-taxonomy",
+        "rationale": "'Original raw values are preserved in a separate Lead Source Detail field for forensic purposes.' É o que permite auditar e reclassificar sem reingerir."
+      },
+      {
+        "id": "P7",
+        "principle": "Dois modelos em paralelo, não um só: atribuição de ORIGEM (single-touch, first-touch) e atribuição de INFLUÊNCIA (multi-touch).",
+        "source": "https://www.revblack.com/guides/lead-source-tracking-attribution-playbook",
+        "rationale": "'Rather than forcing a single source of truth, choose 2-3 models to run in parallel... rather than forcing a single truth that no one trusts.' Na Loupen: origem responde 'de onde veio este lead' (o que FR-5 pede) e influência responde 'quais campanhas tocaram este lead' (o que FR-3/FR-4 tornam visível). Não misturar os dois no mesmo campo."
+      }
+    ],
+
+    "taxonomy": {
+      "level1_segmento": {
+        "values": ["Marketing", "Comercial", "Nao atribuido"],
+        "derivation": "DERIVADO do nível 2, nunca escrito diretamente.",
+        "mapping": {
+          "Marketing": ["Paid Social", "Paid Search", "Organic Social", "Organic Search", "Inbound Web", "E-mail Marketing", "Evento/Webinar"],
+          "Comercial": ["Outbound SDR/Vendas"],
+          "Nao atribuido": ["Direto/Desconhecido", "Outro (requer nota)"],
+          "PENDENTE_DE_DECISAO_DO_USUARIO": {
+            "Parceiro/Indicacao": "Não mapeado deliberadamente. A literatura trata Partner/Referral como categoria própria, e forçá-la em Marketing ou Comercial reintroduz o problema de bucket. Recomendação: perguntar ao usuário se indicação deve contar como Comercial (quem trouxe foi um vendedor), Marketing (programa de parceiros) ou como quarto segmento próprio."
+          }
+        }
+      },
+      "level2_categoria": {
+        "values": ["Paid Social", "Paid Search", "Organic Social", "Organic Search", "Inbound Web", "E-mail Marketing", "Evento/Webinar", "Parceiro/Indicacao", "Outbound SDR/Vendas", "Direto/Desconhecido", "Outro (requer nota)"],
+        "note": "Adaptação das 12 categorias canônicas do framework de normalização de lead source, consolidando Website em 'Inbound Web' e unindo os dois tipos de evento, por não haver hoje na Loupen fonte que distinga evento digital de presencial.",
+        "source": "https://www.williamflaiz.com/blog/lead-source-taxonomy"
+      },
+      "level3_detalhe": {
+        "examples": ["Meta Ads", "Google Ads", "LinkedIn Ads", "WhatsApp SDR IA", "Landing page {nome}", "Formulario {nome}", "Pop-up {nome}", "Prospeccao ativa"],
+        "note": "Preenchido pelo sinal que disparou a classificação."
+      },
+      "level4_campanha": {
+        "note": "Identificador bruto da campanha, exatamente como recebido. Ex.: 'GoTo_INSCRIÇÃO', 'GOTO_GERAL_LEADS_2601', 'LOGMEIN_RESCUE-LICENCA-ECO_08-26', ou o Ad ID do Meta vindo de Campanha_LinkedIn__c."
+      },
+      "preservedRawFields": {
+        "origem_bruta": "valor de LeadSource exatamente como digitado no CRM, antes de qualquer normalização (equivalente ao 'Lead Source Detail' da fonte)",
+        "campanha_linkedin_bruta": "valor cru de Campanha_LinkedIn__c",
+        "fonte_de_dados": "Salesforce | RD Station | SDR IA (AC-9.1)"
+      }
+    },
+
+    "signals": [
+      {
+        "id": "S1",
+        "name": "Ad ID de plataforma presente",
+        "field": "Campanha_LinkedIn__c (carrega o Ad ID do Meta)",
+        "type": "deterministico / rastreado",
+        "confidence": "alta",
+        "classifies": "Marketing → Paid Social → Meta Ads → {Ad ID}",
+        "priority": 1,
+        "rationale": "É o único sinal que vem de um identificador emitido pela plataforma de anúncio, não digitado por pessoa (P2). Hoje NÃO participa da classificação (defeito D5) — incluí-lo é a correção de maior valor imediato, ainda que cubra só ~15% dos leads WhatsApp (CON-5)."
+      },
+      {
+        "id": "S2",
+        "name": "E-mail bate com registro da Central de Leads (automação de anúncios)",
+        "field": "match de e-mail normalizado (hoje: `info` e ORIGEM_OVERRIDE_EMAIL, index.html:2923)",
+        "type": "deterministico / rastreado",
+        "confidence": "alta",
+        "classifies": "Marketing → categoria e detalhe herdados do registro da Central de Leads",
+        "priority": 2,
+        "rationale": "Sinal já existente e já confiável no código atual. Mantido, mas passa a gravar a categoria vinda do registro em vez de apenas ligar um booleano."
+      },
+      {
+        "id": "S3",
+        "name": "LeadSource reconhecido como código de campanha",
+        "field": "LeadSource, avaliado contra CAMPANHA_RULES (hoje via `standardizeCampanha(origem) !== origem`)",
+        "type": "deterministico / regra sobre dado digitado",
+        "confidence": "media-alta",
+        "classifies": "Marketing → 'Campanha (canal a resolver)' → {codigo}",
+        "priority": 3,
+        "rationale": "Preserva o acerto atual, mas com duas mudanças: (a) a regra passa a ser um crosswalk declarativo de padrões → categoria, não o efeito colateral de uma função de exibição (corrige D3); (b) reconhecer o código como campanha NÃO determina o canal. 'GOTO_GERAL_LEADS_2601' prova que houve campanha, não que foi Paid Social. Enquanto o canal não for mapeado, a categoria fica explicitamente 'Campanha (canal a resolver)' — honesto e acionável, em vez de um chute."
+      },
+      {
+        "id": "S4",
+        "name": "Evento de conversão do RD Station em ativo de captura",
+        "field": "ConversionEvent (DM-10) com ativoDeOrigem = landing page | formulario | pop-up",
+        "type": "deterministico / rastreado",
+        "confidence": "alta",
+        "classifies": "Marketing → Inbound Web → {nome do ativo}",
+        "priority": 4,
+        "rationale": "Fonte de sinal que hoje não existe na classificação porque a base do dashboard não tem os eventos do RD Station consolidados. Entra com FR-9. É o análogo do 'form submission cria contato com original source' que a HubSpot exige como método rastreado."
+      },
+      {
+        "id": "S5",
+        "name": "LeadSource em vocabulario controlado de outbound",
+        "field": "LeadSource, avaliado contra lista de valores de prospeccao ativa",
+        "type": "deterministico / dado digitado",
+        "confidence": "media",
+        "classifies": "Comercial → Outbound SDR/Vendas → Prospeccao ativa",
+        "priority": 5,
+        "rationale": "P3: este é o ÚNICO caminho para Comercial. Exige um vocabulário explícito (ex.: 'Prospecção', 'Cold call', 'Lista', 'Outbound') que precisa ser levantado dos valores reais de LeadSource no Salesforce e validado pelo usuário — não é derivável da pesquisa."
+      },
+      {
+        "id": "S6",
+        "name": "LeadSource vazio, nulo ou nao mapeado",
+        "field": "LeadSource",
+        "type": "ausencia de sinal",
+        "confidence": "n/a",
+        "classifies": "Nao atribuido → Direto/Desconhecido",
+        "priority": 6,
+        "rationale": "Crosswalk direto da fonte: 'Blank, null, or (not set) → Direct/Unknown'. Valor presente mas não reconhecido por nenhum crosswalk vai para 'Outro (requer nota)' e entra na fila de mapeamento mensal."
+      },
+      {
+        "id": "S7",
+        "name": "Participacao em workflow do RD Station originado de campanha",
+        "field": "AutomationWorkflow (DM-9)",
+        "type": "sinal de influencia",
+        "confidence": "media",
+        "classifies": "NAO CLASSIFICA ORIGEM — grava influência apenas",
+        "priority": null,
+        "rationale": "P7: entra no modelo de INFLUÊNCIA (multi-touch), nunca no de origem. Um lead pode ser tocado por uma automação de marketing sem ter sido originado por marketing. Confundir os dois é a forma mais comum de inflar crédito de marketing. Restrição adicional: CON-3/NFR-4 — dado atualiza 1x/dia na origem, então o timestamp de influência tem granularidade diária."
+      },
+      {
+        "id": "S8",
+        "name": "Owner do lead pertence ao time comercial",
+        "field": "OwnerId (DM-11)",
+        "type": "probabilistico / fraco",
+        "confidence": "baixa",
+        "classifies": "NAO CLASSIFICA — apenas levanta hipótese revisável",
+        "priority": null,
+        "rationale": "Dono comercial não significa origem comercial: leads de marketing são distribuídos para vendedores. Usar este sinal para classificar recriaria D1 por outro caminho. Uso legítimo: alimentar uma fila de revisão de leads Não atribuídos com dono comercial, para o usuário confirmar manualmente — nunca decidir sozinho."
+      }
+    ],
+
+    "resolutionAlgorithm": {
+      "description": "Avaliação estritamente ordenada, first-match-wins, com gravação obrigatória da razão. Substitui `isMarketing = !!info || pareceCampanha` (que é um OU sem precedência, defeito D4).",
+      "pseudocode": "// executado UMA VEZ na ingestão, no first-touch (P5)\nfunction classificarOrigem(lead) {\n  for (const sinal of [S1, S2, S3, S4, S5, S6]) {   // ordem = precedencia\n    const hit = sinal.avaliar(lead);\n    if (!hit) continue;\n    return {\n      segmento:  hit.segmento,        // derivado do nivel 2 (P1)\n      categoria: hit.categoria,\n      detalhe:   hit.detalhe,\n      campanha:  hit.campanha,\n      razao: {                        // NFR-7 / AC-5.3\n        sinalId:      sinal.id,\n        sinalNome:    sinal.name,\n        campoOrigem:  sinal.field,\n        valorBruto:   hit.valorBruto,  // P6\n        confianca:    sinal.confidence,\n        avaliadoEm:   now()\n      }\n    };\n  }\n  // inalcancavel: S6 sempre casa. Se chegar aqui, e bug de implementacao.\n  throw new Error('classificacao sem sinal terminal');\n}\n\n// NUNCA existe: return isMarketing ? 'Marketing' : 'Comercial'",
+      "invariants": [
+        "I1 — Nenhum caminho retorna Comercial sem que S5 tenha casado. Verificável por teste unitário sobre a base histórica.",
+        "I2 — Todo lead classificado tem `razao` preenchida com sinalId e valorBruto (NFR-7: 100%, AC-5.3).",
+        "I3 — First-touch é gravado uma vez e nunca sobrescrito por reingestão (P5). Last-touch e influência ficam em campos separados.",
+        "I4 — Reclassificação retroativa é operação explícita e versionada (nova coluna/versão de regra), nunca mutação silenciosa do histórico.",
+        "I5 — O percentual de Não atribuído é métrica exposta por canal e por período; acima de 15% dispara alerta de falha de rastreamento, não é apresentado como característica dos dados (P4, AC-12.2)."
+      ]
+    },
+
+    "workedExamples": [
+      {
+        "case": "Lead WhatsApp do SDR IA com Campanha_LinkedIn__c preenchido (~15% dos registros)",
+        "input": "Campanha_LinkedIn__c = {Ad ID do Meta}; LeadSource pode estar vazio",
+        "signalFired": "S1",
+        "result": "Marketing / Paid Social / Meta Ads / {Ad ID}",
+        "razao": "S1 — Ad ID de plataforma presente em Campanha_LinkedIn__c, confiança alta",
+        "vsToday": "Hoje: se LeadSource estiver vazio, `!!info || pareceCampanha` é falso → o lead é contado como Comercial (D1/D5). Um lead vindo de anúncio pago do Meta é atribuído ao time comercial. Este é o bug relatado, na sua forma mais grave."
+      },
+      {
+        "case": "Lead WhatsApp do SDR IA sem Campanha_LinkedIn__c (~85% dos registros)",
+        "input": "Campanha_LinkedIn__c vazio; LeadSource vazio ou genérico",
+        "signalFired": "S6",
+        "result": "Nao atribuido / Direto-Desconhecido, com flag gap_rastreamento = true e canal = WhatsApp SDR IA",
+        "razao": "S6 — ausência de sinal de origem; registro contabilizado na métrica de cobertura",
+        "vsToday": "Hoje esses leads entram em Comercial (EC-1/EC-4). Com a proposta, aparecem como o que são: uma lacuna de instrumentação de 85% em um canal específico. AC-12.1 é atendido (aparece como não atribuído, não é omitido) e AC-12.2 também (cobertura exposta como métrica de qualidade)."
+      },
+      {
+        "case": "Lead com LeadSource = 'GOTO_GERAL_LEADS_2601'",
+        "input": "LeadSource reconhecido por CAMPANHA_RULES; sem match de e-mail; sem Ad ID",
+        "signalFired": "S3",
+        "result": "Marketing / Campanha (canal a resolver) / — / GOTO_GERAL_LEADS_2601",
+        "razao": "S3 — LeadSource reconhecido como código de campanha pelo crosswalk, confiança média-alta",
+        "vsToday": "Hoje o resultado final (Marketing) já é correto. O que muda: (a) o motivo fica explícito em vez de implícito no efeito colateral de standardizeCampanha (corrige D3); (b) o sistema declara que o CANAL ainda não é conhecido, em vez de deixar essa ignorância invisível — o que gera uma fila acionável de mapeamento código→canal."
+      },
+      {
+        "case": "Lead cujo e-mail bate com a Central de Leads (automação de anúncios)",
+        "input": "match de e-mail normalizado com registro da Central; LeadSource digitado diferente no CRM",
+        "signalFired": "S2",
+        "result": "Marketing / categoria herdada do registro da Central / detalhe herdado / campanha herdada",
+        "razao": "S2 — e-mail normalizado bateu com registro de origem rastreada; LeadSource digitado divergente preservado em origem_bruta",
+        "vsToday": "Hoje o resultado (Marketing) também é correto, mas a divergência entre o LeadSource digitado e a origem rastreada é descartada. Com P6, ela fica registrada — e a frequência dessa divergência é, por si, um diagnóstico da qualidade do preenchimento no CRM."
+      },
+      {
+        "case": "Lead com LeadSource = 'Evento XYZ' (valor real, não reconhecido por CAMPANHA_RULES)",
+        "input": "LeadSource preenchido com valor livre não mapeado; sem Ad ID; sem match de e-mail",
+        "signalFired": "S6 (ramo 'valor presente mas não mapeado')",
+        "result": "Nao atribuido / Outro (requer nota) / — / Evento XYZ",
+        "razao": "S6 — valor de LeadSource presente porém não mapeado por nenhum crosswalk; entra na fila de mapeamento",
+        "vsToday": "Hoje cai em Comercial (D1) e o problema fica invisível para sempre. Com a proposta, o valor entra em 'Outro (requer nota)' e a auditoria periódica converte o mapeamento faltante em regra — o modelo aprende em vez de degradar."
+      },
+      {
+        "case": "Lead com LeadSource = 'Prospecção ativa' (hipotético, pendente de levantamento do vocabulário real)",
+        "input": "LeadSource em vocabulário controlado de outbound; nenhum sinal de marketing",
+        "signalFired": "S5",
+        "result": "Comercial / Outbound SDR-Vendas / Prospeccao ativa",
+        "razao": "S5 — LeadSource em vocabulário controlado de outbound, confiança média",
+        "vsToday": "Hoje o resultado (Comercial) coincide, mas por acidente: vem de `!isMarketing`, não de evidência de prospecção. A diferença é que na proposta este é o ÚNICO jeito de um lead ser Comercial, o que torna o número de Comercial auditável.",
+        "dependency": "O vocabulário controlado precisa ser levantado dos valores reais e distintos de LeadSource no Salesforce. Isso é insumo de spike/Spec, não de pesquisa."
+      }
+    ],
+
+    "influenceModelSeparate": {
+      "name": "Atribuicao de influencia (multi-touch), paralela e independente",
+      "purpose": "Responder 'quais campanhas e automações tocaram este lead' — o que FR-3 (jornada) e FR-4 (relacionamentos) tornam visível — sem contaminar a atribuição de origem (P7).",
+      "signals": ["S7 (participação em workflow do RD Station)", "S4 quando NÃO é o primeiro evento (conversões subsequentes)", "eventos de oportunidade do RD Station"],
+      "storage": "tabela de touchpoints (lead_touchpoint) com timestamp, fonte, campanha e tipo — nunca colapsada em um campo de segmento",
+      "constraint": "Eventos de workflow do RD Station têm granularidade diária na origem (CON-3/NFR-4). A timeline deve declarar a idade do dado (EC-10), e comparações intradiárias sobre essa fonte são proibidas.",
+      "source": "https://www.revblack.com/guides/lead-source-tracking-attribution-playbook"
+    },
+
+    "validationPlan": [
+      "V1 — Rodar a regra proposta contra a base histórica atual e produzir a matriz de transição: quantos leads mudam de Comercial → Marketing, Comercial → Não atribuído, e quantos permanecem. Isso quantifica ASM-7 ('a regra atual acerta parte dos casos') com número em vez de suposição.",
+      "V2 — Apresentar ao usuário a lista de leads que migram de Comercial → Não atribuído. É a lista mais desconfortável e a mais informativa: mede o tamanho real da lacuna de rastreamento.",
+      "V3 — Levantar os valores reais e distintos de LeadSource no Salesforce e submeter o crosswalk valor → categoria à validação do usuário (dependência de S3 e S5).",
+      "V4 — Obter decisão do usuário sobre onde 'Parceiro/Indicação' se encaixa no nível 1.",
+      "V5 — Escrever testes unitários das invariantes I1-I5 ANTES da implementação. complexity.json registra que não existe suíte de testes nem CI, e que a estratégia de testes precisa nascer junto com a infraestrutura, especialmente para as regras de atribuição (FR-5/EC-1) e de receita (FR-10/EC-5)."
+    ]
+  },
+
+  "unverifiedClaims": [
+    {
+      "claim": "Next.js 16.2.6 é a versão stable atual (publicada em 2026-05-07), com Turbopack default e React 19.2.",
+      "reason": "Encontrado apenas em blog de terceiro (dev.to), não em release notes oficiais do Next.js/Vercel. Nenhuma fonte primária foi acessível nesta sessão.",
+      "action": "needs_validation",
+      "howToValidate": "npm view next version antes de fixar a versão no Plan."
+    },
+    {
+      "claim": "Qual plano da Windsor.ai a Loupen assina e, portanto, se há limite de 5 scheduled syncs (1 tabela/dia cada) ou destination tasks ilimitadas.",
+      "reason": "A página de pricing descreve os limites por plano, mas o plano contratado pela Loupen não é observável por pesquisa externa.",
+      "action": "needs_validation",
+      "howToValidate": "Verificar no painel Windsor.ai da Loupen, ou via list_actions/metadata do MCP já conectado. Determina se a ingestão de ads suporta a cadência exigida por NFR-4."
+    },
+    {
+      "claim": "Limites de rate, paginação e janela de retenção de histórico dos endpoints do RD Station Marketing (em especial GET /platform/contacts/{uuid}/events).",
+      "reason": "developers.rdstation.com não foi acessado diretamente nesta sessão; as informações vieram de páginas de integradores terceiros (Rollout, Kondado, Zapier).",
+      "action": "needs_validation",
+      "howToValidate": "Ler a documentação oficial em developers.rdstation.com antes de dimensionar a ingestão. Impacta diretamente a viabilidade de FR-3 (jornada) e ASM-5 (carga histórica)."
+    },
+    {
+      "claim": "Se o MCP RD Station em uso hoje expõe os mesmos dados dos endpoints REST públicos (contatos, eventos, estágio de funil, workflows).",
+      "reason": "Nenhuma fonte externa cobre a paridade entre o MCP e a API REST.",
+      "action": "needs_validation",
+      "howToValidate": "Comparar a saída do MCP com a resposta do endpoint REST para um contato conhecido, no spike de ingestão."
+    },
+    {
+      "claim": "Limites de chamadas de API da org Salesforce da Loupen (variam por edição e por número de licenças).",
+      "reason": "Não observável externamente.",
+      "action": "needs_validation",
+      "howToValidate": "Setup → System Overview no Salesforce. Determina a frequência viável de sincronização e se Bulk API 2.0 é obrigatória ou opcional."
+    },
+    {
+      "claim": "Normalização de telefone para E.164 dentro do PostgreSQL.",
+      "reason": "A pesquisa sobre pg_trgm/fuzzystrmatch não retornou nenhuma fonte cobrindo normalização E.164 em Postgres.",
+      "action": "acceptable_risk",
+      "mitigation": "Normalizar telefone na camada de ingestão (n8n) com biblioteca dedicada antes do insert, e persistir apenas o valor já normalizado. Crítico para T1.2 da resolução de identidade, porque no canal WhatsApp o telefone é o identificador primário."
+    },
+    {
+      "claim": "Preço por assento do Attio: uma fonte reporta USD 35/79 e outra USD 29/69 por usuário/mês no anual.",
+      "reason": "Divergência entre fontes secundárias, provavelmente por causa de um aumento de preço em julho de 2026 que umas refletem e outras não. Nenhuma consulta à página oficial de pricing foi feita.",
+      "action": "acceptable_risk",
+      "mitigation": "Irrelevante para a decisão (buy foi descartado por OQ-1). Registrado apenas para que o benchmark de custo não seja citado como preciso."
+    },
+    {
+      "claim": "Especificações de permissão em nível de linha em Appsmith CE, Metabase e ToolJet.",
+      "reason": "As fontes consultadas mencionam controles granulares na edição Business do Appsmith (USD 40/usuário/mês) mas não detalham row-level permissions nas edições gratuitas.",
+      "action": "acceptable_risk",
+      "mitigation": "A recomendação híbrida é usar esses builders apenas como ferramenta interna de verificação, nunca exposta a usuários de negócio — o que torna a permissão em nível de linha desnecessária nesse uso. Se o uso mudar, verificar antes."
+    },
+    {
+      "claim": "Benchmarks de conversão B2B SaaS 2026 (MQL-to-SQL 32-40%, SQL-to-Close 20-25%, CAC payback mediano 16 meses, Visitor-to-Lead 1,5-2,5%).",
+      "reason": "Todas as fontes localizadas são blogs de agência/consultoria que citam o relatório Aleph × Benchmarkit 2026 sem link para o documento primário. Não foi possível acessar o relatório original.",
+      "action": "acceptable_risk",
+      "mitigation": "Usar esses números APENAS para escolher quais métricas construir, nunca como meta de performance da Loupen. Qualquer meta numérica no spec.md deve vir do usuário, não desta pesquisa."
+    },
+    {
+      "claim": "Alvo numérico de tempo de resposta para filtros e ficha de lead (NFR-2) e de frescor por fonte.",
+      "reason": "OQ-5 em aberto. Não é pesquisável — é decisão do usuário.",
+      "action": "blocked",
+      "blockingNote": "complexity.json sinaliza que NFR-2 precisa ser fechado antes do Critique, senão o requisito de performance não é verificável."
+    },
+    {
+      "claim": "Política de LGPD / tratamento de PII aplicável à nova base.",
+      "reason": "OQ-8 em aberto. Não é pesquisável no contexto da Loupen — depende de política interna.",
+      "action": "blocked",
+      "blockingNote": "Trava a parte de tratamento de PII de NFR-3. A recomendação de arquitetura (Supabase) não muda com a resposta, mas retenção, anonimização e região de dados mudam."
+    },
+    {
+      "claim": "Requisito de hospedagem, região de dados ou ambiente já contratado (OQ-4).",
+      "reason": "Não pesquisável.",
+      "action": "needs_validation",
+      "blockingNote": "Se houver exigência de região de dados no Brasil, a escolha de região do Supabase e do host do frontend muda — verificar antes de provisionar."
+    },
+    {
+      "claim": "Se a cobertura de ~15% de Ad ID nos leads WhatsApp pode ser aumentada na origem (OQ-11).",
+      "reason": "Depende de acesso e configuração do fluxo do SDR IA, não pesquisável externamente.",
+      "action": "needs_validation",
+      "note": "Esta pesquisa fortalece o caso de corrigir a origem: o threshold de governança de 15% da literatura classifica esse nível como falha de rastreamento, não característica dos dados. Se corrigível, FR-12 muda de 'expor lacuna' para 'fechar lacuna' e a métrica de CAC por canal passa de não confiável para viável."
+    },
+    {
+      "claim": "Completude e reaproveitabilidade dos dados nas planilhas Google Sheets como carga histórica (ASM-5).",
+      "reason": "Requer inspeção das planilhas, não feita nesta fase.",
+      "action": "needs_validation",
+      "note": "Relacionado a OQ-9 (volume e janela de histórico). Se as planilhas não servirem, o histórico depende das janelas de retenção das APIs de origem — o que amarra em unverifiedClaims sobre RD Station e Salesforce."
+    }
+  ],
+
+  "recommendations": [
+    {
+      "type": "prefer",
+      "subject": "Supabase (Postgres + Auth + RLS) como base e camada de autorização",
+      "rationale": "NFR-3 exige autenticação com perfis (marketing/comercial/direção) já na primeira fase utilizável. Supabase entrega RBAC via custom claims em Auth Hook + políticas RLS no próprio banco, evitando reimplementar autorização em cada rota de API. Neon é Postgres melhor, mas seu auth está em beta desde julho de 2026 — inadequado para um requisito de primeira fase.",
+      "priority": "P0",
+      "traceTo": ["FR-7", "NFR-3", "ASM-4"],
+      "sources": ["https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac", "https://designrevision.com/blog/supabase-vs-neon"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Windsor.ai com destination PostgreSQL para toda a camada de ads",
+      "rationale": "Windsor.ai suporta PostgreSQL como destination. Isso remove a camada de ads do escopo de construção: Meta/Google/LinkedIn Ads e GA4 escrevem direto na base consolidada. É o achado de maior impacto de esforço desta pesquisa — reduz FR-9 de 4 famílias de fonte para 3. Ignorar isso e construir ingestão de ads do zero é violação injustificada de REUSE > ADAPT > CREATE, já sinalizada em complexity.json.",
+      "priority": "P0",
+      "traceTo": ["FR-9", "CON-9", "NFR-6"],
+      "sources": ["https://windsor.ai/destination-guides/"]
+    },
+    {
+      "type": "prefer",
+      "subject": "n8n com upsert idempotente + watermark por SystemModstamp para Salesforce e RD Station",
+      "rationale": "A instância já roda em produção (index.html:1209). INSERT ... ON CONFLICT DO UPDATE torna a ingestão idempotente e o watermark em tabela sync_state permite comparar contagem origem vs destino a cada execução — que é exatamente o que AC-8.1 pede e o que faltava quando Oportunidades(SF) ficou com 44 de 236 linhas.",
+      "priority": "P0",
+      "traceTo": ["FR-8", "FR-9", "EC-6", "NFR-1", "ASM-3"],
+      "sources": ["https://blog.n8n.io/etl-pipeline/", "https://getbruin.com/blog/sync-salesforce-data-to-warehouse/"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Identity graph em Postgres: determinístico primeiro (e-mail, telefone E.164, ConvertedAccountId, UUID RD Station), probabilístico (pg_trgm/fuzzystrmatch) apenas como candidato revisável",
+      "rationale": "É o padrão híbrido documentado: regras determinísticas resolvem os casos de alta confiança e o modelo probabilístico só atua onde nenhum identificador é compartilhado, sob risco explícito de falso positivo. Merge automático em cima de score probabilístico violaria EC-7, que exige preservar os registros de origem e marcar o vínculo como provável.",
+      "priority": "P0",
+      "traceTo": ["EC-7", "DM-1", "DM-2", "FR-2", "FR-3"],
+      "sources": ["https://www.blueconic.com/resources/probabilistic-and-deterministic-matching-explained", "https://cdp.com/glossary/entity-resolution/", "https://www.freecodecamp.org/news/fuzzy-string-matching-with-postgresql/"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Filtros e ficha de lead como estado de URL (nuqs), não estado de componente",
+      "rationale": "Resolve AC-1.2 (filtro preservado ao navegar e voltar) e AC-6.1 (detalhe endereçável e retomável) com uma única decisão, e habilita o fluxo INT-4 porque cada passo da navegação campanha→lead→oportunidade passa a ter endereço. É também a substituição estrutural do popup que já falhou (FR-6).",
+      "priority": "P0",
+      "traceTo": ["FR-1", "FR-6", "AC-1.2", "AC-6.1", "INT-4"],
+      "sources": ["https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/", "https://stacknotice.com/blog/nuqs-nextjs-url-state-2026"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Extrair o bloco <style> do index.html para CSS com custom properties como PRIMEIRA tarefa de frontend",
+      "rationale": "NFR-5 exige reutilizar e evoluir kpi-grid, funil2, badge, mono e t-name. Hoje eles vivem dentro de um único bloco <style> de um arquivo de 5.014 linhas. Sem extração, NFR-5 é retórico e a nova superfície inevitavelmente reintroduz componentes equivalentes mais simples — exatamente o que a métrica de NFR-5 proíbe. O código já usa custom properties no :root, então a extração é mecânica.",
+      "priority": "P0",
+      "traceTo": ["NFR-5", "CON-6"],
+      "sources": ["docs/stories/epic-crm-lead-intelligence/spec/complexity.json"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Estrangular por VIEW, uma por vez, começando por /leads",
+      "rationale": "Strangler Fig com fachada de roteamento é o padrão documentado para manter a interface estável enquanto capacidades migram gradualmente. As 16 views do index.html dão as unidades naturais de corte, e /leads concentra FR-1, FR-2, FR-3 e FR-6 — é a maior densidade de valor por unidade migrada. Atende CON-8 (ponto de decisão do usuário entre fases) de um jeito que uma migração big-bang não atende.",
+      "priority": "P0",
+      "traceTo": ["CON-6", "CON-8", "EC-12", "OQ-10"],
+      "sources": ["https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig", "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/strangler-fig.html"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Entregar a métrica de cobertura de atribuição ANTES de qualquer métrica de performance",
+      "rationale": "É a única métrica viável de imediato e é pré-requisito de confiança de todas as outras. Com 44/236 de sincronização e ~85% de não atribuição no WhatsApp, publicar CAC por canal ou taxa de conversão antes da cobertura produz números que parecem precisos e não são — e complexity.json registra que erro silencioso de atribuição corrompe decisão de investimento sem sinal visível.",
+      "priority": "P0",
+      "traceTo": ["AC-12.2", "FR-8", "NFR-1", "CON-5"],
+      "sources": ["https://www.williamflaiz.com/blog/lead-source-taxonomy"]
+    },
+    {
+      "type": "avoid",
+      "subject": "Comercial como bucket residual (`!isMarketing`)",
+      "rationale": "Defeito verificado em index.html:2923 e :3049 e a causa-raiz do bug relatado. A literatura de taxonomia é explícita: a categoria catch-all é 'last resort, not a dumping ground'. Comercial precisa exigir sinal positivo (S5 da proposta), e a ausência de sinal precisa produzir Não atribuído.",
+      "priority": "P0",
+      "traceTo": ["FR-5", "EC-1", "AC-5.2", "DM-7"],
+      "sources": ["https://www.williamflaiz.com/blog/lead-source-taxonomy"]
+    },
+    {
+      "type": "avoid",
+      "subject": "Adotar qualquer plataforma de mercado como sistema intermediário",
+      "rationale": "Além do custo incompatível com OQ-1, introduziria um terceiro sistema de registro ao lado de Salesforce e RD Station (contra Decisão 5 e ASM-2), criando um novo problema de resolução de identidade. E não resolveria nenhum dos três problemas reais: ingestão parcial, instrumentação faltando na origem, e regra de classificação defeituosa. O pré-requisito da atribuição HubSpot ('every contact needs to enter through a tracked method') falha justamente no canal WhatsApp.",
+      "priority": "P0",
+      "traceTo": ["FR-13", "CON-7", "OQ-1", "ASM-2"],
+      "sources": ["https://www.pedowitzgroup.com/blog/hubspot-marketing-hub-multi-touch-attribution-blog", "https://automationatlas.io/answers/hubspot-operations-hub-pricing-2026/"]
+    },
+    {
+      "type": "avoid",
+      "subject": "Zustand e React Query na fase 1 só porque estão no preset",
+      "rationale": "O preset nextjs-react é o default genérico do framework AIOX, não uma escolha do usuário para este projeto. O estado que precisa persistir é filtro (→ URL) e o resto é dado de servidor (→ Server Components). Adicionar estado global de cliente sem requisito rastreável cria uma segunda fonte de verdade de estado. CON-7 proíbe assumir stack — vale também para as partes do preset que ninguém questionou.",
+      "priority": "P1",
+      "traceTo": ["CON-7", "FR-1"],
+      "sources": [".aiox-core/data/technical-preferences.md:46"]
+    },
+    {
+      "type": "avoid",
+      "subject": "Reescrever o design system em Tailwind",
+      "rationale": "NFR-5 fala de reutilizar e evoluir, e sua métrica proíbe introduzir componente equivalente mais simples em paralelo. Reescrever kpi-grid/funil2/badge/mono/t-name em Tailwind é reescrita. Adotar Tailwind apenas para layout novo, sobre o CSS extraído como camada base, satisfaz os dois lados.",
+      "priority": "P1",
+      "traceTo": ["NFR-5"],
+      "sources": ["docs/stories/epic-crm-lead-intelligence/spec/complexity.json"]
+    },
+    {
+      "type": "avoid",
+      "subject": "Usar sinal de influência (workflow do RD Station) ou dono do lead para classificar ORIGEM",
+      "rationale": "Automação de marketing toca leads que não foram originados por marketing, e leads de marketing são distribuídos para vendedores. Usar S7 ou S8 para decidir origem infla crédito de marketing no primeiro caso e recria o bucket residual no segundo. Influência é modelo paralelo; dono é hipótese para fila de revisão manual.",
+      "priority": "P0",
+      "traceTo": ["FR-5", "FR-3", "NFR-7"],
+      "sources": ["https://www.revblack.com/guides/lead-source-tracking-attribution-playbook"]
+    },
+    {
+      "type": "consider",
+      "subject": "Appsmith CE ou Metabase self-hosted sobre a mesma base, como ferramenta interna de verificação nas fases 1-2",
+      "rationale": "Appsmith CE é MIT, self-hostável e gratuito para usuários ilimitados. Permite validar o modelo de dados e a regra de atribuição contra a realidade antes de existir frontend próprio, atacando a ausência de rede de segurança apontada em complexity.json (risk 5/5). NÃO é a superfície final: NFR-5 não é satisfeito e não deve ser exposta a usuários de negócio.",
+      "priority": "P1",
+      "traceTo": ["FR-8", "NFR-1", "CON-8"],
+      "sources": ["https://queryplane.com/blog/top-retool-alternatives/"]
+    },
+    {
+      "type": "consider",
+      "subject": "Absorver o conceito de 'saved views' do Attio como evolução de FR-1",
+      "rationale": "Attio permite criar views com filtro, ordenação e escolha de atributos visíveis. Combinado com filtros na URL, uma view salva é apenas uma URL nomeada e compartilhável — custo marginal muito baixo sobre a decisão já recomendada, e responde à dor de 'filtros rígidos' de forma mais durável que apenas adicionar mais campos de filtro.",
+      "priority": "P2",
+      "traceTo": ["FR-1", "AC-1.1"],
+      "sources": ["https://attio.com/help/reference/managing-your-data/records/create-and-view-records"]
+    },
+    {
+      "type": "consider",
+      "subject": "Tratar OQ-11 (cobertura de Ad ID no WhatsApp) como corrigível na origem, não como restrição imutável",
+      "rationale": "A regra de governança de que a categoria desconhecida acima de ~15% sinaliza gap de rastreamento reclassifica o caso da Loupen: ~85% sem Ad ID não é característica do canal, é falha de instrumentação no fluxo do SDR IA. Se corrigível na origem, FR-12 muda de 'expor lacuna' para 'fechar lacuna' e CAC por canal sai de não confiável para viável — mudança de valor grande por esforço provavelmente pequeno.",
+      "priority": "P1",
+      "traceTo": ["FR-12", "CON-5", "EC-4", "OQ-11"],
+      "sources": ["https://www.williamflaiz.com/blog/lead-source-taxonomy"]
+    },
+    {
+      "type": "consider",
+      "subject": "Fechar OQ-4 (região de dados) antes de provisionar o Supabase",
+      "rationale": "Região é decisão de provisionamento difícil de reverter. Combinado com OQ-8 (LGPD), pode determinar região brasileira. Custo de perguntar agora é zero; custo de migrar depois não é.",
+      "priority": "P1",
+      "traceTo": ["OQ-4", "OQ-8", "NFR-3"],
+      "sources": []
+    }
+  ],
+
+  "researchNotes": "Fase 3 executada com escopo ampliado por FR-13, cobrindo as cinco perspectivas exigidas por AC-13.2. Context7 e EXA não estavam disponíveis; toda pesquisa externa foi via WebSearch/WebFetch com URL registrada por claim, e o que não teve fonte confiável está em unverifiedClaims (Artigo IV — No Invention). Achado de maior impacto de esforço: Windsor.ai suporta PostgreSQL como destination, o que remove a camada de ads do escopo de construção e reduz FR-9 de quatro famílias de fonte para três (Salesforce, RD Station, SDR IA WhatsApp). Combinado com o padrão de ETL idempotente do n8n (upsert com ON CONFLICT + watermark por SystemModstamp), isso confirma o que o BLOQUEIO DE FASE 6 pedia: o caminho de construção customizada É viável dentro do que já existe. A escolha de banco foi decidida por NFR-3, não por performance: Supabase entrega RBAC via custom claims em Auth Hook mais RLS no banco; Neon é Postgres melhor mas seu auth está em beta desde julho de 2026, o que não serve a um requisito de primeira fase. Na perspectiva de marketing, os três exemplos pesquisados (HubSpot, framework de taxonomia de 12 categorias, playbook de 4 níveis) convergem em regras que atacam o bug do FR-5 de frente: dado rastreado tem precedência sobre digitado, o catch-all é último recurso e não depósito, first-touch é imutável, e a categoria desconhecida acima de 15% é falha de rastreamento. Isso reclassifica a cobertura de ~15% do Campanha_LinkedIn__c de característica dos dados para gap diagnosticado, dando base objetiva para OQ-11. A proposta de atribuição em attributionModelProposal traduz isso em taxonomia de 4 níveis, 6 sinais de classificação com precedência estrita (Ad ID de plataforma > match de e-mail rastreado > código de campanha > conversão em ativo > vocabulário outbound > ausência de sinal), 2 sinais explicitamente excluídos da classificação de origem (workflow e dono do lead), 5 invariantes testáveis e 6 exemplos trabalhados sobre os dados reais. Na perspectiva de UX, Attio é a melhor referência estrutural (objetos, atributos de relacionamento, página com Overview + Activity + Related, saved views) e o padrão de timeline única com progressive disclosure responde a AC-6.2. A alerta mais importante da perspectiva de performance é desconfortável e vale registrar: nem build nem buy entregam CAC por canal confiável com os dados de hoje, e ferramenta comprada apenas apresentaria o mesmo dado incompleto com mais confiança visual. A primeira entrega de valor real é a métrica de cobertura de atribuição, não uma métrica de performance. Recomendação final: BUILD, por três razões independentes — econômica (USD 25-45/mês contra acima de USD 1.000/mês), estrutural (buy criaria um terceiro sistema de registro e um novo problema de identidade, contra Decisão 5) e diagnóstica (os três problemas reais são ingestão parcial, instrumentação faltando na origem e regra de classificação defeituosa; nenhuma compra corrige nenhum deles). Dois spikes seguem obrigatórios antes do Plan, como complexity.json já apontava: resolução de identidade cross-fonte (o desenho em researchByPerspective.1 é insumo do spike, não substituto dele) e prova de ingestão verificável do Salesforce sem MCP em runtime. Bloqueios que a pesquisa não pode resolver e que seguem para o usuário: OQ-5 (métrica de NFR-2, trava o Critique), OQ-8 (LGPD), OQ-4 (região de dados, decidir antes de provisionar) e a decisão sobre onde Parceiro/Indicação se encaixa no nível 1 da taxonomia.",
+
+  "nextPhase": {
+    "phase": "spec",
+    "agent": "@pm",
+    "command": "*write-spec",
+    "note": "Fase 3 (Research) concluída. Insumos passados adiante: research.json, requirements.json, complexity.json. Atenção do @pm em três pontos: (1) attributionModelProposal deve entrar no spec.md marcado como PROPOSTA sujeita a validação do usuário (resolvedOpenQuestions/OQ-7 exige exatamente isso), nunca como fato; (2) os números de benchmark de mercado citados aqui NÃO podem virar meta numérica no spec — vêm de fontes secundárias e estão em unverifiedClaims; (3) OQ-5 continua sem métrica e complexity.json exige que seja fechado antes do Critique."
+  }
+}

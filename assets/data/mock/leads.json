@@ -1,0 +1,125 @@
+[
+  {
+    "id": "real-mkt-01",
+    "nome": "Camila R.",
+    "empresa": "Estoque Ágil Comércio",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-09-02T18:05:24-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "real-mkt-02",
+    "nome": "Rafael M.",
+    "empresa": "Mundo Tech Consultoria",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-09-07T13:52:45-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "real-mkt-03",
+    "nome": "Diego S.",
+    "empresa": "RM Serviços de TI",
+    "segmento": "marketing",
+    "estagio_funil": "Aberto",
+    "data_criacao": "2026-09-06T15:39:50-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "real-mkt-04",
+    "nome": "Priscila A.",
+    "empresa": "Pro Soluções Cloud",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-09-04T18:49:11-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "real-mkt-05",
+    "nome": "Vitor L.",
+    "empresa": "Atmacom Sistemas",
+    "segmento": "marketing",
+    "estagio_funil": "Contato dia 1",
+    "data_criacao": "2026-09-03T14:38:50-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "real-com-01",
+    "nome": "Eduardo F.",
+    "empresa": "Setor Energético Sul",
+    "segmento": "comercial",
+    "estagio_funil": "Rejeitado",
+    "data_criacao": "2026-08-28T13:39:10-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "real-na-01",
+    "nome": "Bruna K.",
+    "empresa": "Escritório Jurídico Beta",
+    "segmento": "nao_atribuido",
+    "estagio_funil": "Aberto",
+    "data_criacao": "2026-09-04T12:10:43-03:00",
+    "fonte_dados": "salesforce"
+  },
+  {
+    "id": "seed-prov-01",
+    "nome": "Joao Pereira Lima",
+    "empresa": "Nortec Sistemas",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-08-20T10:00:00-03:00",
+    "fonte_dados": "salesforce",
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Par de identidade PROVÁVEL com seed-prov-02 (EC-7 Tier 2)."
+  },
+  {
+    "id": "seed-prov-02",
+    "nome": "João P. Lima",
+    "empresa": "Nortec Sistemas",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-08-21T09:30:00-03:00",
+    "fonte_dados": "rd_station",
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Par de identidade PROVÁVEL com seed-prov-01 (EC-7 Tier 2)."
+  },
+  {
+    "id": "seed-conf-01",
+    "nome": "Marcos Vinicius Tavares",
+    "empresa": "Grupo Fictício Alfa",
+    "segmento": "marketing",
+    "estagio_funil": "Contato dia 1",
+    "data_criacao": "2026-08-22T11:15:00-03:00",
+    "fonte_dados": "salesforce",
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. CONFLITO de identidade com seed-conf-02 (mesmo e-mail corporativo genérico, nome e telefone divergentes)."
+  },
+  {
+    "id": "seed-conf-02",
+    "nome": "M. Tavares",
+    "empresa": "Grupo Fictício Alfa",
+    "segmento": "nao_atribuido",
+    "estagio_funil": "Aberto",
+    "data_criacao": "2026-08-23T16:40:00-03:00",
+    "fonte_dados": "rd_station",
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. CONFLITO de identidade com seed-conf-01."
+  },
+  {
+    "id": "seed-s2-01",
+    "nome": "Patrícia G.",
+    "empresa": "Serviços Fictícios Ômega",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-08-18T09:00:00-03:00",
+    "fonte_dados": "salesforce",
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Fecha a cobertura do sinal S2 (nenhum exemplo real disponível na amostra consultada)."
+  },
+  {
+    "id": "seed-src-01",
+    "nome": "Fernanda B.",
+    "empresa": "Comércio Fictício Delta",
+    "segmento": "marketing",
+    "estagio_funil": "Qualificado",
+    "data_criacao": "2026-08-15T08:00:00-03:00",
+    "fonte_dados": "rd_station",
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Testa EC-8/P-UI-6: fonte indisponível na última tentativa de coleta, exibe idade real do último dado válido, nunca zero."
+  }
+]

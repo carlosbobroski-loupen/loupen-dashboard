@@ -1,0 +1,312 @@
+{
+  "storyId": "epic-crm-lead-intelligence",
+  "critiquedAt": "2026-09-04T00:00:00Z",
+  "critiquedBy": "@qa",
+  "specVersion": 1,
+  "critiqueRound": "critique_1",
+
+  "verdict": "NEEDS_REVISION",
+  "verdictReason": "Spec de qualidade muito acima da média para um COMPLEX 24/25: cobertura de FR-1..FR-14, rastreabilidade explícita por afirmação, precedência entre os cinco artefatos de entrada declarada e — verificado por amostragem no repositório — TODOS os fatos de codebase citados são verdadeiros (index.html com 5.014 linhas; :1209 ADS_API_URL; :2923 isMarketing; :3049 filtro !isMarketing; :4373 SRD_IA_LEADS com [REDIGIDO] e zero nome/telefone residual — 763 ocorrências de [REDIGIDO], nenhuma PII remanescente). A regressão que este pipeline já sofreu uma vez NÃO voltou: as 33 menções a Supabase/Windsor.ai/Next.js/React/Tailwind/nuqs/Zustand/Workers/Vercel estão todas rotuladas como DEFERRED, REJECTED, superseded ou fato histórico — nenhuma aparece como stack ATIVO da fase 1. NENHUM issue HIGH foi levantado: nenhuma checagem de dimensão falhou por inteiro. O veredito é NEEDS_REVISION por 7 issues MEDIUM, sendo os três materiais: (1) NFR-2 e NFR-6 não têm nenhuma verificação em §6, e a auto-auditoria do Constitutional Gate afirma '7/7 NFR endereçados em testes ou verificação manual' — a única afirmação factualmente falsa que encontrei no documento; (2) as 15 provas unitárias P0 de §6.1 testam lógica (motor de atribuição, regras de receita) que por §3.5 roda 'na ingestão', isto é, dentro dos workflows n8n declarados em §5.2 como 'fora do repositório', sem runner, linguagem ou ponto de entrada definidos — e R14 (CRÍTICO) depende exatamente dessa suíte; (3) OQ-4 e OQ-14 propagaram para §3.4/§4.1/§4.4/§7/§8/§9 mas NÃO para §2 (Requirements Summary) nem para §3.1/§3.2, apesar de a região ser 'imutável na prática' por R15. Média ponderada 4.08 e ausência de HIGH satisfazem a condição textual de APPROVED, mas a presença de issues MEDIUM aciona NEEDS_REVISION, que é também o caminho previsto por complexity.json (critique_1 → revise → critique_2 → plan). As correções são cirúrgicas: 10 dos 12 issues têm autoFix pronto abaixo.",
+
+  "verdictRuleResolution": "[AUTO-DECISION] verdict_rules do task file permitem sobreposição (APPROVED exige 'no HIGH + média >= 4.0 + todas as dimensões >= 3', satisfeito; NEEDS_REVISION dispara com 'Has MEDIUM severity issues', também satisfeito) → escolhido NEEDS_REVISION (razão: a semântica declarada de APPROVED é 'spec ready for implementation' e issues MEDIUM significam por definição 'needs improvements before implementation'; além disso complexity.json fixa a sequência critique_1 → revise → critique_2 para COMPLEX, portanto APPROVED aqui pularia uma fase obrigatória do pipeline).",
+
+  "scores": {
+    "accuracy": 4.5,
+    "completeness": 3.5,
+    "consistency": 4,
+    "feasibility": 4,
+    "alignment": 4.5,
+    "average": 4.08
+  },
+
+  "scoreRationale": {
+    "accuracy": "acc-1 PASS (14/14 FR endereçados em §2.1 e no checklist §9), acc-2 PASS (nenhum requisito fantasma — Cloudflare Access, taxonomia de 4 níveis, threshold de 15%, banner de snapshot e saved views todos rastreados a amendment 2 / research.json), acc-3 PASS (P0/P1 preservados fielmente de requirements.json), acc-4 PARCIAL (NFR-2/NFR-6 sem seção de verificação correspondente; uma consequência de NFR-2 atribuída ao usuário sem lastro). Pesa a favor: todos os fatos verificáveis de codebase conferidos como verdadeiros.",
+    "completeness": "comp-1 PASS (Overview, Requirements, Approach, Dependencies, Files, Testing, Risks todos presentes e densos), comp-2 PARCIAL (12 de 14 FR com cenário; AC-1.1, AC-4.1, AC-4.2, AC-6.2 sem cenário; FR-13/FR-14 ausentes de §6 sem declaração de N/A; NFR-2 e NFR-6 sem qualquer verificação), comp-3 PARCIAL (versão major do Postgres a provisionar, versão da API do RD Station e versão do n8n não fixadas), comp-4 PASS (§5.1/§5.2 com propósito e trace por arquivo, nomes declarados ilustrativos), comp-5 PASS (21 riscos, todos com mitigação acionável — não apenas descritos). Dimensão mais fraca: é onde estão 5 dos 12 issues.",
+    "consistency": "con-1 PARCIAL (todas as referências FR-*/NFR-*/AC-*/DM-*/INT-*/EC-* existem em requirements.json — verificado item a item; mas CON-10..CON-14, OQ-4-RESIDUAL e OQ-12/13/15/16 são IDs criados no spec e §8.2 não distingue herdados de novos), con-2 PASS (§3.1/§3.2 e §4.1 coerentes; nada em §4.1 que não apareça na abordagem, e vice-versa), con-3 PASS (profundidade proporcional a COMPLEX 24/25), con-4 PARCIAL (colisão de namespace D1..D14 vs D1..D6; `/leads/[id]` de §3.7 vs query string/hash de P-UI-1; '16 views' com 15 nomes).",
+    "feasibility": "feas-1 PASS com honestidade explícita (§4.1 marca ⚠️ por dependência e §4.4 sequencia 7 validações com custo, critério de aceite e impacto se falso), feas-2 PARCIAL (o gate de §3.4 é desenhado com duas camadas EXATAMENTE porque UC-9 não está validado, tem plano B nomeado (Cloudflare Pages + repo privado) e fallback optionB (Worker de ~15 linhas) — o spec é honesto, não trata como certeza; o que falta é onde vive e como se executa o código que §6.1 manda testar, e o roteamento por path em hospedagem estática), feas-3 PASS (declarado epic/programa multi-story, faseado 0/1a/1b/1c/1d com ponto de decisão do usuário por CON-8), feas-4 PASS (nada impossível; NG7 remove explicitamente CAC payback e Visitor-to-Lead do escopo).",
+    "alignment": "align-1 PARCIAL-favorável (desvia do preset ativo `nextjs-react` de technical-preferences.md, mas o desvio é decisão do usuário de 2026-09-04 (F-3/OQ-3-REVISAO), está registrado como DEFERRED em §3.8 com gatilho de retorno nomeado, e §4.3 rejeita as partes do preset não rastreáveis a FR/NFR — este é o caso-livro de 'minor deviations with justification'), align-2 PASS (P-UI-* continua o padrão real do artefato: `showView()`, `fetch()` de webhook n8n, custom properties no `:root`), align-3 PASS (§5 declara nomes ilustrativos e atribui a estrutura final ao Plan; nenhuma convenção violada), align-4 PASS (NFR-5 tratado com rigor incomum: D13 põe a extração do design system como primeira tarefa de frontend e P-UI-4 desqualifica Appsmith/Metabase/Retool como superfície final). Único débito: nenhum framework de teste nomeado, embora a Testing Strategy do preset ativo o exija."
+  },
+
+  "issues": [
+    {
+      "id": "CRIT-1",
+      "severity": "MEDIUM",
+      "category": "completeness",
+      "check": "comp-2 / acc-4",
+      "description": "NFR-2 e NFR-6 não têm NENHUMA verificação no documento, e a auto-auditoria do Constitutional Gate afirma o contrário. Varredura completa de §6.1 (15 testes unitários), §6.2 (8 testes de integração), §6.3 (4 features Gherkin) e §6.4 (10 itens de verificação manual): não existe uma única medição de tempo de resposta contra o alvo de 2–3 s que OQ-5 acabou de tornar verificável, nem qualquer prova de NFR-6 ('adicionar novo canal de anúncio não requer alteração no schema central de Lead/Opportunity/Campaign'). A linha 'Todos os NFR-1..NFR-7 endereçados em testes ou verificação manual | ✅ 7/7' do Constitutional Gate é, portanto, falsa — é a única afirmação factualmente incorreta que encontrei no spec, e é grave por estar justamente na seção que o @pm usou para se autoautorizar. Ironia relevante: o bloqueio que complexity.json impôs ao Critique era 'NFR-2 sem métrica'; a métrica chegou em 2026-09-04 e nada foi criado para medi-la.",
+      "location": "spec.md#6 (Testing Strategy) e spec.md#constitutional-gate",
+      "suggestion": "Acrescentar dois itens a §6.4: (a) medição do tempo de resposta ponta a ponta de /api/leads e da abertura da ficha contra o alvo de 2–3 s de NFR-2, medido depois do gate ativo (porque o caminho real inclui Cloudflare → n8n → Neon) e incluindo um caso após cold start; (b) verificação de NFR-6 por revisão de schema — acrescentar um canal de anúncio novo em ambiente de teste e provar que nenhuma coluna de lead/opportunity/campaign mudou. Corrigir a linha do Constitutional Gate para 5/7 verificados + 2 acrescentados neste patch, em vez de 7/7.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-2",
+      "severity": "MEDIUM",
+      "category": "accuracy",
+      "check": "acc-4 / Artigo IV (No Invention)",
+      "description": "§2.2 NFR-2 apresenta como 'Consequências aceitas explicitamente' pelo usuário duas coisas de status diferente. A primeira ('o cold start de scale-to-zero do Neon (300–500 ms) é aceitável e não exige mitigação de manter o banco/conexão sempre ativos') está literalmente em requirements.json.resolvedOpenQuestions2026_09_04_rodada2.OQ-5.impact. A segunda ('o salto de rede extra (navegador → Cloudflare → n8n → Neon) cabe no orçamento de tempo') NÃO está — nem em requirements.json, nem em research.json, nem nos dois amendments. É uma inferência do spec, e uma inferência de performance sobre um caminho de rede que nenhum artefato mediu, apresentada como aceitação do usuário. O spec é escrupuloso em declarar derivações em §3.7 e no Constitutional Gate; esta escapou.",
+      "location": "spec.md#2.2 (linha da métrica de NFR-2)",
+      "suggestion": "Separar o que o usuário aceitou do que o spec inferiu: manter o cold start como consequência aceita (tem lastro literal) e reclassificar o salto de rede extra como claim a medir, com entrada correspondente em §4.4 e na verificação de §6.4 (CRIT-1).",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-3",
+      "severity": "MEDIUM",
+      "category": "completeness",
+      "check": "comp-2",
+      "description": "Quatro critérios de aceite de requirements.json não têm cenário de teste, sendo dois deles de um FR P0. AC-1.1 (combinar múltiplos critérios simultaneamente e a lista/KPIs refletirem a INTERSEÇÃO sem recarga manual) — §6.1 só testa AC-1.2 (serialização do filtro na URL) e o Gherkin só testa a preservação dos filtros ao voltar da ficha; a semântica de interseção, que é a dor nº 1 declarada pelo usuário (FR-1 P0), não é verificada em nenhum lugar. AC-4.1 e AC-4.2 (navegar campanha → leads → oportunidades e voltar da oportunidade ao lead/conta de origem) — FR-4 é P0 e hoje só tem cobertura de DADOS (§6.2 'Join Lead → Opportunity'), não de navegação; INT-4 e seus três estados (loading/error/empty, incluindo 'vínculo não calculável exibe motivo') não aparecem em §6. AC-6.2 (leitura não depende de contêiner modal com rolagem confinada) também não tem cenário, ainda que P-UI-2 a enderece no desenho. Além disso FR-13 e FR-14 simplesmente não aparecem em §6: são requisitos de processo verificados por artefato, o que é legítimo, mas deveria estar DECLARADO como tal em vez de ausente — do contrário a próxima leitura registra como lacuna.",
+      "location": "spec.md#6.3 (Testes de aceite) e spec.md#6.1",
+      "suggestion": "Acrescentar uma feature Gherkin cobrindo FR-1/AC-1.1 (interseção de filtros combinados, incluindo o estado vazio de INT-1 com resumo dos filtros ativos) e FR-4/AC-4.1/AC-4.2 (navegação campanha → leads → oportunidades e volta, com o caso de lead sem ConvertedAccountId exibindo o motivo por INT-4). Acrescentar um cenário ou item de §6.4 para AC-6.2. Acrescentar uma linha em §6 declarando FR-13 e FR-14 como verificados por artefato (§3.6 e a existência dos artefatos do pipeline), não por teste executável.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-4",
+      "severity": "MEDIUM",
+      "category": "feasibility",
+      "check": "feas-2 / comp-4",
+      "description": "O spec exige uma suíte de testes P0 sobre código cujo domicílio ele não define — e é a mitigação do único risco que ele mesmo classifica como CRÍTICO+Alta probabilidade. Cadeia: §6.1 lista 15 testes unitários P0, dos quais 9 cobrem o motor de atribuição (I1-I5, precedência S1→S6, S7/S8 não classificam) e as regras de receita (FR-10/EC-5); §3.5 determina que os sinais são 'avaliados UMA VEZ na ingestão'; §5.1 confirma que `assets/js/attribution.js` é só exibição ('o cálculo roda na ingestão, não no cliente'); §5.2 coloca a ingestão em 'Workflows n8n (fora do repositório)'. Logo, a lógica de negócio mais crítica da epic vive fora do controle de versão, e §5.1 pede `tests/**` sem nomear runner, linguagem ou ponto de entrada — com CON-12 proibindo build step e sem package.json no repositório. R14 ('Ausência de rede de segurança', Alta/CRÍTICO) tem como mitigação exatamente 'estratégia de testes criada junto com a infraestrutura (§6)', que assim fica sem substrato executável. Agravante de processo: o Constitutional Gate registra que uma sugestão de versionar os workflows n8n como JSON foi REMOVIDA por não rastrear a nenhum input — decisão correta por Artigo IV, mas que deixou o buraco aberto em vez de convertê-lo em Open Question.",
+      "location": "spec.md#5.1, spec.md#5.2, spec.md#6.1, spec.md#7 (R14)",
+      "suggestion": "Não inventar requisito novo: registrar como Open Question dirigida ao @architect (Fase 6) 'onde reside e como é testada a lógica de atribuição e de receita, dado que a ingestão roda em n8n fora do repositório'. Opção de custo zero já disponível no próprio spec, se o @pm quiser fechar em vez de abrir: expressar as regras como funções/views SQL versionadas em `db/migrations/*.sql` e casos em `db/queries/verificacao/*.sql` — ambos JÁ são deliverables de §5.1 e já são in-repo, o que torna I1-I5 e as regras de receita testáveis por asserção SQL sem contrariar CON-12 nem exigir tooling novo. Nomear o runner é decisão do Plan; declarar que uma devDependency de teste não viola 'sem build step' do artefato entregue evita que o @dev descarte a suíte por leitura literal de CON-12.",
+      "autoFixable": false
+    },
+    {
+      "id": "CRIT-5",
+      "severity": "MEDIUM",
+      "category": "consistency",
+      "check": "con-4 / con-2",
+      "description": "Das quatro respostas da rodada 2, duas propagaram completamente e duas ficaram a meio caminho. Verificado seção a seção: OQ-5 → §2.2 ✅, §8.1 ✅, §9 ✅, Metadata ✅ (falta só a verificação, CRIT-1). OQ-9 → §2.4 ASM-5 ✅, §4.4 ✅, §7 R8 ✅, §9 Fase 0 e 1a ✅, e a auto-afirmação do spec de que 'nenhum lugar do documento ainda pede todo o histórico como escopo' confere — as 5 ocorrências restantes descrevem a decisão superada. OQ-4 (região Brasil) → aparece em §3.4, §4.1, §4.4, §7 R15, §8, §9, mas NÃO em §2 (nenhum CON, nenhuma ASM) e NÃO em §3.1 (o diagrama da arquitetura da fase 1 desenha 'NEON FREE (Postgres serverless)' sem região) nem em §3.2 (D2 decide o Neon sem mencionar região). Isso importa porque R15 declara a região 'imutável na prática — trocar depois exige recriar o projeto e recarregar tudo': uma decisão irreversível do usuário está registrada apenas como nota de dependência e como mitigação de risco, e a única menção em §3 está dentro de um bullet sobre 'o que o gate NÃO cobre', que é o lugar menos provável de alguém procurar. OQ-14 → §3.4 ✅, §3.8 ✅, §7 R10 ✅, §9 ✅, mas NÃO na linha de NFR-3 em §2.2 — que é precisamente o requisito cujo escopo de fase 1 OQ-14 fecha.",
+      "location": "spec.md#2.2 (NFR-3), spec.md#2.3 (Constraints), spec.md#3.1, spec.md#3.2 (D2)",
+      "suggestion": "Elevar a região a constraint de primeira classe (CON-15, rastreada a resolvedOpenQuestions2026_09_04_rodada2.OQ-4), mencioná-la em D2 e no rodapé do diagrama de §3.1, e acrescentar à métrica de NFR-3 em §2.2 a nota de que o escopo binário da fase 1 foi aceito pelo usuário em OQ-14 (com R10 como risco aceito).",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-6",
+      "severity": "MEDIUM",
+      "category": "consistency",
+      "check": "con-1",
+      "description": "Boa notícia primeiro: TODAS as referências a FR-1..FR-14, NFR-1..NFR-7, CON-1..CON-9, AC-*.* , DM-1..DM-12, INT-1..INT-6 e EC-1..EC-12 foram conferidas contra requirements.json uma a uma e todas existem — zero referência órfã nessas famílias. O problema é o inverso: o spec CRIA IDs novos sem marcar que são novos, em um documento cuja §0 declara requirements.json como a fonte de FR/NFR/CON/openQuestions. Não existem em requirements.json: CON-10, CON-11, CON-12, CON-13, CON-14 (estes são bem rotulados como 'Acrescentadas pelos amendments', portanto o problema é só de backport) e OQ-4-RESIDUAL, OQ-12, OQ-13, OQ-15, OQ-16 (estes NÃO são rotulados). §8.1 atribui explicitamente as rodadas 1 e 2 a requirements.json e §8.2 então mistura, sem distinção visual, herdados (OQ-2, OQ-8, OQ-10, OQ-11) com criados no spec (OQ-4-RESIDUAL, OQ-12, OQ-13, OQ-15, OQ-16) — um leitor conclui que todos vivem em requirements.json e não encontra cinco deles. A SUBSTÂNCIA de cada um é rastreável, e verifiquei: OQ-12 ← research.json.attributionModelProposal.taxonomy.level1_segmento.mapping.PENDENTE_DE_DECISAO_DO_USUARIO['Parceiro/Indicacao'] (que inclusive já recomenda perguntar ao usuário); OQ-13 ← validationPlan V3 + rationale de S5; OQ-15 ← amendment 2 PR-1; OQ-16 ← plano B do amendment 2. Também: UC-1..UC-6/UC-9/UC-10 vêm do amendment 2 e OQ-14 aparece em requirements.json apenas como resolvido, nunca como pergunta. Ou seja: nada foi inventado (Artigo IV está satisfeito), mas a rastreabilidade bidirecional que AC-14.2 pede está quebrada em uma direção.",
+      "location": "spec.md#8.2, spec.md#2.3",
+      "suggestion": "Anotar procedência por ID em §8.2 (herdado de requirements.json vs criado neste spec a partir de {artefato}.{caminho}) e recomendar ao @po/@pm o backport de CON-10..CON-15 e OQ-12/13/15/16 e OQ-4-RESIDUAL para requirements.json, para que a fonte de verdade volte a conter o conjunto completo antes do Plan.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-7",
+      "severity": "MEDIUM",
+      "category": "feasibility",
+      "check": "feas-2 / con-4",
+      "description": "Há uma tensão não resolvida entre duas formas de endereçar a ficha do lead, e o lado errado dela é tecnicamente inviável na hospedagem escolhida. §3.7 passo 3 descreve a primeira view estrangulada como '/leads + /leads/[id]' — notação de rota de Next.js, herdada do research.json original — e a coluna de precedência corrige apenas o continente ('evolui dentro do mesmo artefato vanilla… refletir estado na URL via History API'), não a forma da URL. P-UI-1, por sua vez, especifica 'parsing de query string/hash'. A diferença não é cosmética: em GitHub Pages estático, /leads/123 retorna 404 no carregamento direto e no refresh (não há server-side rewrite, e o único contorno é o truque de 404.html, que o spec não menciona e que colide com o Custom domain + Access). Como AC-6.1 exige que o detalhe seja 'endereçável/retomável' — o que só tem valor se sobreviver a um carregamento direto e a um link compartilhado — e o cenário Gherkin 'Detalhe endereçável e retomável' testa exatamente isso, deixar as duas notações convivendo entrega ao @architect na Fase 6 uma escolha cujo lado default (path) quebra o AC.",
+      "location": "spec.md#3.7 (passo 3), spec.md#3.3 (P-UI-1)",
+      "suggestion": "Declarar explicitamente em P-UI-1 que na fase 1 o estado de view/filtro/ficha vai em query string ou hash — nunca em segmentos de caminho — porque hospedagem estática sem rewrite não serve caminhos arbitrários (404 em carregamento direto e refresh), e que path routing só volta com o lado servidor da fase 2 (§3.8). Em §3.7 passo 3, manter '/leads + /leads/[id]' apenas como citação da proposta original e anotar a forma efetiva da fase 1 na coluna de precedência.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-8",
+      "severity": "LOW",
+      "category": "completeness",
+      "check": "comp-3 / feas-1",
+      "description": "§4.4 se propõe a consolidar as claims não verificadas do pipeline e perde uma. Inventário dos UC do research-amendment-2.json: UC-1 ✅ (§4.4 nº 6), UC-2 ✅ (nº 3), UC-3 ✅ (nº 2), UC-4 ✅ (nº 4), UC-5 ✅ (nº 5), UC-6 ✅ (nº 1), UC-7 ✅ por substância (§3.4 passo 7 e o bullet da versão do n8n citam a issue #18528 e a mitigação de uma origem só), UC-9 ✅ (nº 4), UC-10 ✅ por substância (§7 R21 e o bullet da purga de histórico). UC-8 — 'as variáveis N8N_CORS_ENABLED e N8N_CORS_ALLOW_ORIGIN existem e controlam CORS globalmente na instância', action needs_validation, com recomendação explícita de ler a referência oficial ANTES de tocar em configuração global — não aparece em nenhum lugar do spec. É baixo impacto (o desenho same-origin tira o CORS do caminho crítico), mas é a única claim needs_validation do amendment 2 que sumiu, e mexer em variável global de uma instância n8n compartilhada com workflows de produção é exatamente o tipo de ação que a nota queria travar. Faltam também itens de checklist para dois bullets de §4.4 que hoje não têm dono: a paridade MCP RD Station vs REST (o texto manda fazer 'no spike de ingestão', mas o único spike no §9 é o de Salesforce/CON-1) e os ToS do Workers Free (condicional a optionB).",
+      "location": "spec.md#4.4",
+      "suggestion": "Acrescentar bullet de UC-8 em §4.4 com a recomendação de não alterar configuração global de CORS do n8n sem ler a referência oficial, e um item de spike de ingestão do RD Station em §9 Fase 0 que inclua a comparação MCP vs REST para um contato conhecido.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-9",
+      "severity": "LOW",
+      "category": "consistency",
+      "check": "con-4",
+      "description": "Colisão de namespace de IDs dentro do mesmo documento: §3.2 usa D1..D14 para as decisões-chave de arquitetura (D1 = BUILD, D2 = Neon Free, D4 = n8n assume 100% da ingestão…) e §3.5 usa D1..D6 para os defeitos da regra de atribuição atual (D1 = Comercial é bucket residual, D4 = sem hierarquia, D6 = sem imutabilidade de first-touch). §6.1 desambigua escrevendo 'FR-5 (defeito D4)' e 'FR-5 (defeito D6)', o que prova que o autor percebeu o conflito — mas §3.5 não desambigua, e o Plan e os ADRs de §5.1 ('ADRs das decisões D1-D14') vão citar D1..D6 de duas coisas diferentes.",
+      "location": "spec.md#3.5",
+      "suggestion": "Renomear os seis defeitos para DEF-1..DEF-6 em §3.5 e nas referências de §6.1, preservando D1..D14 para decisões.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-10",
+      "severity": "LOW",
+      "category": "accuracy",
+      "check": "acc-1",
+      "description": "'16 views' aparece duas vezes (§1.1 e §4.2) seguido de uma lista com 15 nomes. Verificado no repositório: `grep -o 'id=\"view-[a-z0-9_]*\"' index.html | sort -u` retorna exatamente 15 (view-campanhas, view-criativos, view-ga4, view-gads, view-leads, view-linkedin, view-lp, view-mdfs, view-meta, view-oportunidades, view-oportunidades_v2, view-overview, view-rdstation, view-srd_ia, view-utm). O erro é herdado de complexity.json.dimensions.scope.notes, que comete a mesma soma — portanto é rastreável e não é invenção do spec, mas é falso e o número circula em dois lugares. Mantido em LOW porque não altera nenhuma decisão; registrado porque §9 Fase 1d migra 'uma view por vez' e a contagem entra no dimensionamento do faseamento.",
+      "location": "spec.md#1.1, spec.md#4.2",
+      "suggestion": "Trocar '16 views' por '15 views' nos dois lugares e sinalizar a divergência com complexity.json para que o @architect não recalibre o escopo pelo número errado na Fase 6.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-11",
+      "severity": "LOW",
+      "category": "completeness",
+      "check": "comp-3",
+      "description": "Três dependências que exigem versão não têm versão fixada. (a) Versão major do Postgres a provisionar no Neon: §4.1 registra que `pg_trgm` 1.6 e `fuzzystrmatch` 1.1-1.2 são suportadas em 'PG 14-18' mas não fixa qual provisionar — e o desenho de EC-7 depende de similaridade por trigramas com índice GIN/GiST, cujo comportamento e defaults variam por major; o item é decidido no momento de criar o projeto, que R15 declara praticamente irreversível. (b) Versão/edição da API do RD Station Marketing, num contexto em que §4.1 já marca `verified: false` porque developers.rdstation.com não foi acessado diretamente. (c) Versão do n8n em produção segue declaradamente não inventariada (§4.4), o que é honesto mas continua aberto e afeta UC-7/UC-8 e o comportamento SSL do nó Postgres (issue #31234).",
+      "location": "spec.md#4.1, spec.md#4.4",
+      "suggestion": "Acrescentar a fixação da versão major do Postgres à lista de decisões do provisionamento em §9 Fase 1a (junto da região, pelo mesmo motivo de irreversibilidade) e incluir 'versão da API do RD Station' no item de inventário de limites de API.",
+      "autoFixable": false
+    },
+    {
+      "id": "CRIT-12",
+      "severity": "LOW",
+      "category": "completeness",
+      "check": "comp-4 / comp-5",
+      "description": "Uma mitigação de R8 não tem destino de execução. R8 lista como mitigações remanescentes 'particionar eventos por período' e 'política de arquivamento/purga acordada ao fim da janela', mas §5.1 descreve `db/migrations/*.sql` sem particionamento e §9 Fase 1a manda escrever as migrations sem mencioná-lo. Como o próprio R8 identifica que 'o vetor de estouro continua sendo o histórico de eventos de jornada (DM-10/FR-3), não a tabela de leads', e como particionar depois de carregar dados é migração (o mesmo argumento que D12 usa para antecipar as colunas de escopo de M3), a mitigação tende a não acontecer se ficar escrita apenas na célula do risco. Nota: o Constitutional Gate corretamente se recusou a inventar uma política de purga numérica — a sugestão abaixo não inventa número, apenas dá endereço à mitigação já escrita.",
+      "location": "spec.md#5.1, spec.md#9 (Fase 1a)",
+      "suggestion": "Mencionar particionamento por período da tabela de eventos na descrição de `db/migrations/*.sql` em §5.1 e no item de migrations de §9 Fase 1a, com a mesma justificativa de D12 (decidir antes de carregar dados evita migração depois). Sem fixar política numérica de purga, que continua dependente de OQ-8.",
+      "autoFixable": true
+    }
+  ],
+
+  "positiveFindings": [
+    "Regressão de stack NÃO voltou: varredura por Supabase, Windsor.ai, Next.js, React, Tailwind, nuqs, Zustand, Workers e Vercel em spec.md (33 ocorrências) mostra 100% delas rotuladas como DEFERRED (§3.8, com gatilho objetivo de retorno), REJECTED (§4.3, com motivo), superseded (§0) ou fato histórico/análise que levou à decisão (§3.6). Nenhuma aparece como stack ativo da fase 1.",
+    "Todos os fatos de codebase verificados como verdadeiros: index.html com 5.014 linhas; :1209 = ADS_API_URL do webhook n8n; :2923 = `const isMarketing = !!info || pareceCampanha;`; :3049 = `rows.filter(row => !row.isMarketing)`; :4373 = SRD_IA_LEADS. Este spec não cita uma linha que não exista.",
+    "PR-2/INV-4 confere: 763 ocorrências de [REDIGIDO] em index.html e ZERO valores residuais em `\"nome\"` e `\"tel\"`. O incidente de PII está de fato remediado no artefato, como o spec afirma — e ele resiste à tentação de declarar o problema totalmente resolvido, mantendo R21/UC-10 (cópias e caches já ocorridos não são desfeitos) como limitação inerente.",
+    "Honestidade epistêmica do gate de acesso (§3.4): o desenho de DUAS camadas existe declaradamente porque UC-9 não está validado (D10), o plano B é nomeado (Cloudflare Pages + repositório privado, OQ-16, apresentado ao usuário ANTES de aceitar o desenho principal), o fallback optionB é dimensionado (Worker de ~15 linhas), e §4.4 ordena as validações avisando que 'as primeiras podem invalidar as seguintes'. Não há tratamento de premissa como certeza — o oposto do que a pergunta de revisão temia.",
+    "FR-5 corretamente contido: marcado como PROPOSTA em §3.5 com a citação literal de OQ-7 e de research.json.attributionModelProposal.status, plano V1-V5 obrigatório antes de qualquer implementação, V5 exigindo testes antes do código, e ponto de decisão do usuário no checklist (§9 Fase 1b) antes de qualquer exibição. R11 amarra isso ao item risk 5/5 de complexity.json.",
+    "Os 21 riscos de §7 têm mitigação ACIONÁVEL, não descritiva: cada um aponta para uma validação numerada de §4.4, um item de checklist de §9, uma invariante (INV-*) ou um plano B nomeado. Os dois riscos aceitos (R10 sobre-exposição interna, R21 exposição passada) estão rotulados como aceitos com a decisão do usuário rastreada, em vez de silenciados.",
+    "D14 (entregar a cobertura de atribuição ANTES de qualquer métrica de performance) e NG7/NG8 (métricas não construíveis e benchmarks que não são meta) são exatamente o tipo de autocontenção que este projeto precisa, dado que o defeito de origem é justamente número que parece preciso e não é."
+  ],
+
+  "summary": {
+    "highIssues": 0,
+    "mediumIssues": 7,
+    "lowIssues": 5,
+    "autoFixable": 10,
+    "checksRun": 20,
+    "checksPassed": 13,
+    "checksPartial": 7,
+    "checksFailed": 0
+  },
+
+  "nextAction": "Retornar ao @pm (Morgan) para a Fase 5b (revise) com este critique.json. Aplicar os 10 autoFixes abaixo (todos textuais e localizados), decidir CRIT-4 (domicílio e execução da lógica testada — fechar em SQL versionado ou abrir como Open Question dirigida ao @architect) e CRIT-11 (fixação da versão major do Postgres, que pode ser delegada ao Plan). Em seguida re-submeter para critique_2 (@qa), conforme pipelinePhases de complexity.json. NÃO seguir direto para a Fase 6 (plan).",
+
+  "autoFixes": [
+    {
+      "issueId": "CRIT-1",
+      "location": "spec.md#6.4 (após o último item da lista de verificação manual)",
+      "original": "- [ ] Números das views migradas conferidos contra o snapshot congelado antes do corte (Passo 2 de §3.7).",
+      "suggested": "- [ ] Números das views migradas conferidos contra o snapshot congelado antes do corte (Passo 2 de §3.7).\n- [ ] **NFR-2 medido, não presumido:** tempo de resposta ponta a ponta de `/api/leads` e da abertura da ficha conferido contra o alvo de **2–3 s** de §2.2, medido **com o gate ativo** (porque o caminho real é navegador → Cloudflare → n8n → Neon) e em duas condições: banco morno e **após cold start** de scale-to-zero. Se estourar o alvo, a consequência é escopo/arquitetura, não ajuste de expectativa (OQ-5 é decisão do usuário).\n- [ ] **NFR-6 verificado por revisão de schema:** acrescentar um canal de anúncio novo em ambiente de teste e provar que **nenhuma** coluna do schema central de Lead/Opportunity/Campaign mudou."
+    },
+    {
+      "issueId": "CRIT-1",
+      "location": "spec.md#constitutional-gate (linha da tabela sobre NFR)",
+      "original": "| Todos os NFR-1..NFR-7 endereçados em testes ou verificação manual | ✅ 7/7. **NFR-2 agora com métrica**, transcrita da resposta do usuário de 2026-09-04 (\"alguns segundos já resolve, não precisa ser sub-segundo\" → ordem de 2–3 s). **Nenhum número mais preciso foi inventado**: o spec não fixa p95, nem SLA, nem alvo por endpoint |",
+      "suggested": "| Todos os NFR-1..NFR-7 endereçados em testes ou verificação manual | ⚠️ **5/7 na versão 1.0; 7/7 após o patch do critique_1.** NFR-1, NFR-3 (fase 1), NFR-4, NFR-5 e NFR-7 já tinham teste ou item de verificação. **NFR-2 e NFR-6 tinham requisito e métrica, mas nenhuma verificação** — lacuna apontada em `critique.json` CRIT-1 e fechada com dois itens novos em §6.4. **NFR-2 agora com métrica**, transcrita da resposta do usuário de 2026-09-04 (\"alguns segundos já resolve, não precisa ser sub-segundo\" → ordem de 2–3 s). **Nenhum número mais preciso foi inventado**: o spec não fixa p95, nem SLA, nem alvo por endpoint |"
+    },
+    {
+      "issueId": "CRIT-2",
+      "location": "spec.md#2.2 (célula de métrica de NFR-2)",
+      "original": "Consequências aceitas explicitamente: o **cold start de scale-to-zero do Neon (300–500 ms) é aceitável** e **não** exige mitigação de manter o banco/conexão sempre ativos; o salto de rede extra (navegador → Cloudflare → n8n → Neon) cabe no orçamento de tempo",
+      "suggested": "Consequência aceita explicitamente pelo usuário (lastro literal em `resolvedOpenQuestions2026_09_04_rodada2.OQ-5.impact`): o **cold start de scale-to-zero do Neon (300–500 ms) é aceitável** e **não** exige mitigação de manter o banco/conexão sempre ativos. **Consequência ainda NÃO verificada (derivação deste spec, não aceitação do usuário):** que o salto de rede extra (navegador → Cloudflare → n8n → Neon) caiba no orçamento de 2–3 s — nenhum artefato do pipeline mediu esse caminho, portanto ele entra como claim a validar (§4.4) e como verificação obrigatória (§6.4), não como premissa"
+    },
+    {
+      "issueId": "CRIT-2",
+      "location": "spec.md#4.4 (lista de claims adicionais needs_validation, após o bullet da versão do n8n)",
+      "original": "- **Versão do n8n em produção na Loupen** — pendência herdada e ainda aberta. Relevante para dois itens: a issue #18528 (header de CORS incorreto com múltiplas origens — mitigada configurando **uma** origem) e a issue #31234 (comportamento de SSL do nó Postgres mudou entre versões; irrelevante para Neon, que exige SSL, mas indica variação).",
+      "suggested": "- **Versão do n8n em produção na Loupen** — pendência herdada e ainda aberta. Relevante para dois itens: a issue #18528 (header de CORS incorreto com múltiplas origens — mitigada configurando **uma** origem) e a issue #31234 (comportamento de SSL do nó Postgres mudou entre versões; irrelevante para Neon, que exige SSL, mas indica variação).\n- **Latência real do caminho `/api/*` contra o alvo de NFR-2** — que a cadeia navegador → Cloudflare → n8n (webhook) → Neon caiba em 2–3 s é **derivação deste spec, não medição**: nenhum artefato de pesquisa mediu tempo de execução de webhook do n8n nem latência de consulta do Neon a partir de `aws-sa-east-1`. Validar junto do spike de ingestão, com e sem cold start. Impacto se falso: **MÉDIO-ALTO** — não invalida o stack, mas obriga a mover trabalho para o banco (índices, views materializadas, paginação server-side) ou a reabrir OQ-5 com o usuário."
+    },
+    {
+      "issueId": "CRIT-3",
+      "location": "spec.md#6.3 (acrescentar bloco Gherkin após a feature de Ficha do lead e jornada)",
+      "original": "```gherkin\nFeature: Integridade e frescor dos dados (FR-8, NFR-1, NFR-4)",
+      "suggested": "```gherkin\nFeature: Filtragem combinável e navegação de relacionamentos (FR-1, FR-4)\n\n  Scenario: Filtros combinados produzem a intersecao, nao a substituicao\n    Given a base de leads carregada com o filtro A aplicado\n    When o usuario adiciona o filtro B sem remover o filtro A\n    Then a lista e os KPIs refletem a INTERSECAO de A e B\n      And nenhuma recarga manual do artefato e necessaria\n      And o resumo dos filtros ativos exibe A e B\n\n  Scenario: Combinacao de filtros sem resultado\n    Given uma combinacao de filtros sem nenhum lead correspondente\n    When a lista e renderizada\n    Then o estado vazio e explicito, com resumo dos filtros ativos e acao de limpar\n      And nenhum KPI exibe zero sem contexto\n\n  Scenario: Navegar de campanha para leads e oportunidades\n    Given uma campanha com leads originados e oportunidades resultantes\n    When o usuario navega a partir da campanha\n    Then chega aos leads originados e as oportunidades resultantes sem sair da superficie\n      And a metrica de cobertura de atribuicao da campanha e exibida junto\n\n  Scenario: Voltar da oportunidade ao lead de origem\n    Given uma oportunidade cujo Account tem lead convertido associado\n    When o usuario navega a partir da oportunidade\n    Then chega ao lead/conta de origem pelo vinculo ConvertedAccountId\n\n  Scenario: Oportunidade sem origem rastreavel\n    Given uma oportunidade cujo Account nao tem lead convertido associado\n    When o usuario tenta navegar para a origem\n    Then o motivo do vinculo nao calculavel e exibido explicitamente\n      And a oportunidade permanece na base e nos totais, contabilizada na cobertura de atribuicao\n```\n\n> **FR-13 e FR-14 são verificados por artefato, não por teste executável:** FR-13/AC-13.1/AC-13.2 pela existência de §3.6 com as cinco perspectivas e o comparativo de custo/esforço; FR-14/AC-14.1/AC-14.2 pela existência dos artefatos versionados em `docs/stories/epic-crm-lead-intelligence/spec/` e por este próprio ciclo de Critique. Declarado aqui para que a ausência em §6.1-§6.3 seja leitura deliberada, não lacuna.\n\n```gherkin\nFeature: Integridade e frescor dos dados (FR-8, NFR-1, NFR-4)"
+    },
+    {
+      "issueId": "CRIT-3",
+      "location": "spec.md#6.4 (item novo para AC-6.2)",
+      "original": "- [ ] Componentes `kpi-grid`, `funil2`, `badge`, `mono`, `t-name` reutilizados; nenhum equivalente mais simples introduzido em paralelo (NFR-5).",
+      "suggested": "- [ ] Componentes `kpi-grid`, `funil2`, `badge`, `mono`, `t-name` reutilizados; nenhum equivalente mais simples introduzido em paralelo (NFR-5).\n- [ ] **AC-6.2:** com uma jornada longa (lead com muitos eventos), a leitura **não** depende de contêiner modal com rolagem confinada — a ficha é superfície própria com progressive disclosure (P-UI-2/P-UI-3)."
+    },
+    {
+      "issueId": "CRIT-5",
+      "location": "spec.md#2.3 (após CON-14)",
+      "original": "- **CON-14** (technical, amendment 2) — Cloudflare Access e Origin Rules **exigem hostname proxiado em zona ativa da conta Cloudflare**. Isso torna \"conta Cloudflare com zona ativa\" um pré-requisito operacional de fase 1 que não existia em nenhum artefato anterior.",
+      "suggested": "- **CON-14** (technical, amendment 2) — Cloudflare Access e Origin Rules **exigem hostname proxiado em zona ativa da conta Cloudflare**. Isso torna \"conta Cloudflare com zona ativa\" um pré-requisito operacional de fase 1 que não existia em nenhum artefato anterior.\n- **CON-15** (technical, `resolvedOpenQuestions2026_09_04_rodada2.OQ-4`) — **Os dados residem no Brasil.** O projeto Neon é provisionado em **São Paulo (`aws-sa-east-1`)**. Não é preferência: é decisão do usuário de 2026-09-04 e, por R15, **irreversível na prática** (trocar depois exige recriar o projeto e recarregar tudo). Consequência: a região é verificada **na tela de criação** antes de qualquer carga, e a disponibilidade da *seleção* de região no plano Free permanece declarada como não confirmada (§4.1, §4.4)."
+    },
+    {
+      "issueId": "CRIT-5",
+      "location": "spec.md#3.2 (célula de justificativa de D2)",
+      "original": "| D2 | **Neon Free** como banco consolidado | amendment 1: sob custo zero a comparação relevante é Neon Free vs Supabase Free; Neon ganha por retomada automática do compute (wake 300–500 ms) contra pausa por inatividade com reativação manual, por `pg_trgm`/`fuzzystrmatch` via `CREATE EXTENSION` e por 100 projetos vs 2 ativos |",
+      "suggested": "| D2 | **Neon Free** como banco consolidado, **provisionado em São Paulo (`aws-sa-east-1`)** | amendment 1: sob custo zero a comparação relevante é Neon Free vs Supabase Free; Neon ganha por retomada automática do compute (wake 300–500 ms) contra pausa por inatividade com reativação manual, por `pg_trgm`/`fuzzystrmatch` via `CREATE EXTENSION` e por 100 projetos vs 2 ativos. **Região = CON-15** (OQ-4 resolvido em 2026-09-04: dados no Brasil), decisão irreversível na prática (R15), a conferir na tela de criação do projeto |"
+    },
+    {
+      "issueId": "CRIT-5",
+      "location": "spec.md#3.1 (parágrafo de custo, imediatamente após o diagrama)",
+      "original": "**Custo recorrente: USD 0,00/mês** — Neon Free, Cloudflare Free (DNS/proxy/SSL/Access/Rules), n8n já em produção sem custo incremental, GitHub Pages já em uso (amendment 1 `estimatedRecurringCost`; amendment 2 `newDependencies.costEvidence`).",
+      "suggested": "**Custo recorrente: USD 0,00/mês** — Neon Free, Cloudflare Free (DNS/proxy/SSL/Access/Rules), n8n já em produção sem custo incremental, GitHub Pages já em uso (amendment 1 `estimatedRecurringCost`; amendment 2 `newDependencies.costEvidence`).\n\n**Região dos dados: Brasil — Neon em São Paulo (`aws-sa-east-1`)** (CON-15, OQ-4 resolvido em 2026-09-04). A camada `NEON FREE` do diagrama acima é sempre a de São Paulo: a região é escolhida no provisionamento e, por R15, é irreversível na prática."
+    },
+    {
+      "issueId": "CRIT-5",
+      "location": "spec.md#2.2 (célula de métrica de NFR-3)",
+      "original": "**Fase 2:** permissões diferenciadas por perfil (marketing/comercial/direção) implementadas. Política detalhada de tratamento de PII pendente — OQ-8",
+      "suggested": "**Fase 2:** permissões diferenciadas por perfil (marketing/comercial/direção) implementadas. Política detalhada de tratamento de PII pendente — OQ-8. **Escopo do gate da fase 1 fechado por OQ-14 (2026-09-04):** o gate é **binário** — quem entra vê tudo, inclusive telefone e MRR — e o usuário aceitou isso **sem restrição adicional**; nenhum dado é mascarado ou retirado da fase 1, e a sobre-exposição interna fica registrada como **risco aceito** (R10), não como bloqueio (§3.4, §3.8)"
+    },
+    {
+      "issueId": "CRIT-6",
+      "location": "spec.md#8.2 (nota de procedência antes da tabela de perguntas abertas)",
+      "original": "### 8.2 Perguntas ainda abertas",
+      "suggested": "### 8.2 Perguntas ainda abertas\n\n> **Procedência dos IDs (rastreabilidade bidirecional, AC-14.2).** **Herdados de `requirements.json.openQuestions`:** OQ-2, OQ-8, OQ-10, OQ-11. **Criados neste spec a partir de artefato de pesquisa, e ainda NÃO backportados para `requirements.json`:** OQ-4-RESIDUAL (fatia operacional de OQ-4 herdada de `research-amendment-2.json`, PR-1/UC-6), OQ-12 (← `research.json.attributionModelProposal.taxonomy.level1_segmento.mapping.PENDENTE_DE_DECISAO_DO_USUARIO['Parceiro/Indicacao']`, que já recomenda perguntar ao usuário), OQ-13 (← `validationPlan` V3 + rationale de S5), OQ-15 (← `research-amendment-2.json` PR-1, recomendação de hostname), OQ-16 (← plano B do `research-amendment-2.json`). O mesmo vale para **CON-10..CON-15**, criadas a partir dos amendments. **Ação para o @po/@pm antes do Plan:** backportar esses IDs para `requirements.json`, para que a fonte de verdade declarada em §0 volte a conter o conjunto completo."
+    },
+    {
+      "issueId": "CRIT-7",
+      "location": "spec.md#3.3 (P-UI-1)",
+      "original": "- **P-UI-1 — Estado de view, filtro e ficha na URL via History API nativa.** FR-6/AC-6.1 e FR-1/AC-1.2 passam a ser responsabilidade de `history.pushState` + parsing de query string/hash no próprio `index.html`.",
+      "suggested": "- **P-UI-1 — Estado de view, filtro e ficha na URL via History API nativa, em query string ou hash — nunca em segmentos de caminho.** FR-6/AC-6.1 e FR-1/AC-1.2 passam a ser responsabilidade de `history.pushState` + parsing de query string/hash no próprio `index.html`. **Restrição de viabilidade (CON-12 + GitHub Pages):** hospedagem estática sem rewrite não serve caminhos arbitrários — uma URL como `/leads/123` retorna 404 no carregamento direto e no refresh, o que quebraria justamente o \"endereçável e retomável\" de AC-6.1. Path routing só volta com o lado servidor da fase 2 (§3.8); a notação `/leads/[id]` que aparece em §3.7 passo 3 é **citação da proposta original** do `research.json`, não a forma da URL da fase 1."
+    },
+    {
+      "issueId": "CRIT-7",
+      "location": "spec.md#3.7 (coluna 'Estado após precedência' do passo 3)",
+      "original": "**Alterado pelo amendment 2:** não nasce uma app Next.js separada. A view evolui **dentro do mesmo artefato vanilla**, trocando array estático por `fetch('/api/…')` e passando a refletir estado na URL via History API",
+      "suggested": "**Alterado pelo amendment 2:** não nasce uma app Next.js separada, e **a notação `/leads/[id]` da coluna anterior não é a forma da URL da fase 1** — é citação da proposta original. A view evolui **dentro do mesmo artefato vanilla**, trocando array estático por `fetch('/api/…')` e passando a refletir estado na URL via History API **em query string ou hash** (P-UI-1), porque hospedagem estática não serve caminhos arbitrários"
+    },
+    {
+      "issueId": "CRIT-8",
+      "location": "spec.md#4.4 (lista de claims adicionais needs_validation)",
+      "original": "- **Paridade entre o MCP RD Station em uso e os endpoints REST públicos** — comparar a saída do MCP com o REST para um contato conhecido, no spike de ingestão.",
+      "suggested": "- **Paridade entre o MCP RD Station em uso e os endpoints REST públicos** — comparar a saída do MCP com o REST para um contato conhecido, no spike de ingestão (item explícito de §9 Fase 0).\n- **UC-8 — variáveis `N8N_CORS_ENABLED` e `N8N_CORS_ALLOW_ORIGIN` existem e controlam CORS globalmente na instância** (`research-amendment-2.json`, action `needs_validation`): a informação vem de comunidade/terceiros, não da referência oficial de variáveis de ambiente do n8n. **Recomendação independente da validação: NÃO alterar configuração global de CORS** de uma instância que roda workflows de produção — o desenho same-origin (D9) tira o CORS do caminho crítico e a configuração por nó (`Allowed Origins` com **uma** origem) resolve o caso sem tocar em variável global. Impacto se falso: BAIXO no desenho, ALTO no blast radius se a configuração global for alterada às cegas."
+    },
+    {
+      "issueId": "CRIT-9",
+      "location": "spec.md#3.5 (frase de diagnóstico da regra atual)",
+      "original": "Seis defeitos: **D1** Comercial é bucket residual; **D2** booleano binário sem terceiro estado; **D3** sinal implícito e não auditável (depende do efeito colateral de `standardizeCampanha`); **D4** sem hierarquia (`||` sem precedência declarada); **D5** o Ad ID do Meta — o sinal de plataforma mais forte disponível — não participa da classificação; **D6** sem imutabilidade de first-touch",
+      "suggested": "Seis defeitos (numerados **DEF-*** para não colidir com as decisões D1-D14 de §3.2): **DEF-1** Comercial é bucket residual; **DEF-2** booleano binário sem terceiro estado; **DEF-3** sinal implícito e não auditável (depende do efeito colateral de `standardizeCampanha`); **DEF-4** sem hierarquia (`||` sem precedência declarada); **DEF-5** o Ad ID do Meta — o sinal de plataforma mais forte disponível — não participa da classificação; **DEF-6** sem imutabilidade de first-touch"
+    },
+    {
+      "issueId": "CRIT-9",
+      "location": "spec.md#6.1 (duas células de trace que citam os defeitos)",
+      "original": "| I3 — first-touch gravado uma vez, nunca sobrescrito por reingestão | FR-5 (defeito D6), P5 | P0 |",
+      "suggested": "| I3 — first-touch gravado uma vez, nunca sobrescrito por reingestão | FR-5 (DEF-6), princípio P5 de §3.5 | P0 |"
+    },
+    {
+      "issueId": "CRIT-9",
+      "location": "spec.md#6.1 (célula de trace da precedência de sinais)",
+      "original": "| Precedência dos sinais S1→S6 é estritamente ordenada (first-match-wins), não `OU` | FR-5 (defeito D4) | P0 |",
+      "suggested": "| Precedência dos sinais S1→S6 é estritamente ordenada (first-match-wins), não `OU` | FR-5 (DEF-4) | P0 |"
+    },
+    {
+      "issueId": "CRIT-10",
+      "location": "spec.md#1.1",
+      "original": "16 views, sem backend e sem banco",
+      "suggested": "15 views, sem backend e sem banco"
+    },
+    {
+      "issueId": "CRIT-10",
+      "location": "spec.md#4.2",
+      "original": "142 funções, 16 views (`view-overview`",
+      "suggested": "142 funções, **15** views — `complexity.json` escreve \"16\" e lista 15; verificado no repositório que existem 15 `id=\"view-*\"` — (`view-overview`"
+    },
+    {
+      "issueId": "CRIT-12",
+      "location": "spec.md#5.1 (linha de db/migrations)",
+      "original": "| `db/migrations/*.sql` | Schema versionado: entidades DM-1..DM-12, identity graph (`person`, `identity_edge`, `identity_candidate`), `lead_touchpoint`, `sync_state`, extensões e índices GIN/GiST. **Já com as colunas de escopo de M3** | FR-7, EC-7, D12, P-ING-1/2 |",
+      "suggested": "| `db/migrations/*.sql` | Schema versionado: entidades DM-1..DM-12, identity graph (`person`, `identity_edge`, `identity_candidate`), `lead_touchpoint`, `sync_state`, extensões e índices GIN/GiST. **Já com as colunas de escopo de M3** e com a **tabela de eventos de jornada particionada por período** (mitigação de R8: particionar depois de carregar dados é migração — mesmo argumento de D12) | FR-7, EC-7, D12, P-ING-1/2, R8 |"
+    },
+    {
+      "issueId": "CRIT-12",
+      "location": "spec.md#9 (Fase 1a, item de migrations)",
+      "original": "- [ ] Escrever migrations do schema: DM-1..DM-12, `person`/`identity_edge`/`identity_candidate`, `lead_touchpoint`, `sync_state`, extensões e índices GIN/GiST",
+      "suggested": "- [ ] Escrever migrations do schema: DM-1..DM-12, `person`/`identity_edge`/`identity_candidate`, `lead_touchpoint`, `sync_state`, extensões e índices GIN/GiST — com a **tabela de eventos de jornada (DM-10) particionada por período** desde a primeira migration (R8; particionar após a carga é migração de dados). Sem fixar política numérica de purga, que segue dependente de OQ-8"
+    }
+  ],
+
+  "handoff": {
+    "next_agent": "@pm",
+    "next_command": "*write-spec epic-crm-lead-intelligence --revise",
+    "condition": "Critique verdict is NEEDS_REVISION",
+    "then": "critique_2 (@qa) antes da Fase 6 (plan/@architect), conforme complexity.json.pipelinePhases",
+    "doNotSkip": "Fase 5b (revise) e critique_2 são obrigatórias para COMPLEX; a Fase 6 (plan) não deve ser iniciada com este critique aberto"
+  }
+}

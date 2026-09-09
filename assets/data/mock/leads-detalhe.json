@@ -1,0 +1,573 @@
+{
+  "real-mkt-01": {
+    "overview": {
+      "nome": "Camila R.",
+      "empresa": "Estoque Ágil Comércio",
+      "email": "camila.r@estoqueagil-exemplo.com.br",
+      "telefone": "+55 11 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Paid Search",
+        "detalhe": "Google Ads",
+        "campanha_bruta": "Busca Paga | Google",
+        "sinal_id": "S3",
+        "sinal_nome": "LeadSource reconhecido como canal de campanha",
+        "confianca": "media-alta",
+        "razao_legivel": "Classificado como Marketing porque a origem do lead no Salesforce está registrada como \"Busca Paga | Google\" — canal de mídia paga identificável, ainda que sem Ad ID individual associado.",
+        "campo_origem_bruto": "Busca Paga | Google",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-09-02T18:05:24-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada como Busca Paga | Google",
+        "idade_dado_declarada": null
+      },
+      {
+        "tipo": "criacao_oportunidade",
+        "timestamp": "2026-09-02T18:05:36-03:00",
+        "fonte": "salesforce",
+        "titulo": "Oportunidade criada",
+        "descricao": "Estágio inicial: Avaliação",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": { "id": "acc-real-mkt-01", "nome": "Estoque Ágil Comércio" },
+      "oportunidade": { "id": "opp-real-mkt-01", "mrr": 90, "estagio": "Avaliação", "valor_contrato": null },
+      "cadeia_campanha": null
+    }
+  },
+
+  "real-mkt-02": {
+    "overview": {
+      "nome": "Rafael M.",
+      "empresa": "Mundo Tech Consultoria",
+      "email": "rafael.m@mundotech-exemplo.com.br",
+      "telefone": "+55 21 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Evento/Webinar",
+        "detalhe": "Startup Summit 2026",
+        "campanha_bruta": "Startup Summit 2026",
+        "sinal_id": "S3",
+        "sinal_nome": "LeadSource reconhecido como evento de marketing",
+        "confianca": "media-alta",
+        "razao_legivel": "Classificado como Marketing porque a origem do lead está registrada como \"Startup Summit 2026\" — evento de aquisição identificável no LeadSource.",
+        "campo_origem_bruto": "Startup Summit 2026",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-09-07T13:52:45-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada como Startup Summit 2026",
+        "idade_dado_declarada": null
+      },
+      {
+        "tipo": "criacao_oportunidade",
+        "timestamp": "2026-09-07T13:53:19-03:00",
+        "fonte": "salesforce",
+        "titulo": "Oportunidade criada",
+        "descricao": "Estágio inicial: Discovery",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": { "id": "acc-real-mkt-02", "nome": "Mundo Tech Consultoria" },
+      "oportunidade": { "id": "opp-real-mkt-02", "mrr": 19500, "estagio": "Discovery", "valor_contrato": null },
+      "cadeia_campanha": null
+    }
+  },
+
+  "real-mkt-03": {
+    "overview": {
+      "nome": "Diego S.",
+      "empresa": "RM Serviços de TI",
+      "email": "diego.s@rmservicos-exemplo.com.br",
+      "telefone": "+55 31 9XXXX-XXXX",
+      "responsavel": null,
+      "estagio_funil": "Aberto",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Campanha (canal a resolver)",
+        "detalhe": null,
+        "campanha_bruta": "LOGMEIN_RESCUE-LICENCA-ECO_09_26_",
+        "sinal_id": "S3",
+        "sinal_nome": "LeadSource reconhecido como código de campanha",
+        "confianca": "media-alta",
+        "razao_legivel": "Classificado como Marketing porque o LeadSource bate com um código de campanha reconhecido (\"LOGMEIN_RESCUE-LICENCA-ECO_09_26_\"). O canal exato (Meta, Google ou LinkedIn) ainda não está mapeado — entra na fila de revisão mensal, honesto em vez de um chute.",
+        "campo_origem_bruto": "LOGMEIN_RESCUE-LICENCA-ECO_09_26_",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-09-06T15:39:50-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada como LOGMEIN_RESCUE-LICENCA-ECO_09_26_",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "real-mkt-04": {
+    "overview": {
+      "nome": "Priscila A.",
+      "empresa": "Pro Soluções Cloud",
+      "email": "priscila.a@prosolucoes-exemplo.com.br",
+      "telefone": "+55 41 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Inbound Web",
+        "detalhe": null,
+        "campanha_bruta": null,
+        "sinal_id": "S4",
+        "sinal_nome": "Conversão em ativo de captura (LeadSource = Inbound)",
+        "confianca": "alta",
+        "razao_legivel": "Classificado como Marketing porque a origem está registrada como \"Inbound\" — o lead chegou por iniciativa própria via canal web da empresa, sem prospecção ativa.",
+        "campo_origem_bruto": "Inbound",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-09-04T18:49:11-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada como Inbound",
+        "idade_dado_declarada": null
+      },
+      {
+        "tipo": "criacao_oportunidade",
+        "timestamp": "2026-09-04T18:50:00-03:00",
+        "fonte": "salesforce",
+        "titulo": "Oportunidade criada",
+        "descricao": "Estágio inicial: Proposta Enviada",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": { "id": "acc-real-mkt-04", "nome": "Pro Soluções Cloud" },
+      "oportunidade": { "id": "opp-real-mkt-04", "mrr": 923, "estagio": "Proposta Enviada", "valor_contrato": null },
+      "cadeia_campanha": null
+    }
+  },
+
+  "real-mkt-05": {
+    "overview": {
+      "nome": "Vitor L.",
+      "empresa": "Atmacom Sistemas",
+      "email": "vitor.l@atmacom-exemplo.com.br",
+      "telefone": "+55 85 9XXXX-XXXX",
+      "responsavel": null,
+      "estagio_funil": "Contato dia 1",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Campanha (canal a resolver)",
+        "detalhe": null,
+        "campanha_bruta": "LOGMEIN_RESCUE-LICENCA-ECO_09_26_",
+        "sinal_id": "S3",
+        "sinal_nome": "LeadSource reconhecido como código de campanha",
+        "confianca": "media-alta",
+        "razao_legivel": "Mesmo código de campanha do lead real-mkt-03 — mostra que o mesmo sinal se repete de forma consistente entre leads diferentes da mesma campanha.",
+        "campo_origem_bruto": "LOGMEIN_RESCUE-LICENCA-ECO_09_26_",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-09-03T14:38:50-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada como LOGMEIN_RESCUE-LICENCA-ECO_09_26_",
+        "idade_dado_declarada": null
+      },
+      {
+        "tipo": "mudanca_estagio",
+        "timestamp": "2026-09-04T09:00:00-03:00",
+        "fonte": "salesforce",
+        "titulo": "Primeiro contato realizado",
+        "descricao": "Status avançou para Contato dia 1",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "real-com-01": {
+    "overview": {
+      "nome": "Eduardo F.",
+      "empresa": "Setor Energético Sul",
+      "email": null,
+      "telefone": "+55 61 9XXXX-XXXX",
+      "responsavel": null,
+      "estagio_funil": "Rejeitado",
+      "atribuicao": {
+        "segmento": "comercial",
+        "categoria": "Outbound SDR/Vendas",
+        "detalhe": "Prospecção ativa (lista de enriquecimento)",
+        "campanha_bruta": null,
+        "sinal_id": "S5",
+        "sinal_nome": "Vocabulário controlado de outbound",
+        "confianca": "media",
+        "razao_legivel": "Classificado como Comercial — único caminho possível: a origem é uma ferramenta de prospecção ativa por lista (Apollo.io), sem nenhum sinal de marketing associado.",
+        "campo_origem_bruto": "Apollo.Io",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-28T13:39:10-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado por prospecção ativa",
+        "descricao": "Origem registrada como Apollo.Io",
+        "idade_dado_declarada": null
+      },
+      {
+        "tipo": "mudanca_estagio",
+        "timestamp": "2026-08-29T10:00:00-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead rejeitado",
+        "descricao": "Sem resposta após tentativas de contato",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "real-na-01": {
+    "overview": {
+      "nome": "Bruna K.",
+      "empresa": "Escritório Jurídico Beta",
+      "email": "bruna.k@escritoriobeta-exemplo.com.br",
+      "telefone": "+55 71 9XXXX-XXXX",
+      "responsavel": null,
+      "estagio_funil": "Aberto",
+      "atribuicao": {
+        "segmento": "nao_atribuido",
+        "categoria": "Outro (requer nota)",
+        "detalhe": null,
+        "campanha_bruta": "GoTo",
+        "sinal_id": "S6",
+        "sinal_nome": "Ausência de sinal suficiente",
+        "confianca": "n/a",
+        "razao_legivel": "Classificado como Não atribuído — o LeadSource registrado é apenas \"GoTo\" (nome de linha de produto, não um canal ou campanha rastreável), sem Ad ID, sem e-mail correspondido e sem vocabulário de prospecção. ACHADO REAL: hoje esse tipo de lead provavelmente cairia em Comercial por padrão (bug relatado) — aqui fica honesto que a origem é desconhecida.",
+        "campo_origem_bruto": "GoTo",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-09-04T12:10:43-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada apenas como \"GoTo\", sem detalhe de canal",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "seed-prov-01": {
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Par de identidade PROVÁVEL com seed-prov-02.",
+    "overview": {
+      "nome": "Joao Pereira Lima",
+      "empresa": "Nortec Sistemas",
+      "email": "joao.lima@nortec-exemplo.com.br",
+      "telefone": "+55 51 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Paid Social",
+        "detalhe": "Meta Ads",
+        "campanha_bruta": "CAMPANHA_SEED_META_2026",
+        "sinal_id": "S1",
+        "sinal_nome": "Ad ID de plataforma presente",
+        "confianca": "alta",
+        "razao_legivel": "Classificado como Marketing porque o Ad ID de anúncio veio preenchido na origem (Salesforce).",
+        "campo_origem_bruto": "seed-ad-id-778142",
+        "ruleset_version": null
+      },
+      "vinculo_identidade": {
+        "status": "provavel",
+        "candidato_id": "seed-prov-02",
+        "score_similaridade": 0.78,
+        "explicacao": "Nome (\"Joao Pereira Lima\" vs \"João P. Lima\") e empresa (\"Nortec Sistemas\") batem por similaridade de trigrama (Tier 2, pg_trgm), mas não há e-mail nem telefone em comum entre os dois registros — não é um match determinístico (Tier 1), por isso o vínculo fica como candidato, nunca mesclado automaticamente."
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-20T10:00:00-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada com Ad ID de anúncio Meta",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": ["Campanha Seed Meta", "Conjunto Seed", "Anúncio Seed"]
+    }
+  },
+
+  "seed-prov-02": {
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Par de identidade PROVÁVEL com seed-prov-01.",
+    "overview": {
+      "nome": "João P. Lima",
+      "empresa": "Nortec Sistemas",
+      "email": "jp.lima@outrodominio-exemplo.com",
+      "telefone": "+55 51 9XXXX-XXXX",
+      "responsavel": null,
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Inbound Web",
+        "detalhe": "Formulário de contato",
+        "campanha_bruta": null,
+        "sinal_id": "S4",
+        "sinal_nome": "Conversão em ativo de captura",
+        "confianca": "alta",
+        "razao_legivel": "Classificado como Marketing por conversão em formulário próprio, registrada no RD Station.",
+        "campo_origem_bruto": null,
+        "ruleset_version": null
+      },
+      "vinculo_identidade": {
+        "status": "provavel",
+        "candidato_id": "seed-prov-01",
+        "score_similaridade": 0.78,
+        "explicacao": "Ver explicação em seed-prov-01 — mesmo par, mesma pontuação, direção inversa."
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-21T09:30:00-03:00",
+        "fonte": "rd_station",
+        "titulo": "Conversão em formulário",
+        "descricao": "Formulário de contato do site",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "seed-conf-01": {
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. CONFLITO de identidade com seed-conf-02.",
+    "overview": {
+      "nome": "Marcos Vinicius Tavares",
+      "empresa": "Grupo Fictício Alfa",
+      "email": "contato@grupoalfa-exemplo.com.br",
+      "telefone": "+55 11 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Contato dia 1",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Paid Search",
+        "detalhe": "Google Ads",
+        "campanha_bruta": "Busca Paga | Google",
+        "sinal_id": "S3",
+        "sinal_nome": "LeadSource reconhecido como canal de campanha",
+        "confianca": "media-alta",
+        "razao_legivel": "Classificado como Marketing pela origem \"Busca Paga | Google\".",
+        "campo_origem_bruto": "Busca Paga | Google",
+        "ruleset_version": null
+      },
+      "vinculo_identidade": {
+        "status": "conflito",
+        "candidato_id": "seed-conf-02",
+        "score_similaridade": 0.41,
+        "explicacao": "E-mail idêntico ao de seed-conf-02 (endereço corporativo genérico, usado por mais de uma pessoa na mesma empresa), mas nome e telefone divergem o suficiente para não confirmar que é a mesma pessoa. Fica em identity_candidate com status 'conflito' — nunca mesclado automaticamente, precisa de revisão humana (EC-7)."
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-22T11:15:00-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "Origem registrada como Busca Paga | Google",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "seed-conf-02": {
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. CONFLITO de identidade com seed-conf-01.",
+    "overview": {
+      "nome": "M. Tavares",
+      "empresa": "Grupo Fictício Alfa",
+      "email": "contato@grupoalfa-exemplo.com.br",
+      "telefone": "+55 21 9XXXX-XXXX",
+      "responsavel": null,
+      "estagio_funil": "Aberto",
+      "atribuicao": {
+        "segmento": "nao_atribuido",
+        "categoria": "Direto/Desconhecido",
+        "detalhe": null,
+        "campanha_bruta": null,
+        "sinal_id": "S6",
+        "sinal_nome": "Ausência de sinal de origem",
+        "confianca": "n/a",
+        "razao_legivel": "Classificado como Não atribuído — nenhum sinal de origem rastreável neste registro específico.",
+        "campo_origem_bruto": null,
+        "ruleset_version": null
+      },
+      "vinculo_identidade": {
+        "status": "conflito",
+        "candidato_id": "seed-conf-01",
+        "score_similaridade": 0.41,
+        "explicacao": "Ver explicação em seed-conf-01 — mesmo par em conflito, direção inversa. Nota de caso real: os dois lados de um conflito podem ter classificações de origem DIFERENTES (aqui, Marketing e Não atribuído) — resolver a identidade não decide a atribuição por si só."
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-23T16:40:00-03:00",
+        "fonte": "rd_station",
+        "titulo": "Lead criado",
+        "descricao": "Sem origem rastreável",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  },
+
+  "seed-s2-01": {
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Fecha a cobertura do sinal S2.",
+    "overview": {
+      "nome": "Patrícia G.",
+      "empresa": "Serviços Fictícios Ômega",
+      "email": "patricia.g@omega-exemplo.com.br",
+      "telefone": "+55 71 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Paid Social",
+        "detalhe": "Meta Ads",
+        "campanha_bruta": "seed-campanha-central-leads",
+        "sinal_id": "S2",
+        "sinal_nome": "E-mail bate com registro da Central de Leads",
+        "confianca": "alta",
+        "razao_legivel": "Classificado como Marketing porque o e-mail normalizado bate com um registro já rastreado na Central de Leads (automação de anúncios), mesmo com o LeadSource digitado no CRM divergente.",
+        "campo_origem_bruto": "Indicação Interna",
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-18T09:00:00-03:00",
+        "fonte": "salesforce",
+        "titulo": "Lead criado",
+        "descricao": "LeadSource digitado divergia da origem rastreada; e-mail confirmou o match",
+        "idade_dado_declarada": null
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": ["Campanha Seed Central de Leads", "Conjunto Seed", "Anúncio Seed"]
+    }
+  },
+
+  "seed-src-01": {
+    "_seed_nota": "SEMEADO (subtask 0.4) — não é registro real. Testa EC-8/P-UI-6: fonte indisponível na última coleta.",
+    "overview": {
+      "nome": "Fernanda B.",
+      "empresa": "Comércio Fictício Delta",
+      "email": "fernanda.b@delta-exemplo.com.br",
+      "telefone": "+55 27 9XXXX-XXXX",
+      "responsavel": "Time Comercial",
+      "estagio_funil": "Qualificado",
+      "atribuicao": {
+        "segmento": "marketing",
+        "categoria": "Inbound Web",
+        "detalhe": null,
+        "campanha_bruta": null,
+        "sinal_id": "S4",
+        "sinal_nome": "Conversão em ativo de captura",
+        "confianca": "alta",
+        "razao_legivel": "Classificado como Marketing por conversão em landing page do RD Station.",
+        "campo_origem_bruto": null,
+        "ruleset_version": null
+      }
+    },
+    "activity": [
+      {
+        "tipo": "conversao",
+        "timestamp": "2026-08-15T08:00:00-03:00",
+        "fonte": "rd_station",
+        "titulo": "Conversão em Landing Page",
+        "descricao": "Última conversão conhecida antes da falha de coleta",
+        "idade_dado_declarada": null
+      },
+      {
+        "tipo": "participacao_workflow",
+        "timestamp": null,
+        "fonte": "rd_station",
+        "titulo": "Fonte indisponível na última tentativa de coleta",
+        "descricao": "RD Station não respondeu na última execução de ingestão (EC-8). Último dado válido conhecido é o evento acima, de 2026-08-15.",
+        "idade_dado_declarada": "último dado válido: 23 dias atrás — NUNCA exibir como zero ou como ausência de atividade"
+      }
+    ],
+    "related": {
+      "conta": null,
+      "oportunidade": null,
+      "cadeia_campanha": null
+    }
+  }
+}

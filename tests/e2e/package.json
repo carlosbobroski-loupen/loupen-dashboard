@@ -1,0 +1,11 @@
+{
+  "name": "loupen-dashboard-e2e-dev-only",
+  "private": true,
+  "description": "Ferramenta de verificação SÓ para desenvolvimento (subtask 5.16). NUNCA referenciado por index.html/assets/js — o artefato servido não depende disto (CON-12). node_modules deste diretório é gitignored (regra global node_modules/ do .gitignore da raiz).",
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  },
+  "scripts": {
+    "test": "playwright test --config playwright.config.js"
+  }
+}

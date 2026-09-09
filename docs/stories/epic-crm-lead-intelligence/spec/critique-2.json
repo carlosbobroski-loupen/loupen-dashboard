@@ -1,0 +1,262 @@
+{
+  "storyId": "epic-crm-lead-intelligence",
+  "critiquedAt": "2026-09-04T00:00:00Z",
+  "critiquedBy": "@qa",
+  "specVersion": 2,
+  "critiqueRound": "critique_2",
+  "previousCritique": "critique.json",
+
+  "verdict": "NEEDS_REVISION",
+  "verdictReason": "A iteração 2 é uma revisão de alta qualidade: 20 dos 21 autoFixes de critique_1 foram aplicados LITERALMENTE (verificado texto a texto, não pela tabela de auto-auditoria do @pm), o 21º tem estado final correto, e os dois issues não-autoFixáveis foram fechados de forma defensável — CRIT-4 com decisão do orquestrador humano-em-loop (motor de atribuição e regras de receita como função/view SQL versionada em db/migrations/*.sql; os 9 testes P0 como asserções SQL em db/queries/verificacao/*.sql) e CRIT-11 delegado ao provisionamento sem inventar versão. A resolução de CRIT-4 SE SUSTENTA sob nova inspeção em 4 das 5 seções que ela toca (§5.1, §6.1, §7 R14, §9 Fase 1b) e a coluna nova 'Onde roda' de §6.1 é aplicada a TODOS os 15 testes unitários (14 SQL + 1 JS), não apenas aos 9 que motivaram a mudança. attribution.js ficou corretamente reduzido a camada de exibição, sem recálculo, sem reordenação de sinais e sem fallback no cliente. Média ponderada subiu de 4.08 para 4.40; zero HIGH; nenhum check falhou por inteiro; 16 de 21 checks agora PASS contra 13 antes. O veredito NÃO é APPROVED por UM issue MEDIUM, e é justamente uma referência órfã do tipo que esta rodada foi encarregada de caçar: §3.5 ('Confirmação de estabilidade', o penúltimo parágrafo da seção do modelo de atribuição) continua afirmando que os seis sinais 'não têm dependência de banco' e que 'o único ponto de contato com o banco é a resolução de identidade (EC-7)'. Ambas as afirmações foram superseididas pela própria decisão de CRIT-4 — o banco deixou de ser ponto de contato e passou a ser o DOMICÍLIO da regra. Agravante de processo, e é a segunda vez que a auto-auditoria deste documento afirma mais do que verificou: a seção 'Auto-checagem de contradição introduzida' (§Constitutional Gate) declara explicitamente que §3.5 'permanece verdadeiro' — checou a frase 'sinais avaliados UMA VEZ na ingestão' e não varreu o resto da seção. Materialidade: §3.5 é a seção que o @architect obrigatoriamente lê para planejar FR-5 (R11, risk 5/5, 'erro silencioso corrompe decisão de investimento sem sinal visível'); ler ali que a regra não depende do banco reverte a resolução de CRIT-4 e reabre a lacuna CRÍTICA de R14. Mais 3 issues LOW, todos com autoFix literal. Nenhum dos 4 issues exige nova decisão de produto, de stack ou de escopo: são 5 edições de texto localizadas.",
+
+  "verdictRuleResolution": "[AUTO-DECISION] Sobreposição de regras novamente presente (APPROVED: 0 HIGH + média 4.40 >= 4.0 + todas as dimensões >= 3 → satisfeito; NEEDS_REVISION: 'Has MEDIUM severity issues' → também satisfeito) → escolhido NEEDS_REVISION (razão: a semântica de APPROVED é 'spec ready for implementation', e um parágrafo que contradiz o domicílio da lógica mais crítica da epic, dentro da seção que o implementador de FR-5 lê primeiro, não está pronto para ir ao Plan). ATENÇÃO — este NEEDS_REVISION NÃO significa repetir a Fase 5b inteira: complexity.json.pipelinePhases não prevê critique_3, e criar uma fase seria invenção de processo. [AUTO-DECISION] Caminho de encerramento definido em closeoutPath: @pm aplica os 5 autoFixes literais como patch mecânico (iteração 2.1, zero decisões novas), @qa faz verificação DELTA (confirmar as 5 edições, sem re-crítica das 5 dimensões) e o épico segue para a Fase 6. Razão: proporcionalidade — o gate permanece bloqueante para o defeito, sem inflar 5 edições de texto em um ciclo completo de revise+critique."
+
+  ,
+  "closeoutPath": {
+    "step1": "@pm aplica os 5 autoFixes deste arquivo em spec.md (patch mecânico, iteração 2.1). Nenhum exige decisão do usuário, do @architect ou do orquestrador.",
+    "step2": "@qa executa verificação DELTA: confirmar que os 5 trechos foram substituídos e que nenhum novo texto contradiz §5.1/§6.1/§7 R14/§9. Não é uma critique_3 — é conferência de 5 diffs.",
+    "step3": "Fase 6 (plan / @architect) liberada após a verificação delta.",
+    "doNotDo": "Não reabrir a Fase 5b como revisão completa; não criar uma fase critique_3 em complexity.json.pipelinePhases; não iniciar a Fase 6 antes da verificação delta, porque o issue MEDIUM está exatamente na seção que o Plan de FR-5 consome."
+  },
+
+  "scores": {
+    "accuracy": 4.5,
+    "completeness": 4.5,
+    "consistency": 4,
+    "feasibility": 4.5,
+    "alignment": 4.5,
+    "average": 4.4
+  },
+
+  "scoreDelta": {
+    "accuracy": "4.5 → 4.5 (mantida)",
+    "completeness": "3.5 → 4.5 (maior ganho: CRIT-1, CRIT-3, CRIT-8, CRIT-11 e CRIT-12 fechados)",
+    "consistency": "4 → 4 (CRIT-5, CRIT-6, CRIT-7 e CRIT-9 fechados, mas a revisão introduziu uma contradição nova em §3.5)",
+    "feasibility": "4 → 4.5 (CRIT-4 fechado — era a maior lacuna de viabilidade)",
+    "alignment": "4.5 → 4.5 (mantida; o débito 'nenhum framework de teste nomeado' deixou de existir para os 14 testes SQL e virou decisão explícita do Plan para o resíduo JS)",
+    "average": "4.08 → 4.40"
+  },
+
+  "scoreRationale": {
+    "accuracy": "acc-1 PASS (14/14 FR em §2.1 e no checklist §9). acc-2 PARCIAL (um único desvio novo e pequeno: o cenário Gherkin de navegação de campanha, acrescentado pelo autoFix de CRIT-3, assere exibição da cobertura de atribuição no caminho FELIZ, enquanto INT-4 só a exige no estado empty — CRIT2-4). acc-3 PASS (P0/P1 preservados). acc-4 agora PASS (era PARCIAL): NFR-2 e NFR-6 ganharam verificação real em §6.4 — conferi os dois itens no documento, não a alegação do Constitutional Gate — e a linha falsa '7/7' foi substituída por '5/7 na versão 1.0; 7/7 após o patch', que é verdadeira (na v1 tinham verificação NFR-1, NFR-3, NFR-4, NFR-5 e NFR-7 = 5). A misatribuição de CRIT-2 foi corrigida com precisão: o cold start ficou como consequência aceita (confirmei o lastro literal em requirements.json.resolvedOpenQuestions2026_09_04_rodada2.OQ-5.impact) e o salto de rede extra foi reclassificado como derivação a medir. Contra a nota: a seção de auto-checagem introduziu uma nova afirmação inexata (declarar §3.5 consistente sem varrer a seção) — por isso a dimensão não sobe.",
+    "completeness": "comp-1 PASS. comp-2 agora PASS (era PARCIAL): as quatro lacunas de AC foram fechadas — AC-1.1 e AC-4.1/AC-4.2 com a feature Gherkin nova de §6.3 (conferida contra o texto literal de AC-1.1, AC-4.1, AC-4.2, INT-1 e INT-4 em requirements.json), AC-6.2 com item novo em §6.4, e FR-13/FR-14 declarados como verificados por artefato em vez de ausentes. comp-3 agora PASS (era PARCIAL): as três versões faltantes têm destino — major do Postgres no checklist de provisionamento §9 Fase 1a junto da região (mesma irreversibilidade por R15) SEM o spec escolher a versão, versão/edição da API do RD Station no inventário de limites de §9 Fase 0, e versão do n8n declaradamente aberta em §4.4; delegar é a resposta correta por Artigo IV, já que nenhum artefato de entrada fixa esses números. comp-4 PARCIAL (CRIT2-3: a descrição e o trace de db/queries/verificacao/*.sql em §5.1 cobrem 9 testes, mas §6.1 aloca 14 ali). comp-5 PASS (21 riscos; R14 deixou de ter mitigação vazia).",
+    "consistency": "con-1 agora PASS (era PARCIAL): a nota de procedência de §8.2 separa herdados (OQ-2, OQ-8, OQ-10, OQ-11) de criados no spec (OQ-4-RESIDUAL, OQ-12, OQ-13, OQ-15, OQ-16), CON-10..CON-15 estão rotuladas na abertura de §2.3 e o backport ficou como ação nomeada de @po/@pm no carryForward da Metadata. con-2 PASS. con-3 PASS. con-4 PARCIAL e é onde mora o único MEDIUM: as três colisões de critique_1 foram resolvidas — D1..D14 vs D1..D6 virou DEF-1..DEF-6 com as duas células de trace de §6.1 corrigidas e ZERO ocorrências remanescentes de 'defeito D'; '/leads/[id]' está explicitamente marcado como citação da proposta original em §3.7 e P-UI-1 proíbe segmentos de caminho; '16 views' não aparece mais em nenhum lugar do corpo do documento e o repositório confirma 15 (grep de id=\"view-*\" retorna 15). Mas a revisão INTRODUZIU uma contradição nova em §3.5 (CRIT2-1) e deixou um desalinhamento §5.1↔§6.1 (CRIT2-3).",
+    "feasibility": "feas-1 PASS (§4.1 mantém as ressalvas por dependência e §4.4 sequencia as validações; ganhou o bullet de UC-8 e o de latência de NFR-2). feas-2 PARCIAL, mas com o buraco principal FECHADO: CRIT-4 tinha esvaziado a mitigação do único risco Alta+CRÍTICO (R14) porque a suíte P0 não tinha domicílio executável; agora tem, e a solução é a de custo zero que o próprio critique_1 nomeou — asserções SQL in-repo contra função/view SQL versionada, sem runner, sem package.json, sem build step, portanto sem tensão com CON-12. Verifiquei a coerência em §5.1 (3 linhas + escopo residual de tests/**), §6.1 (coluna 'Onde roda' em todos os 15 testes), §7 R14 e §9 Fase 1b — as quatro consistentes. O resíduo é a asserção de I4 sem alvo persistido no schema (CRIT2-2). feas-3 PASS. feas-4 PASS.",
+    "alignment": "align-1 PARCIAL-favorável, inalterado e continua sendo o caso-livro de 'minor deviations with justification' (desvio do preset nextjs-react é decisão do usuário de 2026-09-04, registrado como DEFERRED com gatilho de retorno). align-2 PASS. align-3 PASS. align-4 PASS. Melhora relevante: o único débito de alignment de critique_1 ('nenhum framework de teste nomeado, embora a Testing Strategy do preset ativo o exija') deixou de existir para 14 dos 15 testes unitários, porque asserção SQL não precisa de framework, e para o 15º está declarado como decisão do Plan em vez de omissão."
+  },
+
+  "verifiedFixes": {
+    "method": "Verificação texto a texto contra os 21 autoFixes de critique.json e contra as duas resoluções não-autoFixáveis. NÃO usei a tabela de auto-auditoria do Constitutional Gate nem o revisionNote da Metadata como evidência — ambos foram tratados como alegações a conferir, e um deles (a auto-checagem de contradição) provou-se incompleto.",
+    "autoFixesApplied": "20 de 21 aplicados literalmente; 1 com estado final correto por outro caminho.",
+    "byIssue": [
+      {
+        "issue": "CRIT-1",
+        "status": "APLICADO (2/2)",
+        "evidence": "§6.4 ganhou os dois itens novos com o texto sugerido (NFR-2 medido com gate ativo, banco morno e após cold start; NFR-6 por revisão de schema). A linha do Constitutional Gate deixou de dizer '7/7' sem qualificação e agora diz '⚠️ 5/7 na versão 1.0; 7/7 após o patch do critique_1' — conferi que o 5/7 da v1 é aritmeticamente verdadeiro."
+      },
+      {
+        "issue": "CRIT-2",
+        "status": "APLICADO (2/2)",
+        "evidence": "§2.2 NFR-2 separa a consequência com lastro literal (cold start) da derivação não verificada (salto de rede), com a citação do caminho requirements.json correto. §4.4 ganhou o bullet de latência real do caminho /api/* com impacto MÉDIO-ALTO. Confirmei em requirements.json que OQ-5.impact menciona cold start e NÃO menciona o salto de rede — a reclassificação está certa."
+      },
+      {
+        "issue": "CRIT-3",
+        "status": "APLICADO (2/2)",
+        "evidence": "§6.3 tem a feature nova 'Filtragem combinável e navegação de relacionamentos (FR-1, FR-4)' com os 5 cenários, inserida antes da feature de integridade, e a nota de FR-13/FR-14 verificados por artefato está no lugar certo. §6.4 tem o item de AC-6.2. Conferi os cenários contra o texto literal de AC-1.1, AC-4.1, AC-4.2, INT-1 (estado empty) e INT-4 (estados error e empty) em requirements.json — fiéis, exceto o ponto de CRIT2-4."
+      },
+      {
+        "issue": "CRIT-4",
+        "status": "FECHADO — resolução sustenta-se em 4 das 5 seções; a 5ª é o MEDIUM desta rodada",
+        "evidence": "§5.1 (db/migrations como domicílio da regra; db/queries/verificacao como domicílio da suíte; attribution.js reduzido a exibição; tests/** com escopo residual declarado), §6.1 (coluna 'Onde roda' em 15/15 testes), §7 R14 (mitigação deixou de ser vazia) e §9 Fase 1b (motor e regras de receita como SQL versionado, V5 como asserções SQL) são internamente consistentes. Zero referência órfã a runner de JS ou package.json para os testes de atribuição/receita: as 3 menções a 'sem runner, sem package.json' aparecem exatamente onde devem (§5.1, §6.1 e §7 R14, sempre qualificando os testes SQL) e o único teste JS restante diz 'runner é decisão do Plan'. §3.5 é a exceção — ver CRIT2-1."
+      },
+      {
+        "issue": "CRIT-5",
+        "status": "APLICADO (4/4)",
+        "evidence": "CON-15 criada em §2.3 com rastreio a OQ-4; D2 em §3.2 menciona São Paulo/aws-sa-east-1 e a irreversibilidade por R15; §3.1 ganhou o parágrafo de região logo abaixo do diagrama; a métrica de NFR-3 em §2.2 ganhou o fechamento de escopo por OQ-14 com R10 como risco aceito."
+      },
+      {
+        "issue": "CRIT-6",
+        "status": "APLICADO (1/1)",
+        "evidence": "Nota de procedência presente na abertura de §8.2, com o caminho JSON exato de origem de cada ID criado, e o backport registrado como ação de @po/@pm no carryForward da Metadata. O cabeçalho de §2.3 também passou a dizer 'IDs criados neste spec, ainda não backportados'."
+      },
+      {
+        "issue": "CRIT-7",
+        "status": "APLICADO (2/2)",
+        "evidence": "P-UI-1 agora proíbe explicitamente segmentos de caminho, explica o 404 em carregamento direto/refresh em hospedagem estática e remete o path routing à fase 2. §3.7 passo 3 declara que '/leads/[id]' não é a forma da URL da fase 1. O lado que quebrava AC-6.1 deixou de ser o default."
+      },
+      {
+        "issue": "CRIT-8",
+        "status": "APLICADO (1/1 + item de checklist)",
+        "evidence": "§4.4 ganhou o bullet de UC-8 com a recomendação de não alterar CORS global de instância de produção, e o bullet de paridade MCP vs REST passou a apontar §9 Fase 0, onde o item de spike do RD Station existe de fato (conferido)."
+      },
+      {
+        "issue": "CRIT-9",
+        "status": "APLICADO (3/3)",
+        "evidence": "§3.5 usa DEF-1..DEF-6 com a justificativa da renomeação; §6.1 traz 'FR-5 (DEF-6)' e 'FR-5 (DEF-4)'; grep por 'defeito D' retorna zero. D1..D14 preservado para decisões."
+      },
+      {
+        "issue": "CRIT-10",
+        "status": "ESTADO FINAL CORRETO (1 aplicado literalmente, 1 divergência de relato sem consequência)",
+        "evidence": "§4.2 recebeu o texto sugerido, inclusive a sinalização da divergência com complexity.json. §1.1 diz '15 views'. O revisionNote do @pm afirma que o autoFix de §1.1 não foi aplicado porque §1.1 já dizia 15, enquanto critique_1 afirmava que '16 views' aparecia nos dois lugares — um dos dois relatos está errado, mas o estado final é verificadamente correto: grep de id=\"view-*\" em index.html retorna 15 e o corpo do spec não contém mais nenhum '16 views'. Sem issue."
+      },
+      {
+        "issue": "CRIT-11",
+        "status": "DELEGADO corretamente",
+        "evidence": "§9 Fase 1a tem o item de fixar a versão major do Postgres junto da região, com a justificativa de irreversibilidade, e o spec declara explicitamente que NÃO escolhe a versão (§4.1 registra apenas o intervalo PG 14-18 verificado em doc). 'Versão/edição da API do RD Station' entrou no item de inventário de limites de §9 Fase 0. Delegar era a saída correta por Artigo IV; fixar seria invenção."
+      },
+      {
+        "issue": "CRIT-12",
+        "status": "APLICADO (2/2)",
+        "evidence": "A linha de db/migrations em §5.1 menciona o particionamento por período da tabela de eventos de jornada com o argumento de D12, e o item de migrations de §9 Fase 1a repete a exigência 'desde a primeira migration'. Nenhuma política numérica de purga foi inventada — segue dependente de OQ-8, como deve."
+      }
+    ],
+    "attributionJsCheck": "assets/js/attribution.js está descrito como camada de exibição apenas, renderizando classificação e razão JÁ calculadas pela função/view SQL e devolvidas prontas por /api/*, sem recalcular, sem reordenar sinais e sem fallback no cliente, e exibindo lacuna (P-UI-6) quando a razao vier ausente em vez de deduzi-la. Varri o documento por qualquer afirmação remanescente de cálculo no cliente: não existe nenhuma. O único vestígio do desenho anterior é conceitual e está em §3.5 (CRIT2-1), não na descrição do arquivo.",
+    "ondeRodaColumnCheck": "A coluna 'Onde roda' de §6.1 é aplicada a TODOS os 15 testes unitários, não só aos 9 que motivaram a mudança: 14 marcados SQL (I1-I5, precedência S1→S6, S7/S8, as duas regras de receita, RecordType.Name, os três de identidade EC-7 e evento sem data) e 1 marcado JS (serialização de filtro na URL, com 'runner é decisão do Plan'). O caso de identidade Tier 1 é tratado com honestidade incomum: declara que a normalização E.164 roda no n8n antes do insert e que o teste é de resultado PERSISTIDO, não da função de normalização — resíduo declarado, coerente com o acceptable_risk registrado em §3.3, e não um encobrimento.",
+    "constitutionalGateCheck": "A linha de NFR não contém mais o '7/7' sem qualificação e a aritmética do '5/7 na versão 1.0' confere. A Metadata reflete iteration: 2, version 2.0, revisionInput apontando para critique.json e nextPhase.phase = critique_2 com doNotSkip da Fase 6 — corretos. A seção de resolução de CRIT-4 declara o lastro de forma verificável (decisão do orquestrador; nenhum deliverable novo; nenhuma ferramenta nova; opção nomeada pelo próprio critique_1) e conferi os quatro pontos: os dois arquivos .sql já eram deliverables de §5.1 na v1 e a opção está literalmente na suggestion de CRIT-4. O defeito do gate é a sub-seção 'Auto-checagem de contradição introduzida', que declara §3.5 verificado tendo checado apenas uma frase — ver CRIT2-1."
+  },
+
+  "issues": [
+    {
+      "id": "CRIT-1",
+      "severity": "MEDIUM",
+      "category": "consistency",
+      "check": "con-4 (No Contradictions)",
+      "description": "Referência órfã que reverte, em texto, a própria resolução de CRIT-4 — e está na seção que o implementador de FR-5 lê primeiro. O penúltimo parágrafo de §3.5 ('Confirmação de estabilidade') continua afirmando, sem qualquer anotação de supersessão: 'os seis sinais são avaliados na ingestão e não têm dependência de banco, de framework de frontend nem de autenticação. O único ponto de contato com o banco é a resolução de identidade (EC-7), preservada integralmente no Neon.' Depois da iteração 2, ambas as afirmações estão erradas: o motor de atribuição é função/view SQL versionada em db/migrations/*.sql (§5.1), logo o banco deixou de ser 'ponto de contato' e passou a ser o DOMICÍLIO da regra, e o único ponto de contato deixou de ser EC-7. Materialidade, e é por isso que não é LOW: (a) §3.5 é a seção normativa de FR-5, o requisito que R11 amarra ao item risk 5/5 de complexity.json ('erro silencioso de atribuição corrompe decisão de investimento sem sinal visível'); (b) o @architect que planejar FR-5 na Fase 6 lê esse parágrafo como estado da arte e pode implementar o motor fora do banco, revertendo a resolução de CRIT-4 e reabrindo a lacuna que esvaziava a mitigação de R14 (Alta/CRÍTICO); (c) o parágrafo tem consequência técnica real e não apenas textual — a decisão da iteração 2 AUMENTA o acoplamento a Postgres, e o spec deveria reconhecer isso (a portabilidade continua garantida por serem funções/views SQL padrão sem feature proprietária do Neon, o que preserva R19 e não enfraquece D3), em vez de afirmar o contrário. Agravante de processo, e é a SEGUNDA vez que a auto-auditoria deste documento afirma mais do que verificou: a sub-seção 'Auto-checagem de contradição introduzida' do Constitutional Gate diz textualmente '§3.5 (\"sinais avaliados UMA VEZ na ingestão\") permanece verdadeiro' — verificou uma frase da seção e concluiu pela seção inteira. Em critique_1 o mesmo padrão produziu o '7/7' falso. O documento tem idioma próprio e maduro para exatamente este caso (CON-9 'Parcialmente superseidido', §3.6 'a análise que levou à decisão', §3.7 passo 4 'Superseidido para a fase 1'); aqui simplesmente não foi aplicado.",
+      "location": "spec.md#3.5 (parágrafo 'Confirmação de estabilidade') e spec.md#constitutional-gate (sub-seção 'Auto-checagem de contradição introduzida')",
+      "suggestion": "Anotar o parágrafo como parcialmente superseidido pela iteração 2, no mesmo idioma que o spec já usa em CON-9 e §3.7: preservar o que continua verdadeiro (nenhum sinal, precedência ou invariante mudou; nada depende de framework de frontend ou de autenticação; os sinais continuam avaliados uma vez na ingestão; a portabilidade permanece porque são funções/views SQL padrão, migráveis por pg_dump/pg_restore — R19) e corrigir o que mudou (o banco passou a ser o domicílio da regra, não apenas o ponto de contato de EC-7). Corrigir também a sub-seção de auto-checagem para registrar que a varredura original de §3.5 foi parcial. Ver autoFixes CRIT2-AF-1 e CRIT2-AF-2.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-2",
+      "severity": "LOW",
+      "category": "feasibility",
+      "check": "feas-2",
+      "description": "A asserção SQL de I4 não tem alvo no schema — consequência direta e não prevista da resolução de CRIT-4. Ao fechar o domicílio dos testes como 'asserção SQL versionada contra a função/view de db/migrations', a revisão tornou a completude do schema LOAD-BEARING para a testabilidade: uma asserção só é escrevível se existir estrutura persistida contra a qual asserir. Os outros 13 testes SQL têm alvo (função de atribuição, view de receita, person/identity_edge/identity_candidate, lead_touchpoint, sync_state, tabela de eventos). I4 — 'reclassificação retroativa é operação explícita e versionada, nunca mutação silenciosa do histórico', P0 — não tem: §5.1 enumera o conteúdo de db/migrations/*.sql (DM-1..DM-12, identity graph, lead_touchpoint, sync_state, extensões, índices, colunas de escopo de M3, eventos particionados) e nenhum desses elementos registra quem reclassificou o quê, quando e de-para. Sem isso, a query de asserção de I4 não é escrevível — e, pela lógica de antecipação que o próprio spec aplica duas vezes (D12 para as colunas de escopo de M3 e R8/CRIT-12 para o particionamento: 'decidir depois de carregar dados é migração'), esta estrutura pertence à primeira migration, porque histórico de reclassificação não é reconstruível retroativamente. Nota de contenção: NÃO estou pedindo DDL — §5.1 declara explicitamente que a estrutura final é decisão do Plan, e isso é legítimo. Estou pedindo que a exigência seja NOMEADA, exatamente como CRIT-12 pediu para o particionamento, para que não se perca entre §6.1 e a Fase 6. Precedente de severidade: critique_1 classificou CRIT-12 ('uma mitigação de R8 não tem destino de execução') como LOW; este é o mesmo padrão.",
+      "location": "spec.md#6.1 (linha de I4), spec.md#5.1 (db/migrations/*.sql), spec.md#9 (Fase 1a, item de migrations)",
+      "suggestion": "Nomear em §5.1 e no item de migrations de §9 Fase 1a a exigência de uma estrutura que persista a reclassificação de atribuição (quem/quando/de-para), com a mesma justificativa de D12/R8, deixando a forma (coluna de versão, tabela de histórico ou log de reclassificação) como decisão do Plan. Anotar na linha de I4 em §6.1 que a asserção é escrita contra esse registro. Sem fixar política de retenção do log, que segue dependente de OQ-8. Ver autoFix CRIT2-AF-4.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-3",
+      "severity": "LOW",
+      "category": "consistency",
+      "check": "con-2 / comp-4",
+      "description": "Desalinhamento de cobertura entre §5.1 e §6.1 sobre o mesmo arquivo. §6.1 aloca 14 testes a db/queries/verificacao/*.sql, mas a descrição desse arquivo em §5.1 declara como 'domicílio da suíte' apenas 'os 9 testes P0 de §6.1 que cobrem o motor de atribuição e as regras de receita'. Ficam de fora da descrição 5 testes que §6.1 manda morar lá: agrupamento por RecordType.Name (FR-11/AC-11.1/EC-11, P0), os três de resolução de identidade (EC-7: Tier 1 persistido, Tier 2 como candidato com confidence < 1, conflito em identity_candidate — todos P0) e evento sem data rastreável (FR-3/AC-3.2, P1). O trace da linha confirma a lacuna: 'AC-8.1, AC-12.2, V1, §3.6, §6.1, R14' não menciona EC-7, FR-11 nem FR-3, apesar de o arquivo ser agora o único domicílio declarado dos testes desses requisitos. Impacto: EC-7 é o item que complexity.json marca como o mais difícil da epic e exige spike dedicado; deixá-lo fora do trace do arquivo que hospeda sua verificação enfraquece a rastreabilidade que AC-14.2 pede, e o '9' contado em três lugares (§5.1, §7 R14 e o Constitutional Gate) pode ser lido pelo @dev como o escopo total da suíte SQL.",
+      "location": "spec.md#5.1 (linha de db/queries/verificacao/*.sql)",
+      "suggestion": "Ajustar a descrição para os 14 testes marcados SQL em §6.1 (mantendo a distinção dos 9 P0 de atribuição/receita, que é o núcleo da resolução de CRIT-4) e acrescentar EC-7, FR-11 e FR-3/AC-3.2 ao trace. Ver autoFix CRIT2-AF-3.",
+      "autoFixable": true
+    },
+    {
+      "id": "CRIT-4",
+      "severity": "LOW",
+      "category": "accuracy",
+      "check": "acc-2 (No Phantom Requirements) / Artigo IV",
+      "description": "Uma asserção sem lastro entrou pelo autoFix de CRIT-3 — ironia registrada: foi o critique_1 que a redigiu, e ela não sobrevive à conferência contra requirements.json que este round fez. O cenário 'Navegar de campanha para leads e oportunidades' termina com 'And a metrica de cobertura de atribuicao da campanha e exibida junto', em um Given de campanha COM leads originados e oportunidades resultantes. Conferi INT-4 em requirements.json: a cobertura de atribuição aparece apenas no estado empty ('campanha sem leads atribuídos exibe estado vazio junto da métrica de cobertura de atribuição'). AC-4.1 exige somente 'chegar aos leads originados e às oportunidades resultantes sem sair da superfície'. Nenhum artefato pede exibição de cobertura no caminho felizde navegação de campanha: AC-12.2 fala da base de leads WhatsApp, I5 fala de exposição 'por canal e por período' (não por campanha) e a trava de D14 fala de 'mesma superfície de qualquer métrica de CAC por canal'. Ou seja, o cenário cria trabalho de UI que nenhum AC/INT sustenta — pequeno em esforço, mas é exatamente a classe de coisa que o Artigo IV existe para barrar, e o cenário INT-4 que É exigido (estado empty) continua sem cobertura. Segundo ponto, mais brando, no mesmo bloco: 'And a oportunidade permanece na base e nos totais, contabilizada na cobertura de atribuicao' generaliza AC-12.1 de leads para oportunidades; é derivação razoável de INV-2/AC-8.2, mas não está declarada como derivação num documento que declara as suas.",
+      "location": "spec.md#6.3 (feature 'Filtragem combinável e navegação de relacionamentos', cenários de campanha e de oportunidade sem origem)",
+      "suggestion": "Remover a asserção de cobertura do cenário de caminho felizde campanha e acrescentar o cenário que INT-4 realmente exige (campanha sem leads atribuídos → estado vazio junto da métrica de cobertura), citando INT-4 estado empty. Para o segundo ponto, marcar a extensão de AC-12.1 a oportunidades como derivação de INV-2/AC-8.2, no mesmo idioma de §3.7. Ver autoFix CRIT2-AF-5.",
+      "autoFixable": true
+    }
+  ],
+
+  "positiveFindings": [
+    "A resolução de CRIT-4 SUSTENTA-SE sob inspeção adversarial. Testei-a pelos quatro caminhos que poderiam quebrá-la e nenhum quebrou: (1) referência órfã a runner/package.json para os testes de atribuição/receita — inexistente; as três menções a 'sem runner, sem package.json' qualificam corretamente os testes SQL, e o único teste JS remanescente diz explicitamente 'runner é decisão do Plan'; (2) tensão com CON-12 ('sem build step') — resolvida em vez de contornada, porque asserção SQL não exige tooling; (3) contradição com R19 (portabilidade por pg_dump) — não há, funções/views SQL padrão são dumpáveis e nenhuma feature proprietária do Neon entrou no caminho crítico; (4) contradição com D3 (rejeição do SQLite por falta de pg_trgm) — o argumento de D3 fica MAIS forte, não mais fraco. Só falhou no quinto caminho, textual, que é o CRIT2-1.",
+    "A coluna 'Onde roda' foi aplicada com disciplina a 15/15 testes, não apenas aos 9 que motivaram a mudança — o teste específico que a pergunta de revisão levantava. E o caso mais escorregadio (identidade Tier 1, cuja normalização E.164 roda no n8n antes do insert) foi tratado com honestidade incomum: declara que o teste é de resultado PERSISTIDO, não da função de normalização, em vez de fingir cobertura. É coerente com o acceptable_risk já registrado em §3.3.",
+    "attribution.js ficou melhor do que 'só exibição': o texto proíbe as três formas concretas de vazamento de lógica para o cliente (não recalcula, não reordena sinais, não aplica fallback) e resolve o caso degenerado na direção correta — se a razao vier ausente, exibe a lacuna por P-UI-6 em vez de deduzi-la. Isso preserva NFR-7 (100% dos leads expõem o sinal que os classificou) mesmo quando o backend falha, que é justamente onde uma camada de exibição 'esperta' costuma reintroduzir o bug do FR-5.",
+    "A linha falsa do Constitutional Gate foi corrigida com aritmética verificável em vez de apagada: '5/7 na versão 1.0; 7/7 após o patch' é verdadeira (na v1 tinham verificação NFR-1, NFR-3, NFR-4, NFR-5 e NFR-7), e os dois itens novos de §6.4 existem de fato — conferi os itens, não a alegação. O item de NFR-2 é particularmente bem escrito: exige medição COM o gate ativo e em duas condições (banco morno e após cold start), e fecha a porta do ajuste de expectativa ('se estourar o alvo, a consequência é escopo/arquitetura, não ajuste de expectativa, porque OQ-5 é decisão do usuário').",
+    "CRIT-2 foi corrigido com precisão epistêmica: confirmei em requirements.json que OQ-5.impact menciona o cold start e NÃO menciona o salto de rede navegador → Cloudflare → n8n → Neon. A revisão manteve o primeiro como consequência aceita pelo usuário e reclassificou o segundo como derivação a validar, com entrada correspondente em §4.4 e verificação obrigatória em §6.4. É exatamente a distinção que critique_1 pediu, sem diluir nenhum dos dois lados.",
+    "CRIT-11 foi delegado do modo constitucionalmente correto: o item de checklist existe, está pareado com a decisão de região pelo mesmo motivo de irreversibilidade (R15), e o spec diz explicitamente que NÃO escolhe a versão major, registrando apenas o intervalo PG 14-18 verificado em doc. Inventar a versão para 'fechar' o issue teria sido pior do que deixá-lo aberto — a revisão não caiu nessa.",
+    "Nenhuma regressão de stack, novamente: as decisões DEFERRED/REJECTED de §3.8 e §4.3 continuam intactas e a iteração 2 não reintroduziu Supabase, Windsor.ai, Next.js, React, Tailwind, nuqs, Zustand, Workers como hospedagem nem Vercel como stack ativo da fase 1. Uma revisão que mexe em §5.1, §6.1, §7 e §9 é justamente onde esse tipo de inércia costuma voltar.",
+    "As quatro colisões de consistência de critique_1 foram fechadas de forma verificável, não alegada: 'defeito D' retorna zero ocorrências, '16 views' retorna zero no corpo do documento (e o repositório confirma 15), '/leads/[id]' está explicitamente marcado como citação da proposta original, e a nota de procedência de §8.2 dá o caminho JSON exato de origem de cada ID criado no spec."
+  ],
+
+  "summary": {
+    "highIssues": 0,
+    "mediumIssues": 1,
+    "lowIssues": 3,
+    "autoFixable": 4,
+    "autoFixEntries": 5,
+    "checksRun": 21,
+    "checksPassed": 16,
+    "checksPartial": 5,
+    "checksFailed": 0,
+    "deltaVsCritique1": {
+      "issues": "12 → 4",
+      "medium": "7 → 1",
+      "low": "5 → 3",
+      "checksPassed": "13/20 → 16/21",
+      "average": "4.08 → 4.40",
+      "critique1IssuesClosed": "12 de 12 endereçados: 10 por autoFix literal (20/21 trechos), CRIT-4 fechado com decisão do orquestrador e CRIT-11 delegado ao provisionamento",
+      "newIssuesIntroducedByRevision": "2 (CRIT2-1 contradição em §3.5; CRIT2-2 alvo da asserção de I4) — ambos consequência da própria resolução de CRIT-4",
+      "note": "checksRun corrigido para 21 (accuracy 4 + completeness 5 + consistency 4 + feasibility 4 + alignment 4, conforme spec-critique.md). critique_1 registrou 20 — subcontagem de 1, sem efeito sobre o veredito daquela rodada."
+    }
+  },
+
+  "nextAction": "Aplicar os 5 autoFixes deste arquivo em spec.md como patch mecânico (iteração 2.1) — nenhum exige decisão nova de produto, stack ou escopo. Em seguida, verificação DELTA por @qa (confirmar as 5 edições; NÃO é uma critique_3, que não existe em complexity.json.pipelinePhases) e liberação da Fase 6 (plan / @architect). O bloqueio é dirigido: o issue MEDIUM está na seção §3.5 que o Plan de FR-5 consome diretamente, portanto a Fase 6 não deve começar antes do patch. Nada mais neste spec impede o Plan.",
+
+  "autoFixes": [
+    {
+      "id": "CRIT2-AF-1",
+      "issueId": "CRIT-1",
+      "location": "spec.md#3.5 (parágrafo 'Confirmação de estabilidade', penúltimo da seção)",
+      "original": "**Confirmação de estabilidade:** os dois amendments verificaram e registraram que esta proposta permanece **inalterada** por qualquer mudança de stack — os seis sinais são avaliados na ingestão e não têm dependência de banco, de framework de frontend nem de autenticação. O único ponto de contato com o banco é a resolução de identidade (EC-7), preservada integralmente no Neon.",
+      "suggested": "**Confirmação de estabilidade (com uma supersessão declarada na iteração 2):** os dois amendments verificaram e registraram que esta proposta permanece **inalterada** por qualquer mudança de stack — nenhum sinal, nenhuma precedência e nenhuma das invariantes I1-I5 mudou, nada aqui depende de framework de frontend nem de autenticação, e os sinais continuam sendo avaliados **uma vez, na ingestão**.\n\n> **Parcialmente superseidido (iteração 2, resolução de CRIT-4).** A formulação original dos amendments — de que os sinais \"não têm dependência de banco\" e de que \"o único ponto de contato com o banco é a resolução de identidade (EC-7)\" — descrevia o desenho em que a regra rodava em código de workflow do n8n. **A partir desta revisão o banco é o DOMICÍLIO da regra, não apenas um ponto de contato:** o motor de atribuição (S1→S6, I1-I5, `razao` obrigatória) e as regras de receita (FR-10/EC-5) são **função/view SQL versionada** em `db/migrations/*.sql` (§5.1), invocada pelo n8n durante a ingestão. Consequências: (a) o acoplamento a Postgres **aumentou** deliberadamente — é o preço aceito para tirar a lógica mais crítica da epic de fora do controle de versão (§7 R14); (b) a **portabilidade permanece**, porque são funções/views SQL padrão sem nenhuma feature proprietária do Neon, logo migráveis por `pg_dump`/`pg_restore` (R19), e o argumento de D3 contra SQLite fica mais forte, não mais fraco; (c) a **estabilidade semântica** afirmada pelos amendments segue válida — o que mudou foi onde a regra mora, não o que ela decide.",
+      "rationale": "Usa o idioma de supersessão que o próprio spec já aplica em CON-9, §3.6 e §3.7 passo 4. Preserva a afirmação verdadeira dos amendments como registro histórico e corrige apenas o que a iteração 2 tornou falso."
+    },
+    {
+      "id": "CRIT2-AF-2",
+      "issueId": "CRIT-1",
+      "location": "spec.md#constitutional-gate (sub-seção 'Auto-checagem de contradição introduzida')",
+      "original": "§3.5 (\"sinais avaliados UMA VEZ na ingestão\") permanece verdadeiro, porque a função SQL é invocada na ingestão.",
+      "suggested": "§3.5 (\"sinais avaliados UMA VEZ na ingestão\") permanece verdadeiro, porque a função SQL é invocada na ingestão. **Correção registrada no critique_2 (iteração 2.1):** esta auto-checagem concluiu pela consistência de §3.5 após verificar **uma única frase** da seção, e deixou passar o parágrafo \"Confirmação de estabilidade\", que ainda afirmava que os sinais \"não têm dependência de banco\" e que \"o único ponto de contato com o banco é a resolução de identidade (EC-7)\" — as duas afirmações superseididas por esta própria decisão. O parágrafo foi anotado como parcialmente superseidido. Lição de processo, e é a segunda ocorrência do mesmo padrão neste documento (a primeira foi o \"7/7\" de NFR apontado por CRIT-1 do critique_1): **auto-auditoria por amostragem de frase não é auto-auditoria** — a varredura tem de ser por seção inteira.",
+      "rationale": "Fecha o padrão de auto-auditoria que já produziu duas afirmações inexatas neste documento, e deixa o registro para as próximas revisões."
+    },
+    {
+      "id": "CRIT2-AF-3",
+      "issueId": "CRIT-3",
+      "location": "spec.md#5.1 (linha de `db/queries/verificacao/*.sql`)",
+      "original": "**Domicílio da suíte (resolução de CRIT-4):** os **9 testes P0 de §6.1** que cobrem o motor de atribuição (I1-I5, precedência S1→S6, S7/S8 não classificam) e as regras de receita (FR-10/EC-5) viram **asserções SQL versionadas aqui** — cada caso é uma query que retorna zero linhas quando a invariante vale, e as linhas que retorna são o relatório da falha. Executáveis pelo console SQL do Neon ou por qualquer cliente `psql`, sem runner, sem `package.json` e sem build step (CON-12) | AC-8.1, AC-12.2, V1, §3.6, §6.1, R14 |",
+      "suggested": "**Domicílio da suíte (resolução de CRIT-4):** os **14 testes de §6.1 marcados `SQL`** viram **asserções SQL versionadas aqui** — o núcleo são os **9 P0** do motor de atribuição (I1-I5, precedência S1→S6, S7/S8 não classificam) e das regras de receita (FR-10/EC-5); os outros 5 são o agrupamento por `RecordType.Name` (FR-11/AC-11.1/EC-11), os três de resolução de identidade (EC-7: Tier 1 persistido, Tier 2 como candidato com `confidence < 1`, conflito em `identity_candidate`) e o evento sem data rastreável (FR-3/AC-3.2). Cada caso é uma query que retorna zero linhas quando a invariante vale, e as linhas que retorna são o relatório da falha. Executáveis pelo console SQL do Neon ou por qualquer cliente `psql`, sem runner, sem `package.json` e sem build step (CON-12) | AC-8.1, AC-12.2, V1, §3.6, §6.1, R14, EC-7, FR-11/AC-11.1, FR-3/AC-3.2 |",
+      "rationale": "Alinha a descrição e o trace do arquivo com o que §6.1 efetivamente aloca nele, sem alterar nenhuma decisão. Recupera EC-7 na rastreabilidade, que é o item que complexity.json marca como o mais difícil da epic."
+    },
+    {
+      "id": "CRIT2-AF-4",
+      "issueId": "CRIT-2",
+      "location": "spec.md#6.1 (linha de I4) + spec.md#9 (Fase 1a, item de migrations)",
+      "original": "| I4 — reclassificação retroativa é versionada, nunca mutação silenciosa | FR-5, I4 | **`SQL`** — `db/queries/verificacao/` | P0 |",
+      "suggested": "| I4 — reclassificação retroativa é versionada, nunca mutação silenciosa | FR-5 (DEF-6), invariante I4 e princípio P5 de §3.5 | **`SQL`** — `db/queries/verificacao/`, **contra o registro versionado de reclassificação** exigido em §5.1 (sem estrutura que persista quem reclassificou o quê, quando e de-para, esta asserção não é escrevível) | P0 |",
+      "additionalEdit": {
+        "location": "spec.md#9 (Fase 1a, item de migrations do schema)",
+        "original": "— com a **tabela de eventos de jornada (DM-10) particionada por período** desde a primeira migration (R8; particionar após a carga é migração de dados). Sem fixar política numérica de purga, que segue dependente de OQ-8",
+        "suggested": "— com a **tabela de eventos de jornada (DM-10) particionada por período** desde a primeira migration (R8; particionar após a carga é migração de dados) e com uma **estrutura que persista a reclassificação de atribuição** (quem/quando/de-para), sem a qual a asserção de **I4** em §6.1 não é escrevível — mesma lógica de antecipação de D12 e R8: histórico de reclassificação **não é reconstruível depois**. A forma (coluna de versão, tabela de histórico ou log de reclassificação) é decisão do Plan. Sem fixar política numérica de purga nem de retenção do log, que seguem dependentes de OQ-8"
+      },
+      "rationale": "Nomeia a exigência sem inventar DDL nem política de retenção — exatamente o padrão que critique_1 usou em CRIT-12 para o particionamento. A estrutura em si continua sendo decisão do Plan, como §5.1 declara."
+    },
+    {
+      "id": "CRIT2-AF-5",
+      "issueId": "CRIT-4",
+      "location": "spec.md#6.3 (feature 'Filtragem combinável e navegação de relacionamentos', cenário de campanha)",
+      "original": "  Scenario: Navegar de campanha para leads e oportunidades\n    Given uma campanha com leads originados e oportunidades resultantes\n    When o usuario navega a partir da campanha\n    Then chega aos leads originados e as oportunidades resultantes sem sair da superficie\n      And a metrica de cobertura de atribuicao da campanha e exibida junto",
+      "suggested": "  Scenario: Navegar de campanha para leads e oportunidades\n    Given uma campanha com leads originados e oportunidades resultantes\n    When o usuario navega a partir da campanha\n    Then chega aos leads originados e as oportunidades resultantes sem sair da superficie\n      And o caminho de navegacao de volta a campanha e preservado\n\n  Scenario: Campanha sem leads atribuidos\n    Given uma campanha sem nenhum lead atribuido\n    When o usuario navega a partir da campanha\n    Then o estado vazio e exibido junto da metrica de cobertura de atribuicao\n      And nenhum contador aparece como zero sem contexto",
+      "rationale": "A asserção de cobertura no caminho feliz não tem lastro em AC-4.1 nem em INT-4 (que a exige apenas no estado empty) — sai do caminho feliz e entra no cenário que INT-4 realmente pede. O 'And' que substitui vem do último step de INT-4 ('retorna à campanha mantendo o caminho de navegação'), e o segundo 'And' do estado empty de INT-1/INT-4."
+    }
+  ],
+
+  "carryForwardToPlan": [
+    "Aplicar os 5 autoFixes (iteração 2.1) ANTES de a Fase 6 consumir §3.5 — o issue MEDIUM está exatamente na seção normativa de FR-5.",
+    "O spec fixa o DOMICÍLIO da regra de atribuição/receita (função/view SQL versionada) e o domicílio e a FORMA do teste (asserção SQL in-repo). Continuam abertos para o @architect: a mecânica de invocação pelo n8n (nó, ordem, transação, tratamento de erro), o DDL da estrutura de versionamento de reclassificação exigida por I4, e o runner/linguagem dos casos não expressáveis em SQL (§6.1 linha JS, §6.2 integração, §6.3 aceite).",
+    "Backport para requirements.json de CON-10..CON-15 e de OQ-4-RESIDUAL, OQ-12, OQ-13, OQ-15, OQ-16 — ação de @po/@pm herdada de CRIT-6 do critique_1, ainda pendente (a procedência está declarada em §8.2, mas a fonte de verdade de §0 segue incompleta).",
+    "Divergência de contagem de views com complexity.json (escreve 16, lista 15; repositório confirma 15) — não recalibrar escopo de §9 Fase 1d pelo número errado.",
+    "Os dois spikes exigidos por complexity.json (EC-7 e ingestão de Salesforce sem MCP em runtime) e o Spike nº 0 (CREATE EXTENSION pg_trgm/fuzzystrmatch em Neon Free, R4) permanecem pré-requisitos do Plan, não do Critique.",
+    "OQ-8 (LGPD) segue como único bloqueante de provisionamento; não bloqueia o Plan.",
+    "Resíduo declarado e aceito: a normalização de telefone E.164 continua rodando em n8n, fora do controle de versão, e §6.1 testa o resultado persistido em vez da função. Coerente com o acceptable_risk de §3.3 — registrado aqui para que a Fase 6 não o descubra como surpresa."
+  ],
+
+  "handoff": {
+    "next_agent": "@pm",
+    "next_command": "*write-spec epic-crm-lead-intelligence --patch",
+    "condition": "Critique verdict is NEEDS_REVISION com 1 MEDIUM + 3 LOW, todos com autoFix literal e nenhuma decisão nova pendente",
+    "then": "Verificação delta por @qa (5 diffs) e liberação da Fase 6 (plan / @architect)",
+    "doNotSkip": "A Fase 6 não deve começar antes do patch da iteração 2.1: o issue MEDIUM está em §3.5, a seção que o Plan de FR-5 lê primeiro, e o texto atual, se seguido, reverte a resolução de CRIT-4 e reabre a lacuna CRÍTICA de R14.",
+    "doNotOverbuild": "Não reabrir a Fase 5b como revisão completa e não criar uma fase critique_3 — complexity.json.pipelinePhases termina em critique_2 → plan."
+  }
+}

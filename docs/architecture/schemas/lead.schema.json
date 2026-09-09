@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "lead.schema.json",
+  "title": "Contrato de dados — Lead (fase 1, epic-crm-lead-intelligence)",
+  "description": "Ver docs/architecture/data-contract.md para a prosa e o rastreamento a requirements.json/research.json. Duas raízes neste arquivo: listItem (GET /api/leads) e detail (GET /api/leads/{id}).",
+
+  "definitions": {
+    "segmento": {
+      "type": "string",
+      "enum": ["marketing", "comercial", "nao_atribuido"],
+      "description": "DM-7.classificacao. Nunca omitido — AC-5.2: ausência de sinal produz 'nao_atribuido', jamais 'comercial'."
+    },
+    "sinalId": {
+      "type": "string",
+      "enum": ["S1", "S2", "S3", "S4", "S5", "S6"],
+      "description": "research.json attributionModelProposal.signals — precedência estrita, first-match-wins."
+    },
+    "confianca": {
+      "type": "string",
+      "enum": ["alta", "media-alta", "media", "n/a"]
+    },
+    "listItem": {
+      "type": "object",
+      "required": ["id", "nome", "segmento", "estagio_funil", "data_criacao", "fonte_dados"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "empresa": { "type": ["string", "null"] },
+        "segmento": { "$ref": "#/definitions/segmento" },
+        "estagio_funil": { "type": "string" },
+        "data_criacao": { "type": "string", "format": "date-time" },
+        "fonte_dados": { "type": "string", "enum": ["salesforce", "rd_station"] },
+        "_seed_nota": {
+          "type": "string",
+          "description": "SOMENTE em fixtures de teste (Etapa A) — marca um registro deliberadamente sintético (subtask 0.4). Nunca presente numa resposta real da Etapa B; um validador de contrato da Etapa B pode rejeitar payload que o contenha."
+        }
+      }
+    },
+    "atribuicao": {
+      "type": "object",
+      "required": ["segmento", "categoria", "sinal_id", "sinal_nome", "confianca", "razao_legivel"],
+      "additionalProperties": false,
+      "properties": {
+        "segmento": { "$ref": "#/definitions/segmento" },
+        "categoria": { "type": "string" },
+        "detalhe": { "type": ["string", "null"] },
+        "campanha_bruta": { "type": ["string", "null"] },
+        "sinal_id": { "$ref": "#/definitions/sinalId" },
+        "sinal_nome": { "type": "string" },
+        "confianca": { "$ref": "#/definitions/confianca" },
+        "razao_legivel": { "type": "string", "minLength": 10 },
+        "campo_origem_bruto": { "type": ["string", "null"] },
+        "ruleset_version": {
+          "type": ["string", "null"],
+          "description": "NULLABLE na Etapa A por definição (D21) — só a Etapa B preenche."
+        }
+      },
+      "allOf": [
+        {
+          "description": "Invariante I1 (spec.md §3.5): segmento=comercial exige sinal_id=S5.",
+          "if": { "properties": { "segmento": { "const": "comercial" } } },
+          "then": { "properties": { "sinal_id": { "const": "S5" } } }
+        },
+        {
+          "description": "Invariante: segmento=nao_atribuido exige sinal_id=S6.",
+          "if": { "properties": { "segmento": { "const": "nao_atribuido" } } },
+          "then": { "properties": { "sinal_id": { "const": "S6" } } }
+        }
+      ]
+    },
+    "activityEvent": {
+      "type": "object",
+      "required": ["tipo", "fonte", "titulo", "descricao"],
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "type": "string",
+          "enum": ["conversao", "mudanca_estagio", "criacao_oportunidade", "participacao_workflow"]
+        },
+        "timestamp": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "null explícito quando a data não é rastreável (AC-3.2) — nunca data arbitrária."
+        },
+        "fonte": { "type": "string", "enum": ["rd_station", "salesforce"] },
+        "titulo": { "type": "string" },
+        "descricao": { "type": "string" },
+        "idade_dado_declarada": { "type": ["string", "null"] }
+      }
+    },
+    "related": {
+      "type": "object",
+      "required": ["conta", "oportunidade", "cadeia_campanha"],
+      "additionalProperties": false,
+      "properties": {
+        "conta": {
+          "type": ["object", "null"],
+          "required": ["id", "nome"],
+          "additionalProperties": false,
+          "properties": { "id": { "type": "string" }, "nome": { "type": "string" } }
+        },
+        "oportunidade": {
+          "type": ["object", "null"],
+          "required": ["id", "mrr", "estagio", "valor_contrato"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "mrr": { "type": "number", "minimum": 0 },
+            "estagio": { "type": "string" },
+            "valor_contrato": {
+              "type": ["number", "null"],
+              "description": "FR-10/EC-5: SÓ preenchido quando estagio='Ganho' e duração conhecida."
+            }
+          },
+          "allOf": [
+            {
+              "description": "Invariante FR-10/EC-5: valor_contrato só quando estagio=Ganho.",
+              "if": { "properties": { "estagio": { "not": { "const": "Ganho" } } } },
+              "then": { "properties": { "valor_contrato": { "const": null } } }
+            }
+          ]
+        },
+        "cadeia_campanha": {
+          "type": ["array", "null"],
+          "items": { "type": "string" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "[campanha, conjunto, anuncio] — DM-6."
+        }
+      }
+    },
+    "vinculoIdentidade": {
+      "type": ["object", "null"],
+      "description": "EC-7 / research.json proposedIdentityResolutionDesign (person/identity_edge/identity_candidate). NULL para a maioria dos leads (identidade já resolvida deterministicamente, Tier 1). Só populado quando existe um candidato Tier 2 (probabilístico) — nunca confirma merge automático.",
+      "required": ["status", "explicacao"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["provavel", "conflito"] },
+        "candidato_id": { "type": ["string", "null"], "description": "id do outro lead candidato ao mesmo person — null se o candidato ainda não tem registro próprio na lista" },
+        "score_similaridade": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "explicacao": { "type": "string", "minLength": 10 }
+      }
+    },
+    "detail": {
+      "type": "object",
+      "required": ["overview", "activity", "related"],
+      "additionalProperties": false,
+      "properties": {
+        "_seed_nota": { "type": "string", "description": "Ver listItem._seed_nota — mesma semântica, na raiz do registro de detalhe." },
+        "overview": {
+          "type": "object",
+          "required": ["nome", "estagio_funil", "atribuicao"],
+          "additionalProperties": false,
+          "properties": {
+            "nome": { "type": "string" },
+            "empresa": { "type": ["string", "null"] },
+            "email": { "type": ["string", "null"] },
+            "telefone": { "type": ["string", "null"] },
+            "responsavel": { "type": ["string", "null"] },
+            "estagio_funil": { "type": "string" },
+            "atribuicao": { "$ref": "#/definitions/atribuicao" },
+            "vinculo_identidade": { "$ref": "#/definitions/vinculoIdentidade" },
+            "_seed_nota": { "type": "string", "description": "Ver listItem._seed_nota — mesma semântica." }
+          }
+        },
+        "activity": { "type": "array", "items": { "$ref": "#/definitions/activityEvent" } },
+        "related": { "$ref": "#/definitions/related" }
+      }
+    }
+  },
+
+  "oneOf": [
+    { "$ref": "#/definitions/listItem" },
+    { "$ref": "#/definitions/detail" }
+  ]
+}

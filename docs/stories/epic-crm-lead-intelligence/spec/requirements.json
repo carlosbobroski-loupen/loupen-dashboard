@@ -1,0 +1,1095 @@
+{
+  "storyId": "epic-crm-lead-intelligence",
+  "gatheredAt": "2026-09-03T19:08:13Z",
+  "source": "user",
+  "gatheredBy": "@pm",
+  "elicitationVersion": "2.0",
+  "elicitationNote": "Elicitação conduzida pelo agente principal em conversa direta com o usuário (Carlos, Loupen). Este subagente sintetizou o contexto verbatim + 4 decisões já confirmadas + fatos técnicos estabelecidos. Nenhum requisito foi inventado (Artigo IV da Constitution): lacunas reais estão em openQuestions.",
+  "functional": [
+    {
+      "id": "FR-1",
+      "description": "Prover filtragem rica e combinável sobre leads e oportunidades, substituindo os filtros atuais que o usuário classifica como insuficientes e rígidos.",
+      "priority": "P0",
+      "rationale": "Dor citada literalmente pelo usuário: 'problema de filtro — os filtros atuais são insuficientes/rígidos'. É o principal bloqueio de uso do dashboard hoje.",
+      "acceptance": [
+        "AC-1.1: Given a base de leads carregada, When o usuário combina múltiplos critérios de filtro simultaneamente, Then a lista e os indicadores refletem a interseção dos critérios sem exigir recarga manual do artefato.",
+        "AC-1.2: Given um filtro aplicado, When o usuário navega para a ficha de um lead e retorna, Then o estado do filtro é preservado."
+      ]
+    },
+    {
+      "id": "FR-2",
+      "description": "Disponibilizar uma ficha interna de lead (perfil 'lead 360') mostrando o que o lead converteu e quais oportunidades ele gerou.",
+      "priority": "P0",
+      "rationale": "Pedido explícito: 'quer abrir uma parte interna do lead — uma ficha/perfil onde vê o que ele converteu e quais oportunidades ele gerou'.",
+      "acceptance": [
+        "AC-2.1: Given um lead selecionado, When a ficha é aberta, Then exibe os eventos de conversão do lead e a lista de oportunidades associadas.",
+        "AC-2.2: Given um lead convertido, When a ficha é aberta, Then as oportunidades vêm do vínculo por ConvertedAccountId (nunca por LeadSource)."
+      ]
+    },
+    {
+      "id": "FR-3",
+      "description": "Apresentar a jornada do lead como sequência cronológica de eventos (conversões, entrada/saída de workflows de automação, mudança de estágio de funil, criação/mudança de oportunidade).",
+      "priority": "P0",
+      "rationale": "Pedido explícito: 'quer acompanhar a jornada do lead'. Os eventos citados existem nas fontes já conectadas (RD Station: eventos de conversão/oportunidade, estágio de funil, entrada/saída/etapa de workflow; Salesforce: lead e oportunidade).",
+      "acceptance": [
+        "AC-3.1: Given um lead com eventos em mais de uma fonte, When a jornada é exibida, Then os eventos aparecem em ordem cronológica única, com a fonte de origem identificada por evento.",
+        "AC-3.2: Given um evento cuja data não é rastreável, When a jornada é exibida, Then o evento é marcado como sem data confirmada em vez de receber data arbitrária."
+      ]
+    },
+    {
+      "id": "FR-4",
+      "description": "Modelar e navegar relacionamentos entre entidades (lead ↔ conta ↔ oportunidade ↔ campanha ↔ anúncio ↔ workflow), substituindo a apresentação atual em listas soltas.",
+      "priority": "P0",
+      "rationale": "Pedido explícito: 'quer mais relacionamento entre os leads, não só listas soltas'. Sem relacionamento persistido, jornada (FR-3) e ficha 360 (FR-2) não são construíveis.",
+      "acceptance": [
+        "AC-4.1: Given uma campanha selecionada, When o usuário navega, Then é possível chegar aos leads originados e às oportunidades resultantes sem sair da superfície.",
+        "AC-4.2: Given uma oportunidade selecionada, When o usuário navega, Then é possível voltar ao lead/conta de origem quando o vínculo existir."
+      ]
+    },
+    {
+      "id": "FR-5",
+      "description": "Redesenhar o modelo de atribuição de origem (Marketing vs Comercial) corrigindo os casos em que leads vindos de campanha de marketing são classificados como 'Comercial'. A regra atual (isMarketing = match de e-mail OU LeadSource batendo padrão de código de campanha) é incompleta e deve ser substituída dentro deste projeto, não por hotfix isolado.",
+      "priority": "P0",
+      "rationale": "Bug reportado pelo usuário + Decisão confirmada nº 4: 'o bug de atribuição entra dentro do redesenho maior, não como correção pontual separada'.",
+      "acceptance": [
+        "AC-5.1: Given um lead cujo campo de origem indica campanha de marketing, When a classificação é calculada, Then o lead é classificado como Marketing.",
+        "AC-5.2: Given um lead sem sinal suficiente de origem, When a classificação é calculada, Then o lead recebe estado explícito de origem não atribuída (nunca fallback silencioso para Comercial).",
+        "AC-5.3: Given qualquer lead classificado, When o usuário inspeciona a ficha, Then a razão da classificação (qual sinal disparou a regra) é visível e auditável."
+      ]
+    },
+    {
+      "id": "FR-6",
+      "description": "Substituir a abordagem de popups de lead (tentativa anterior que não funcionou bem) por uma superfície de detalhe navegável e persistente.",
+      "priority": "P1",
+      "rationale": "Relato do usuário: 'a tentativa de implementar popups de lead não funcionou bem'. A superfície de detalhe é o veículo de FR-2/FR-3.",
+      "acceptance": [
+        "AC-6.1: Given um lead na lista, When o usuário abre o detalhe, Then o detalhe é endereçável/retomável e não perde o contexto da lista ao fechar.",
+        "AC-6.2: Given o detalhe aberto, When há muitos dados de jornada, Then a leitura não depende de um contêiner modal com rolagem confinada."
+      ]
+    },
+    {
+      "id": "FR-7",
+      "description": "Persistir os dados de leads, oportunidades, campanhas e eventos em um backend real com banco de dados, substituindo o modelo atual de arrays/JSON estáticos embutidos no index.html.",
+      "priority": "P0",
+      "rationale": "Decisão confirmada nº 2: o projeto assume migrar para backend real com banco de dados, porque ficha de lead, jornada e filtros ricos não são viáveis de forma satisfatória apenas com Google Sheets → JSON estático.",
+      "acceptance": [
+        "AC-7.1: Given uma consulta de leads, When executada, Then os dados vêm de um armazenamento consultável, não de um array embutido no HTML.",
+        "AC-7.2: Given uma atualização na fonte (Salesforce/RD Station/ads), When a ingestão roda, Then os dados ficam disponíveis sem edição manual do arquivo do dashboard."
+      ]
+    },
+    {
+      "id": "FR-8",
+      "description": "Garantir ingestão completa e verificável das fontes, eliminando sincronização parcial e totais hardcoded (hoje: aba 'Oportunidades(SF)' com 44 de 236 linhas sincronizadas e totais de funil hardcoded; aba 'SRD IA' com array estático sem n8n).",
+      "priority": "P0",
+      "rationale": "Problemas conhecidos e documentados da arquitetura atual; qualquer análise de performance construída sobre base parcial é inválida.",
+      "acceptance": [
+        "AC-8.1: Given uma execução de ingestão, When concluída, Then o número de registros na origem e no destino é comparado e divergência é reportada.",
+        "AC-8.2: Given qualquer total de funil exibido, When renderizado, Then ele é derivado dos dados persistidos, nunca de valor fixo no código."
+      ]
+    },
+    {
+      "id": "FR-9",
+      "description": "Consolidar em uma base única os dados de Salesforce (leads/oportunidades/RecordType), RD Station Marketing (contatos, eventos de conversão, estágio de funil, campanhas, landing pages/formulários/pop-ups, segmentações, workflows), anúncios pagos (Windsor.ai e/ou padrão n8n para Meta Ads) e leads WhatsApp do SDR IA.",
+      "priority": "P0",
+      "rationale": "Todas essas fontes já estão conectadas/implementadas hoje de forma isolada; a análise integrada marketing+comercial pedida pelo usuário exige consolidação.",
+      "acceptance": [
+        "AC-9.1: Given as quatro famílias de fonte, When a ingestão roda, Then cada registro persistido carrega identificação de fonte e timestamp de coleta.",
+        "AC-9.2: Given uma fonte indisponível, When a ingestão roda, Then as demais fontes são ingeridas e a lacuna é registrada (ver EC de fonte indisponível)."
+      ]
+    },
+    {
+      "id": "FR-10",
+      "description": "Calcular receita de forma correta: tratar Amount da oportunidade Salesforce como MRR e só derivar valor de contrato (MRR × meses) quando o estágio é 'Ganho', nunca assumindo duração padrão.",
+      "priority": "P0",
+      "rationale": "Fato técnico validado do Salesforce e regra de negócio já estabelecida pelo usuário em trabalhos anteriores.",
+      "acceptance": [
+        "AC-10.1: Given uma oportunidade não Ganha, When métricas são calculadas, Then nenhum valor de contrato é exibido para ela.",
+        "AC-10.2: Given uma oportunidade Ganha sem duração informada, When métricas são calculadas, Then o valor de contrato fica indisponível em vez de usar duração default."
+      ]
+    },
+    {
+      "id": "FR-11",
+      "description": "Usar RecordType.Name como sinal de Produto/Serviço em segmentações e relatórios, e não LeadSource.",
+      "priority": "P1",
+      "rationale": "Fato técnico validado do Salesforce: RecordType.Name é o sinal confiável de Produto/Serviço.",
+      "acceptance": [
+        "AC-11.1: Given qualquer agrupamento por Produto/Serviço, When calculado, Then a chave de agrupamento é RecordType.Name."
+      ]
+    },
+    {
+      "id": "FR-12",
+      "description": "Melhorar a rastreabilidade de campanha para leads WhatsApp do SDR IA, hoje dependente de Campanha_LinkedIn__c (que carrega o Ad ID do Meta) com cobertura de apenas ~15% dos registros.",
+      "priority": "P1",
+      "status": "DEFERRED (2026-09-04) — usuário tirou SDR IA/WhatsApp do escopo imediato pra ganhar velocidade, focando em Salesforce (leads/oportunidades), RD Station e ads. Não removido: volta a P1 quando o canal WhatsApp reentrar em escopo. Ver CON-5 (mesma decisão) e spec.md §1.3 NG9.",
+      "rationale": "Fato estabelecido: atribuição de campanha para leads WhatsApp é majoritariamente não rastreável hoje, o que limita a análise integrada marketing+comercial.",
+      "acceptance": [
+        "AC-12.1: Given um lead WhatsApp sem Campanha_LinkedIn__c, When a atribuição é calculada, Then o lead aparece como não atribuído em vez de ser omitido da base.",
+        "AC-12.2: Given a base de leads WhatsApp, When a cobertura de atribuição é medida, Then o percentual de cobertura é exposto como métrica de qualidade de dados."
+      ]
+    },
+    {
+      "id": "FR-13",
+      "description": "Produzir pesquisa multidisciplinar comparando construir solução customizada versus adotar ferramenta de mercado pronta (ex.: HubSpot Operations Hub, plataformas de RevOps/CDP), com prós e contras de cada caminho, cobrindo as perspectivas de marketing, dashboard/UX, desenvolvimento, planejamento e performance — não apenas a de agentes de IA.",
+      "priority": "P0",
+      "rationale": "Pedido explícito do usuário ('pesquisa ampla... visão multidisciplinar de como times de marketing+comercial fazem essa análise de performance integrada') + Decisão confirmada nº 1 (build vs buy em aberto, pesquisa deve cobrir ambos).",
+      "acceptance": [
+        "AC-13.1: Given a fase de Research do pipeline, When concluída, Then existe comparativo build vs buy com prós/contras por caminho e implicações de custo/esforço.",
+        "AC-13.2: Given o comparativo, When revisado, Then cada uma das cinco perspectivas (marketing, dashboard/UX, desenvolvimento, planejamento, performance) está representada explicitamente."
+      ]
+    },
+    {
+      "id": "FR-14",
+      "description": "Formalizar o trabalho como projeto AIOX via Spec Pipeline (Gather → Assess → Research → Spec → Critique → Plan), gerando artefatos rastreáveis em vez de um documento de pesquisa solto.",
+      "priority": "P0",
+      "rationale": "Decisão confirmada nº 3.",
+      "acceptance": [
+        "AC-14.1: Given cada fase do pipeline, When concluída, Then existe artefato versionado correspondente em docs/stories/epic-crm-lead-intelligence/spec/.",
+        "AC-14.2: Given a fase de Spec, When escrita, Then cada afirmação rastreia para um FR-*, NFR-*, CON-* ou achado de pesquisa (Artigo IV — No Invention)."
+      ]
+    }
+  ],
+  "nonFunctional": [
+    {
+      "id": "NFR-1",
+      "category": "reliability",
+      "description": "Integridade de dados end-to-end: a base consolidada não pode exibir agregados derivados de sincronização parcial sem sinalizar a incompletude ao usuário.",
+      "metric": "0 casos de total exibido divergente da contagem da origem sem aviso visível; divergência de contagem origem↔destino reportada em cada execução de ingestão."
+    },
+    {
+      "id": "NFR-2",
+      "category": "performance",
+      "description": "Filtros combinados e abertura da ficha de lead devem responder em tempo interativo sobre a base atual (ordem de centenas de oportunidades e leads).",
+      "metric": "Alvo numérico não definido pelo usuário — ver OQ-5."
+    },
+    {
+      "id": "NFR-3",
+      "category": "security",
+      "description": "A base passará a conter dados pessoais de leads (nome, e-mail, telefone/WhatsApp) em backend próprio, ao contrário do snapshot estático atual; é necessário controle de acesso definido antes de qualquer exposição pública. REVISADO em 2026-09-04 (ver OQ-3-REVISAO): autenticação com perfis (marketing/comercial/direção) fica ADIADA para fase 2, não é requisito de fase 1. Na fase 1, a mitigação é um gate de acesso via Cloudflare Access (e-mail @loupen.com.br), sem noção de perfil — cobre 'é da Loupen ou não é', não substitui NFR-3 completo.",
+      "metric": "Fase 1: nenhuma página/endpoint de dado de lead acessível fora do gate de e-mail corporativo. Fase 2 (não bloqueia fase 1): permissões diferenciadas por perfil implementadas; política de acesso detalhada ainda pendente — ver OQ-8."
+    },
+    {
+      "id": "NFR-4",
+      "category": "reliability",
+      "description": "Frescor de dados explícito por fonte: dados de workflow do RD Station são atualizados 1x/dia na origem, portanto a superfície deve declarar a idade do dado em vez de sugerir tempo real.",
+      "metric": "Cada bloco de dados exibe timestamp da última coleta da respectiva fonte."
+    },
+    {
+      "id": "NFR-5",
+      "category": "usability",
+      "description": "A superfície visual deve respeitar e evoluir o sistema de componentes já estabelecido no dashboard (kpi-grid, funil2, badges, classes mono, t-name), não descartá-lo, caso o redesenho mantenha superfície visual compartilhada.",
+      "metric": "Novas telas reutilizam os componentes existentes; nenhum componente equivalente mais simples é introduzido em paralelo."
+    },
+    {
+      "id": "NFR-6",
+      "category": "scalability",
+      "description": "O modelo de dados deve suportar adição de novos canais de anúncio e novas fontes sem reescrita do núcleo, seguindo o padrão já provado (Meta Ads via n8n serviu de template para outros canais).",
+      "metric": "Adicionar um novo canal de anúncio não requer alteração no schema central de Lead/Opportunity/Campaign."
+    },
+    {
+      "id": "NFR-7",
+      "category": "usability",
+      "description": "A lógica de atribuição deve ser auditável pelo usuário: para qualquer lead, deve ser possível ver por que ele foi classificado como Marketing, Comercial ou não atribuído.",
+      "metric": "100% dos leads classificados expõem o sinal/regra que determinou a classificação."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "CON-1",
+      "type": "technical",
+      "description": "O conector nativo Salesforce disponível no Claude (MCP Salesforce) é read/write via chat e NÃO pode servir como backend vivo para o dashboard — constraint já validada em trabalho anterior.",
+      "impact": "A ingestão de Salesforce precisa de uma camada própria (ex.: n8n, como já feito para ads), não do MCP em runtime do dashboard."
+    },
+    {
+      "id": "CON-2",
+      "type": "technical",
+      "description": "RD Station Marketing está conectado via MCP majoritariamente para leitura; existem ações de escrita (criar/atualizar contato, mudar estágio de funil, inscrever lead em workflow) que são mutação real na plataforma.",
+      "impact": "Qualquer feature de escrita em RD Station exige confirmação explícita e não pode ser efeito colateral de análise/leitura."
+    },
+    {
+      "id": "CON-3",
+      "type": "technical",
+      "description": "Dados de workflows de automação do RD Station (entrou/saiu/chegou em etapa) são atualizados 1x/dia na origem.",
+      "impact": "Jornada do lead não pode prometer granularidade de tempo real para eventos de automação."
+    },
+    {
+      "id": "CON-4",
+      "type": "technical",
+      "description": "No Salesforce: RecordType.Name é o sinal confiável de Produto/Serviço (não LeadSource); Amount é MRR e não valor de contrato; o join Lead convertido → Oportunidade deve ser feito por ConvertedAccountId (não por LeadSource).",
+      "impact": "Define chaves e semântica obrigatórias do modelo de dados; violar isso reintroduz erros já diagnosticados."
+    },
+    {
+      "id": "CON-5",
+      "type": "technical",
+      "description": "O campo Campanha_LinkedIn__c (que carrega o Ad ID do Meta para leads WhatsApp do SDR IA) tem cobertura de apenas ~15% dos registros.",
+      "impact": "A atribuição de campanha para o canal WhatsApp é estruturalmente incompleta; o design precisa tratar 'não atribuído' como estado de primeira classe.",
+      "status": "NÃO APLICÁVEL nesta fase (2026-09-04): o canal WhatsApp/SDR IA saiu do escopo imediato. A restrição permanece registrada para quando o canal reentrar (ver FR-12)."
+    },
+    {
+      "id": "CON-6",
+      "type": "technical",
+      "description": "Arquitetura de partida: index.html estático na raiz do repositório loupen-dashboard é o dashboard v3 em produção, alimentado por Google Sheets + workflows n8n congelados em arrays/JSON no próprio HTML; não há backend vivo nem banco de dados.",
+      "impact": "Todo o projeto é uma migração brownfield, não greenfield: exige plano de coexistência/corte entre o artefato estático atual e a nova base."
+    },
+    {
+      "id": "CON-7",
+      "type": "business",
+      "description": "A decisão build vs buy está em aberto por decisão do usuário; a pesquisa deve cobrir ambos os caminhos antes de qualquer compromisso de stack.",
+      "impact": "As fases Assess e Research não podem assumir stack; o Plan (Fase 6) só é válido após a decisão build vs buy."
+    },
+    {
+      "id": "CON-8",
+      "type": "business",
+      "description": "Entrega faseada e deliberada: o usuário quer construir 'passo a passo', debatendo ao longo do caminho, ciente de que o projeto é grande e pode levar várias horas e exigir avaliação/desenvolvimento de integrações.",
+      "impact": "O plano de implementação deve ter fases com ponto de decisão do usuário entre elas, não uma entrega monolítica."
+    },
+    {
+      "id": "CON-9",
+      "type": "technical",
+      "description": "Já existe integração de anúncios pagos via Windsor.ai (MCP, 350+ conectores incluindo Meta/Google/LinkedIn Ads, GA4 e data warehouses, com leitura e escrita) e um padrão implementado via n8n para Meta Ads, com workflows reais rodando na conta n8n da Loupen.",
+      "impact": "A camada de ads deve reaproveitar esses ativos (REUSE > ADAPT > CREATE) em vez de construir nova ingestão de ads do zero."
+    },
+    {
+      "id": "CON-10",
+      "type": "business",
+      "description": "Custo recorrente ZERO, sem exceção.",
+      "impact": "Não é \"sem orçamento para plataforma de mercado\": é nenhuma linha de assinatura. Fonte: research-amendment-1.json."
+    },
+    {
+      "id": "CON-11",
+      "type": "technical",
+      "description": "Sem VPS/servidor próprio para banco de dados.",
+      "impact": "O banco tem de ser managed/serverless free tier de terceiro. A dependência de servidor próprio para ingestão permanece e é herdada de CON-9/ASM-3. Fonte: research-amendment-1.json."
+    },
+    {
+      "id": "CON-12",
+      "type": "technical",
+      "description": "Hospedagem permanece GitHub Pages e o paradigma permanece HTML/CSS/JS vanilla, sem framework e sem build step.",
+      "impact": "Restringe P-UI-1 (estado de view/filtro/ficha só em query string, nunca em segmento de caminho — GitHub Pages sem rewrite não serve caminho arbitrário) e proíbe devDependency/build step na aplicação entregue. Fonte: research-amendment-2.json F-3."
+    },
+    {
+      "id": "CON-13",
+      "type": "technical",
+      "description": "GitHub Pages privado só existe no Enterprise Cloud e só para repositórios de organização.",
+      "impact": "Nesta conta pessoal, \"manter Pages grátis\" e \"repositório privado\" são mutuamente exclusivos — motivou o desenho do gate via Cloudflare Access (spec.md §3.4) em vez de tornar o repositório privado. Fonte: research-amendment-2.json F-2."
+    },
+    {
+      "id": "CON-14",
+      "type": "technical",
+      "description": "Cloudflare Access e Origin Rules exigem hostname proxiado em zona ativa da conta Cloudflare.",
+      "impact": "Torna \"conta Cloudflare com zona ativa\" um pré-requisito operacional de fase 1 que não existia em nenhum artefato anterior (ver R3, OQ-4-RESIDUAL). Fonte: research-amendment-2.json."
+    },
+    {
+      "id": "CON-15",
+      "type": "technical",
+      "description": "Os dados residem no Brasil — o projeto Neon é provisionado em São Paulo (aws-sa-east-1).",
+      "impact": "Decisão do usuário de 2026-09-04, irreversível na prática por R15 (trocar depois exige recriar o projeto e recarregar tudo); verificada na tela de criação antes de qualquer carga. Fonte: resolvedOpenQuestions2026_09_04_rodada2.OQ-4."
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "ASM-1",
+      "description": "Google Sheets → JSON estático é insuficiente para entregar 'CRM interno' com ficha de lead, jornada e filtros ricos de forma satisfatória; por isso o projeto assume backend real com banco de dados.",
+      "risk": "high",
+      "risk_if_wrong": "Se uma solução de mercado (buy) for escolhida, parte do esforço de backend próprio pode ser desnecessária — daí a dependência de FR-13 antes do Plan.",
+      "validation_needed": true
+    },
+    {
+      "id": "ASM-2",
+      "description": "Salesforce permanece o sistema de registro (CRM oficial); o 'CRM interno' pedido é uma camada de inteligência/visualização sobre ele, não sua substituição.",
+      "risk": "low",
+      "risk_if_wrong": "Confirmado pelo usuário em 2026-09-03: o CRM interno é somente leitura/análise. Salesforce e RD Station permanecem os únicos sistemas onde se opera (mudar estágio, atualizar lead, registrar atividade). Resolve OQ-6.",
+      "validation_needed": false
+    },
+    {
+      "id": "ASM-3",
+      "description": "n8n continua disponível e é a camada de orquestração de ingestão preferida, dado o padrão já implementado e rodando para Meta Ads.",
+      "risk": "medium",
+      "risk_if_wrong": "Necessidade de escolher e implementar outro orquestrador de ingestão, aumentando esforço de infraestrutura.",
+      "validation_needed": false
+    },
+    {
+      "id": "ASM-4",
+      "description": "Confirmado pelo usuário em 2026-09-03: o CRM interno terá múltiplos usuários e múltiplos perfis (marketing, comercial, direção) desde o início — não é uso individual do Carlos.",
+      "risk": "medium",
+      "risk_if_wrong": "N/A — decisão confirmada. Eleva NFR-3 de 'controle de acesso básico' para 'autenticação + permissões por perfil' como requisito de primeira fase, não extensão futura. Resolve OQ-3.",
+      "validation_needed": false
+    },
+    {
+      "id": "ASM-5",
+      "description": "Os dados hoje existentes nas planilhas Google Sheets que alimentam o dashboard são reaproveitáveis como carga histórica inicial da nova base.",
+      "risk": "medium",
+      "risk_if_wrong": "Histórico precisaria ser recarregado das fontes originais (Salesforce/RD Station/ads), com risco de janelas de retenção limitadas nas APIs.",
+      "validation_needed": true
+    },
+    {
+      "id": "ASM-6",
+      "description": "O projeto é multi-sessão: o usuário aceita que ele leve várias horas e envolva avaliação e desenvolvimento de integrações.",
+      "risk": "low",
+      "risk_if_wrong": "Se houver pressão de prazo curto, o escopo da Fase 1 de implementação precisa ser reduzido — ver OQ-2.",
+      "validation_needed": true
+    },
+    {
+      "id": "ASM-7",
+      "description": "A regra atual de classificação isMarketing (match de e-mail OU LeadSource batendo padrão de código de campanha) captura parte dos casos corretamente e serve como ponto de partida, não como especificação final.",
+      "risk": "medium",
+      "risk_if_wrong": "Se a regra atual estiver errada também nos casos que hoje 'acertam', a base histórica de classificação precisa ser recalculada por completo.",
+      "validation_needed": true
+    }
+  ],
+  "domainModel": [
+    {
+      "id": "DM-1",
+      "entity": "Lead",
+      "description": "Pessoa capturada por qualquer canal (formulário/landing page/pop-up do RD Station, anúncio pago, WhatsApp via SDR IA) antes ou depois de conversão em Salesforce. É a entidade central da ficha 360 e da jornada.",
+      "attributes": [
+        "nome",
+        "email",
+        "telefone/WhatsApp",
+        "LeadSource (Salesforce)",
+        "Campanha_LinkedIn__c (Ad ID do Meta, cobertura ~15%)",
+        "classificacaoOrigem (Marketing | Comercial | NaoAtribuido)",
+        "razaoClassificacao (sinal auditável — NFR-7)",
+        "ConvertedAccountId (quando convertido)",
+        "estagioFunil (RD Station)",
+        "fonteDeDados (Salesforce | RD Station | SDR IA)"
+      ],
+      "relationships": [
+        "belongs_to Account (via ConvertedAccountId, quando convertido)",
+        "has_many ConversionEvent",
+        "has_many Opportunity (indireto, via Account/ConvertedAccountId — nunca via LeadSource)",
+        "belongs_to Channel/Source",
+        "belongs_to Campaign (quando rastreável)",
+        "has_many AutomationWorkflow (participações: entrou/saiu/chegou em etapa)",
+        "belongs_to Owner",
+        "has_one FunnelStage (estágio atual)"
+      ]
+    },
+    {
+      "id": "DM-2",
+      "entity": "Contact",
+      "description": "Contato do RD Station Marketing — a representação do mesmo indivíduo do lado de marketing, com perfil, eventos de conversão, eventos de oportunidade e estágio de funil. Pode ou não ter par correspondente no Salesforce.",
+      "attributes": [
+        "email",
+        "perfil",
+        "estagioFunil",
+        "segmentacoes"
+      ],
+      "relationships": [
+        "has_one Lead (mesma pessoa; requer chave de identidade — ver EC-7)",
+        "has_many ConversionEvent",
+        "has_many AutomationWorkflow (participações)",
+        "belongs_to Campaign"
+      ]
+    },
+    {
+      "id": "DM-3",
+      "entity": "Opportunity",
+      "description": "Oportunidade do Salesforce. Amount representa MRR (receita mensal recorrente), NÃO valor total de contrato; valor de contrato só é derivado (MRR × meses) quando o estágio é Ganho.",
+      "attributes": [
+        "Amount (MRR)",
+        "StageName (inclui 'Ganho')",
+        "RecordType.Name (Produto/Serviço)",
+        "AccountId",
+        "OwnerId",
+        "valorContrato (derivado, somente quando Ganho e com duração conhecida)"
+      ],
+      "relationships": [
+        "belongs_to Account",
+        "belongs_to Owner",
+        "has_one RecordType (Produto/Serviço)",
+        "belongs_to FunnelStage",
+        "traced_to Lead (via ConvertedAccountId do lead)",
+        "attributed_to Campaign (quando rastreável)"
+      ]
+    },
+    {
+      "id": "DM-4",
+      "entity": "Account",
+      "description": "Empresa/conta no Salesforce. É a ponte estrutural entre Lead convertido e Opportunity — o join correto é por ConvertedAccountId.",
+      "attributes": [
+        "nome",
+        "Id"
+      ],
+      "relationships": [
+        "has_many Lead (convertidos)",
+        "has_many Opportunity",
+        "belongs_to Owner"
+      ]
+    },
+    {
+      "id": "DM-5",
+      "entity": "Campaign",
+      "description": "Campanha de marketing (RD Station e/ou identificada por código em LeadSource). É o principal sinal usado hoje para classificar origem como Marketing.",
+      "attributes": [
+        "nome",
+        "codigo/identificador em LeadSource",
+        "canal"
+      ],
+      "relationships": [
+        "has_many Lead",
+        "has_many Contact",
+        "has_many AdCampaign (quando paga)",
+        "has_many ConversionEvent",
+        "generates Opportunity (atribuição indireta)"
+      ]
+    },
+    {
+      "id": "DM-6",
+      "entity": "AdCampaign",
+      "description": "Campanha de anúncio pago nas plataformas (Meta Ads, Google Ads, LinkedIn Ads), acessível via Windsor.ai e/ou via o padrão n8n já implementado para Meta Ads. Possui hierarquia campanha → conjunto → anúncio (Ad ID).",
+      "attributes": [
+        "plataforma",
+        "campanhaId",
+        "conjuntoId",
+        "adId",
+        "metricas de mídia"
+      ],
+      "relationships": [
+        "belongs_to Campaign (quando mapeável)",
+        "has_many Lead (via Ad ID, ex.: Campanha_LinkedIn__c para WhatsApp)",
+        "belongs_to Channel/Source"
+      ]
+    },
+    {
+      "id": "DM-7",
+      "entity": "Channel/Source",
+      "description": "Canal/origem do lead e a dimensão de atribuição Marketing vs Comercial. Precisa de um terceiro estado explícito 'NaoAtribuido' — o modelo atual força Comercial e gera o bug reportado (FR-5).",
+      "attributes": [
+        "canal (formulario | landing page | pop-up | ads | WhatsApp/SDR IA | outbound)",
+        "classificacao (Marketing | Comercial | NaoAtribuido)",
+        "sinalDeterminante"
+      ],
+      "relationships": [
+        "has_many Lead",
+        "has_many AdCampaign",
+        "referenced_by Campaign"
+      ]
+    },
+    {
+      "id": "DM-8",
+      "entity": "FunnelStage",
+      "description": "Estágio de funil. Existe em duas semânticas distintas que devem ser mantidas separadas e mapeadas: estágio de funil do RD Station (marketing) e StageName da oportunidade no Salesforce (comercial).",
+      "attributes": [
+        "nome",
+        "origem (RD Station | Salesforce)",
+        "ordem"
+      ],
+      "relationships": [
+        "has_many Lead",
+        "has_many Contact",
+        "has_many Opportunity"
+      ]
+    },
+    {
+      "id": "DM-9",
+      "entity": "AutomationWorkflow",
+      "description": "Workflow de automação do RD Station, com registro de quem entrou, saiu e chegou em cada etapa (dados atualizados 1x/dia na origem).",
+      "attributes": [
+        "nome",
+        "etapas",
+        "dataAtualizacaoOrigem (1x/dia)"
+      ],
+      "relationships": [
+        "has_many Contact (participações)",
+        "has_many Lead (participações)",
+        "produces ConversionEvent"
+      ]
+    },
+    {
+      "id": "DM-10",
+      "entity": "ConversionEvent",
+      "description": "Evento de interação/conversão de um lead/contato: conversão em formulário, landing page ou pop-up, evento de oportunidade do RD Station, entrada/saída/etapa de workflow, ou qualificação via SDR IA no WhatsApp. É o átomo que compõe a jornada (FR-3).",
+      "attributes": [
+        "tipo",
+        "timestamp",
+        "fonteDeDados",
+        "ativoDeOrigem (formulário | LP | pop-up | anúncio | conversa WhatsApp)"
+      ],
+      "relationships": [
+        "belongs_to Lead",
+        "belongs_to Contact",
+        "belongs_to Campaign (quando rastreável)",
+        "belongs_to AutomationWorkflow (quando originado de automação)"
+      ]
+    },
+    {
+      "id": "DM-11",
+      "entity": "Owner",
+      "description": "Usuário responsável no Salesforce (proprietário do lead, da conta ou da oportunidade).",
+      "attributes": [
+        "nome",
+        "OwnerId"
+      ],
+      "relationships": [
+        "has_many Lead",
+        "has_many Account",
+        "has_many Opportunity"
+      ]
+    },
+    {
+      "id": "DM-12",
+      "entity": "MarketingAsset",
+      "description": "Ativos de captura do RD Station (landing pages, formulários, pop-ups) e e-mails, todos com métricas de conversão disponíveis via MCP.",
+      "attributes": [
+        "tipo (landing page | formulário | pop-up | e-mail)",
+        "metricasDeConversao"
+      ],
+      "relationships": [
+        "belongs_to Campaign",
+        "produces ConversionEvent"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "id": "INT-1",
+      "flow": "Filtrar leads e oportunidades com critérios combinados",
+      "description": "Usuário chega à superfície de leads/oportunidades, aplica múltiplos filtros combinados e os indicadores e listas se atualizam mantendo o estado do filtro durante a navegação.",
+      "states": [
+        "loading: indicador de carregamento na lista e nos KPIs enquanto a consulta roda",
+        "error: falha de consulta exibe erro acionável com opção de repetir, sem apagar o filtro aplicado",
+        "empty: combinação de filtros sem resultado mostra estado vazio explícito com resumo dos filtros ativos e ação de limpar"
+      ],
+      "steps": [
+        "abre a superfície de leads",
+        "aplica filtro A",
+        "adiciona filtro B (combinação, não substituição)",
+        "lê KPIs e lista recalculados",
+        "navega para uma ficha e retorna com filtros preservados"
+      ]
+    },
+    {
+      "id": "INT-2",
+      "flow": "Abrir a ficha interna do lead (lead 360)",
+      "description": "Usuário seleciona um lead na lista e abre a superfície de detalhe navegável (substituindo a abordagem de popup que não funcionou), vendo o que o lead converteu e as oportunidades que gerou.",
+      "states": [
+        "loading: skeleton nas seções de conversões e oportunidades",
+        "error: seção que falhou é marcada individualmente, sem derrubar a ficha inteira",
+        "empty: lead sem conversões ou sem oportunidades mostra estado vazio explícito ('nenhuma oportunidade vinculada') em vez de zero ambíguo"
+      ],
+      "steps": [
+        "clica no lead",
+        "abre superfície de detalhe endereçável",
+        "lê dados de perfil e classificação de origem com a razão da classificação",
+        "lê eventos de conversão",
+        "lê oportunidades vinculadas via ConvertedAccountId",
+        "fecha e retorna ao contexto anterior"
+      ]
+    },
+    {
+      "id": "INT-3",
+      "flow": "Percorrer a jornada do lead",
+      "description": "Dentro da ficha, usuário visualiza a linha do tempo cronológica unificada dos eventos do lead, com a fonte de cada evento identificada e a idade do dado por fonte.",
+      "states": [
+        "loading: timeline em carregamento progressivo por fonte",
+        "error: fonte indisponível aparece como lacuna declarada na timeline, não como ausência silenciosa",
+        "empty: lead sem eventos registrados mostra aviso de que nenhuma interação foi capturada nas fontes conectadas"
+      ],
+      "steps": [
+        "abre a aba/seção de jornada na ficha",
+        "lê eventos em ordem cronológica",
+        "identifica a fonte por evento",
+        "navega de um evento para a campanha/workflow/oportunidade relacionada"
+      ]
+    },
+    {
+      "id": "INT-4",
+      "flow": "Navegar relacionamentos campanha → lead → oportunidade",
+      "description": "Usuário parte de uma campanha (ou anúncio) e navega até os leads originados e as oportunidades resultantes, e vice-versa, sem perder o contexto — substituindo as listas soltas atuais.",
+      "states": [
+        "loading: contadores de vínculo em carregamento",
+        "error: vínculo não calculável exibe motivo (ex.: lead sem ConvertedAccountId)",
+        "empty: campanha sem leads atribuídos exibe estado vazio junto da métrica de cobertura de atribuição"
+      ],
+      "steps": [
+        "seleciona campanha ou anúncio",
+        "abre a lista de leads originados",
+        "seleciona um lead",
+        "salta para a oportunidade gerada",
+        "retorna à campanha mantendo o caminho de navegação"
+      ]
+    },
+    {
+      "id": "INT-5",
+      "flow": "Inspecionar e auditar a classificação de origem (Marketing vs Comercial)",
+      "description": "Usuário identifica um lead cuja classificação parece incorreta e inspeciona qual sinal determinou a classificação, permitindo diagnosticar a regra em vez de adivinhar — este é o fluxo que expõe o bug relatado.",
+      "states": [
+        "loading: cálculo da razão de classificação em andamento",
+        "error: sinal indisponível exibe 'razão não determinável' de forma explícita",
+        "empty: lead sem nenhum sinal de origem aparece como NaoAtribuido, nunca como Comercial por default"
+      ],
+      "steps": [
+        "filtra leads por classificação de origem",
+        "abre um lead classificado como Comercial",
+        "lê a razão da classificação e o campo de origem bruto",
+        "confirma ou contesta a classificação"
+      ]
+    },
+    {
+      "id": "INT-6",
+      "flow": "Verificar frescor e integridade dos dados ingeridos",
+      "description": "Usuário confere quando cada fonte foi coletada por último e se houve divergência de contagem entre origem e destino, evitando repetir o problema de exibir totais sobre base parcial.",
+      "states": [
+        "loading: status de ingestão em consulta",
+        "error: última execução falhou — exibe fonte, horário e mensagem",
+        "empty: fonte nunca ingerida aparece como não configurada, não como zero"
+      ],
+      "steps": [
+        "abre o painel de status de dados",
+        "lê timestamp por fonte",
+        "lê divergência origem↔destino por fonte",
+        "identifica fontes com atribuição incompleta (ex.: cobertura ~15% no WhatsApp)"
+      ]
+    }
+  ],
+  "edgeCases": [
+    {
+      "id": "EC-1",
+      "scenario": "Lead sem sinal suficiente de origem (não bate match de e-mail nem padrão de código de campanha em LeadSource).",
+      "handling": "Classificar explicitamente como 'NaoAtribuido' e expor a razão. Proibido fallback silencioso para 'Comercial' — esse comportamento é a causa do bug relatado pelo usuário.",
+      "severity": "critical"
+    },
+    {
+      "id": "EC-2",
+      "scenario": "Lead não convertido (sem ConvertedAccountId) sendo aberto na ficha 360.",
+      "handling": "Exibir a ficha com conversões e jornada, e a seção de oportunidades em estado vazio explícito ('lead ainda não convertido'), sem tentar join por LeadSource.",
+      "severity": "high"
+    },
+    {
+      "id": "EC-3",
+      "scenario": "Oportunidade sem lead de origem rastreável (Account sem lead convertido associado).",
+      "handling": "Manter a oportunidade na base e nos totais, marcada como sem origem rastreável, e contabilizá-la na métrica de cobertura de atribuição.",
+      "severity": "high"
+    },
+    {
+      "id": "EC-4",
+      "scenario": "Lead WhatsApp do SDR IA sem Campanha_LinkedIn__c preenchido (~85% dos registros).",
+      "handling": "Persistir o lead com atribuição de anúncio ausente e expor a cobertura agregada; nunca inferir campanha por proximidade temporal sem regra validada pelo usuário.",
+      "severity": "high"
+    },
+    {
+      "id": "EC-5",
+      "scenario": "Oportunidade não Ganha, ou Ganha sem duração de contrato informada, em cálculo de receita.",
+      "handling": "Não Ganha: exibir apenas MRR (Amount), sem valor de contrato. Ganha sem duração: valor de contrato indisponível — proibido assumir duração padrão.",
+      "severity": "critical"
+    },
+    {
+      "id": "EC-6",
+      "scenario": "Sincronização parcial da fonte (padrão do problema atual: 44 de 236 linhas em 'Oportunidades(SF)').",
+      "handling": "Bloquear a exibição de agregados como se fossem completos: mostrar contagem sincronizada vs contagem na origem e sinalizar incompletude na superfície.",
+      "severity": "critical"
+    },
+    {
+      "id": "EC-7",
+      "scenario": "Mesma pessoa presente em mais de uma fonte (contato no RD Station, lead no Salesforce, conversa no WhatsApp) gerando registros duplicados.",
+      "handling": "Definir chave de identidade e regra de resolução de duplicidade antes da consolidação; ao empatar/conflitar, preservar os registros de origem e marcar o vínculo como provável, não como confirmado.",
+      "severity": "high"
+    },
+    {
+      "id": "EC-8",
+      "scenario": "Fonte externa indisponível durante a ingestão (Salesforce, RD Station, Windsor.ai ou n8n fora do ar).",
+      "handling": "Ingerir as demais fontes, registrar a lacuna com fonte e horário, e manter o último dado válido marcado com sua idade real — nunca substituir por zero.",
+      "severity": "high"
+    },
+    {
+      "id": "EC-9",
+      "scenario": "Ação de escrita do RD Station (criar/atualizar contato, mudar estágio de funil, inscrever em workflow) disparada como efeito colateral de uma operação de leitura/análise.",
+      "handling": "Bloquear por padrão: escritas só ocorrem por ação deliberada e confirmada; nenhum caminho de leitura pode invocar mutação.",
+      "severity": "critical"
+    },
+    {
+      "id": "EC-10",
+      "scenario": "Consumo de dados de workflow do RD Station como se fossem de tempo real, quando a origem atualiza 1x/dia.",
+      "handling": "Declarar a idade do dado na superfície e evitar comparações intradiárias sobre essa fonte.",
+      "severity": "medium"
+    },
+    {
+      "id": "EC-11",
+      "scenario": "Agrupamento por Produto/Serviço construído sobre LeadSource em vez de RecordType.Name.",
+      "handling": "Rejeitar na revisão: RecordType.Name é o único sinal confiável de Produto/Serviço.",
+      "severity": "high"
+    },
+    {
+      "id": "EC-12",
+      "scenario": "Coexistência entre o index.html estático em produção e a nova base durante a migração, gerando dois números diferentes para a mesma métrica.",
+      "handling": "Definir a fonte da verdade por fase e sinalizar na superfície legada que ela é um snapshot congelado até o corte.",
+      "severity": "high"
+    }
+  ],
+  "terminology": [
+    {
+      "term": "Lead",
+      "definition": "Pessoa capturada por qualquer canal antes da conversão em conta/oportunidade no Salesforce. No contexto Loupen inclui leads de formulário/LP/pop-up (RD Station), de anúncio pago e de WhatsApp via SDR IA.",
+      "aliases": [
+        "Contato (quando no RD Station)"
+      ],
+      "avoid": [
+        "usar 'Lead' e 'Contato' como se fossem a mesma entidade sem chave de identidade definida (ver EC-7)"
+      ]
+    },
+    {
+      "term": "Contato",
+      "definition": "Registro de pessoa no RD Station Marketing, com perfil, eventos de conversão/oportunidade e estágio de funil.",
+      "aliases": [
+        "Contact"
+      ],
+      "avoid": [
+        "tratar Contato do RD Station como Contact do Salesforce"
+      ]
+    },
+    {
+      "term": "Oportunidade",
+      "definition": "Registro de Opportunity no Salesforce, com StageName, RecordType.Name e Amount.",
+      "aliases": [
+        "Opportunity",
+        "Deal"
+      ],
+      "avoid": [
+        "'evento de oportunidade' do RD Station — é um evento de marketing, não o registro comercial"
+      ]
+    },
+    {
+      "term": "MRR",
+      "definition": "Receita mensal recorrente. É o que o campo Amount da oportunidade no Salesforce representa.",
+      "aliases": [
+        "Amount",
+        "receita mensal recorrente"
+      ],
+      "avoid": [
+        "chamar Amount de 'valor do contrato' ou de 'ticket'"
+      ]
+    },
+    {
+      "term": "Valor de contrato",
+      "definition": "MRR multiplicado pelo número de meses do contrato. Só é calculado quando o estágio da oportunidade é 'Ganho' e a duração é conhecida.",
+      "aliases": [
+        "valor total",
+        "TCV"
+      ],
+      "avoid": [
+        "derivar valor de contrato para oportunidades não Ganhas ou com duração assumida por default"
+      ]
+    },
+    {
+      "term": "Marketing (origem)",
+      "definition": "Classificação de origem do lead indicando que ele veio de ação de marketing (campanha, ativo de captura, anúncio). Hoje inferida por match de e-mail OU LeadSource batendo padrão de código de campanha — regra incompleta a ser redesenhada (FR-5).",
+      "aliases": [
+        "isMarketing"
+      ],
+      "avoid": [
+        "assumir que ausência de sinal de Marketing significa Comercial"
+      ]
+    },
+    {
+      "term": "Comercial (origem)",
+      "definition": "Classificação de origem do lead indicando geração pelo time comercial (prospecção ativa), e não por marketing.",
+      "aliases": [
+        "outbound"
+      ],
+      "avoid": [
+        "usar Comercial como bucket residual/default de tudo que não foi classificado como Marketing"
+      ]
+    },
+    {
+      "term": "Não atribuído",
+      "definition": "Terceiro estado explícito de origem, para leads sem sinal suficiente de atribuição. Introduzido por este projeto para eliminar o fallback incorreto para Comercial.",
+      "aliases": [
+        "NaoAtribuido",
+        "sem atribuição"
+      ],
+      "avoid": [
+        "omitir esses leads da base ou somá-los a Comercial"
+      ]
+    },
+    {
+      "term": "Produto/Serviço",
+      "definition": "Dimensão de oferta da oportunidade, obtida de RecordType.Name no Salesforce.",
+      "aliases": [
+        "RecordType",
+        "linha de oferta"
+      ],
+      "avoid": [
+        "derivar Produto/Serviço de LeadSource"
+      ]
+    },
+    {
+      "term": "Jornada do lead",
+      "definition": "Sequência cronológica unificada dos eventos de um lead (conversões, participações em workflow, mudanças de estágio, criação/evolução de oportunidade), agregando múltiplas fontes.",
+      "aliases": [
+        "timeline",
+        "histórico do lead"
+      ],
+      "avoid": [
+        "chamar de jornada uma lista de eventos de uma única fonte"
+      ]
+    },
+    {
+      "term": "Ficha do lead (lead 360)",
+      "definition": "Superfície interna de detalhe de um lead, com perfil, classificação de origem auditável, conversões, jornada e oportunidades geradas.",
+      "aliases": [
+        "parte interna do lead",
+        "perfil do lead",
+        "lead 360"
+      ],
+      "avoid": [
+        "'popup de lead' — a abordagem de popup já foi tentada e não funcionou bem (FR-6)"
+      ]
+    },
+    {
+      "term": "SDR IA",
+      "definition": "Fluxo de IA que qualifica leads via WhatsApp na Loupen. Sua atribuição de anúncio depende do campo Campanha_LinkedIn__c (Ad ID do Meta), com cobertura ~15%.",
+      "aliases": [
+        "SRD IA (grafia usada na aba atual do dashboard)"
+      ],
+      "avoid": [
+        "padronizar as duas grafias sem decisão — a aba em produção usa 'SRD IA'"
+      ]
+    },
+    {
+      "term": "Snapshot estático",
+      "definition": "Modelo atual de dados do dashboard: arrays/JSON congelados dentro do index.html, gerados a partir de Google Sheets via n8n, sem backend vivo nem banco de dados.",
+      "aliases": [
+        "array estático",
+        "dados congelados"
+      ],
+      "avoid": [
+        "chamar o snapshot de 'backend' ou de 'integração ao vivo'"
+      ]
+    },
+    {
+      "term": "CRM interno",
+      "definition": "Termo usado pelo usuário para descrever o resultado desejado: superfície com filtros ricos, ficha de lead, jornada e relacionamentos. Escopo em relação ao Salesforce (camada de leitura vs operação) ainda não confirmado (ASM-2, OQ-6).",
+      "aliases": [
+        "quase um CRM"
+      ],
+      "avoid": [
+        "assumir que substitui o Salesforce como sistema de registro"
+      ]
+    },
+    {
+      "term": "Atribuição",
+      "definition": "Processo de ligar um lead ou oportunidade à sua origem (canal, campanha, anúncio) e classificá-la como Marketing, Comercial ou Não atribuído.",
+      "aliases": [
+        "attribution",
+        "origem"
+      ],
+      "avoid": [
+        "confundir atribuição de origem com o campo LeadSource bruto — LeadSource é um sinal, não a classificação"
+      ]
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "OQ-1",
+      "question": "Existe orçamento disponível para ferramenta paga de mercado (ex.: HubSpot Operations Hub, plataforma de RevOps/CDP)? Se sim, qual a faixa mensal aceitável?",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Não bloqueia Fase 2 (Assess), mas é determinante para a recomendação build vs buy na Fase 3 (FR-13)."
+    },
+    {
+      "id": "OQ-2",
+      "question": "Qual o prazo desejado para a primeira fase utilizável? Existe data/evento de negócio amarrado?",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user"
+    },
+    {
+      "id": "OQ-3",
+      "question": "Quem mais vai usar o 'CRM interno' além do Carlos? Quantos usuários e quais perfis (marketing, comercial, direção)?",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Impacta NFR-3 (controle de acesso) e ASM-4."
+    },
+    {
+      "id": "OQ-4",
+      "question": "Há requisito específico de hospedagem/infraestrutura (provedor, região de dados, uso obrigatório de algum ambiente já contratado)?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user"
+    },
+    {
+      "id": "OQ-5",
+      "question": "Quais são os alvos aceitáveis de tempo de resposta para filtros e ficha de lead, e de frescor de dados por fonte (tempo real, horário, diário)?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Sem isso, NFR-2 fica sem métrica."
+    },
+    {
+      "id": "OQ-6",
+      "question": "O 'CRM interno' precisa permitir escrita (atualizar lead, mudar estágio, registrar atividade) ou é analítico/leitura sobre Salesforce e RD Station?",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Valida ASM-2 e determina se CON-2 (escritas em RD Station) entra em escopo."
+    },
+    {
+      "id": "OQ-7",
+      "question": "Qual é a regra de negócio autoritativa para classificar um lead como Marketing vs Comercial? Precisamos da definição correta do usuário, não apenas dos casos errados.",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Não bloqueia Assess, mas bloqueia a escrita definitiva do FR-5 na Fase 4 (Spec)."
+    },
+    {
+      "id": "OQ-8",
+      "question": "Existe política de LGPD/tratamento de dados pessoais a observar, dado que a nova base conterá PII de leads (nome, e-mail, WhatsApp) fora de Salesforce e RD Station?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user"
+    },
+    {
+      "id": "OQ-9",
+      "question": "Qual volume e janela de histórico devem ser migrados para a nova base (todo o histórico das planilhas, últimos N meses, apenas dados vivos)?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Valida ASM-5."
+    },
+    {
+      "id": "OQ-10",
+      "question": "O dashboard estático atual (index.html) deve continuar funcionando em paralelo durante a migração, ou pode ser descontinuado no corte?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Determina o tratamento de EC-12."
+    },
+    {
+      "id": "OQ-11",
+      "question": "Há como aumentar a cobertura de atribuição dos leads WhatsApp na origem (garantir preenchimento do Ad ID no fluxo do SDR IA), ou o projeto deve apenas conviver com ~15%?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Se a origem puder ser corrigida, FR-12 muda de 'expor lacuna' para 'fechar lacuna'."
+    },
+    {
+      "id": "OQ-4-RESIDUAL",
+      "question": "Qual zona DNS usar e se ela está na Cloudflare, na mesma conta do Zero Trust (UC-6) — item herdado do amendment 2, que viajava dentro de OQ-4.",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "A parte de região de dados de OQ-4 está resolvida (Brasil / aws-sa-east-1, ver CON-15). O que sobrou é operacional e se cruza com OQ-15: sem zona na Cloudflare, a fase 1 passa a incluir migração de nameservers de domínio corporativo (R3). Não bloqueia progresso, mas é a primeira verificação de spec.md §4.4."
+    },
+    {
+      "id": "OQ-12",
+      "question": "Onde \"Parceiro/Indicação\" se encaixa no nível 1 da taxonomia de atribuição: Comercial (quem trouxe foi um vendedor), Marketing (programa de parceiros) ou um quarto segmento próprio?",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Deliberadamente não mapeado na proposta de atribuição (research.json): a literatura trata Partner/Referral como categoria própria, e forçá-la em Marketing ou Comercial reintroduz o problema de bucket residual que esta epic existe para corrigir. Não bloqueia progresso da spec, mas bloqueia o fechamento de FR-5. Item V4 do plano de validação (spec.md §3.5)."
+    },
+    {
+      "id": "OQ-13",
+      "question": "Qual é o vocabulário controlado de outbound — quais valores reais e distintos de LeadSource no Salesforce significam prospecção ativa?",
+      "priority": "high",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "S5 (vocabulário de outbound) é o único caminho para o segmento Comercial; sem esse vocabulário levantado, Comercial não é calculável. Não é derivável só da pesquisa. Não bloqueia progresso da spec, mas bloqueia S5. Item V3 do plano de validação (spec.md §3.5)."
+    },
+    {
+      "id": "OQ-15",
+      "question": "Qual hostname usar: dashboard.loupenapps.com.br (recomendado — zona do n8n, mesma zona para API, domínio institucional fora do caminho crítico) ou um subdomínio de loupen.com.br (mais apresentável, mas envolve a zona do e-mail corporativo)?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Como o gate é por e-mail e não por URL, a estética não afeta a segurança. Fonte: research-amendment-2.json PR-1."
+    },
+    {
+      "id": "OQ-16",
+      "question": "Aceitar o plano B nomeado (Cloudflare Pages + repositório privado) caso R1 ou R2 se materializem?",
+      "priority": "medium",
+      "blocksProgress": false,
+      "assignedTo": "user",
+      "note": "Melhor postura de segurança de todo o leque: elimina de uma vez o site público, o repositório público e o histórico. Custos: sai do GitHub Pages (contraria F-3/CON-12), introduz passo de deploy, e a URL *.pages.dev precisa entrar na Access Application. O usuário deve saber que existe antes de aceitar o desenho principal como definitivo. Não bloqueia agora, mas decidir antes do Plan. Fonte: plano B de research-amendment-2.json."
+    }
+  ],
+  "resolvedOpenQuestions2026_09_04_rodada2": [
+    {
+      "id": "OQ-5",
+      "resolvedAt": "2026-09-04",
+      "answer": "Alvo de performance: 'alguns segundos já resolve' — não precisa ser sub-segundo. Compatível com o cold start de 300-500ms do Neon Free sem necessidade de manter o banco sempre ativo.",
+      "impact": "Resolve o bloqueio de NFR-2 para a Fase 5 (Critique). Métrica proposta: filtros e abertura de ficha respondem em até poucos segundos (ordem de 2-3s) sob carga normal; cold start ocasional é aceitável e não precisa de mitigação de manter conexão viva."
+    },
+    {
+      "id": "OQ-4",
+      "resolvedAt": "2026-09-04",
+      "answer": "Região dos dados: Brasil. Verificado: Neon oferece região São Paulo (aws-sa-east-1) — https://neon.com/docs/introduction/regions.",
+      "impact": "Provisionar o projeto Neon em aws-sa-east-1. Resolve a parte de região de OQ-4; resta confirmar se a seleção de região está disponível no plano Free especificamente (não confirmado na doc oficial) — verificação rápida no momento de criar o projeto."
+    },
+    {
+      "id": "OQ-9-REVISAO",
+      "resolvedAt": "2026-09-04",
+      "answer": "REVISADO: em vez de todo o histórico disponível (decisão de 2026-09-03), a janela de carga histórica passa a ser os ÚLTIMOS 6-12 MESES, dado o limite de 0,5 GB por projeto do Neon Free.",
+      "impact": "Reduz o risco R8 (estouro de storage) do desenho do spec.md. ASM-5 (reaproveitar Google Sheets como carga histórica) só precisa cobrir essa janela, não o histórico completo. Atualizar spec.md (OQ-9, R8, checklist de Fase 1a) para refletir a janela de 6-12 meses em vez de 'todo o histórico'."
+    },
+    {
+      "id": "OQ-14",
+      "resolvedAt": "2026-09-04",
+      "answer": "O gate binário (e-mail @loupen.com.br vê tudo, incluindo telefone e MRR) foi aceito sem restrição adicional para a fase 1 — time pequeno, confiança interna alta.",
+      "impact": "Resolve OQ-14. Nenhum dado precisa ser mascarado/excluído da fase 1. R10 (sobre-exposição interna) permanece registrado como risco aceito conscientemente, não como bloqueio."
+    }
+  ],
+  "resolvedOpenQuestions": [
+    {
+      "id": "OQ-6",
+      "resolvedAt": "2026-09-03",
+      "answer": "Só leitura/análise. Salesforce e RD Station continuam sendo os únicos sistemas onde se opera (mudar estágio, atualizar lead, registrar atividade). O CRM interno não escreve de volta nas fontes.",
+      "impact": "Confirma ASM-2. Remove escrita bidirecional do escopo. CON-2 (escritas do RD Station) permanece como restrição de segurança (nunca como efeito colateral de leitura — EC-9), mas não como funcionalidade a construir. Reduz a Dimensão de Risco/Escopo do projeto."
+    },
+    {
+      "id": "OQ-1",
+      "resolvedAt": "2026-09-03",
+      "answer": "Sem orçamento adicional no momento. Foco da pesquisa (FR-13) deve ser o caminho de construção customizada, reaproveitando o que já existe (RD Station, Salesforce, n8n, Windsor.ai).",
+      "impact": "FR-13 é reduzido de 'comparativo build vs buy equilibrado' para 'construção customizada como caminho principal, com ferramentas de mercado citadas apenas como referência/benchmark de features, não como recomendação de compra'. CON-7 permanece válido caso o cenário de orçamento mude no futuro."
+    },
+    {
+      "id": "OQ-7",
+      "resolvedAt": "2026-09-03",
+      "answer": "O usuário não tem a regra correta definida. A pesquisa/arquitetura (Fases 3-4) devem PROPOR um modelo de atribuição Marketing/Comercial/Não atribuído (conforme DM-7, FR-5) para validação posterior do usuário — não implementar uma regra já dada.",
+      "impact": "FR-5 e DM-7 seguem como estão (correção de bug + terceiro estado), mas a especificação final da regra de classificação em spec.md fica marcada como proposta sujeita a validação do usuário, não como fato definitivo."
+    },
+    {
+      "id": "OQ-3",
+      "resolvedAt": "2026-09-03",
+      "answer": "Múltiplos usuários, múltiplos perfis (marketing, comercial, direção) desde o início — não é uso individual do Carlos.",
+      "impact": "Confirma ASM-4. Eleva NFR-3 para autenticação + permissões por perfil como requisito de primeira fase implementável, não extensão futura."
+    },
+    {
+      "id": "OQ-3-REVISAO",
+      "resolvedAt": "2026-09-04",
+      "answer": "PARCIALMENTE REVERTIDO no dia seguinte: NFR-3 completo (autenticação com perfis) é ADIADO para fase 2. Fase 1 entrega a estrutura/dashboard funcionando sem sistema de login. Além disso: hospedagem continua no GitHub Pages (onde o dashboard já está publicado hoje, publicamente) e o frontend mantém o paradigma vanilla HTML/CSS/JS atual — sem migração para Next.js/React na fase 1.",
+      "impact": "Como GitHub Pages não permite site privado em conta pessoal gratuita (só Enterprise Cloud, só organização) e login foi adiado, os dados pessoais de lead ficariam publicamente acessíveis sem nenhuma barreira. Mitigação escolhida: gate de acesso via Cloudflare Access (grátis, restrito a e-mails @loupen.com.br) na frente de um domínio próprio — não é autenticação por perfil, só impede acesso de estranhos. Ver detalhamento completo, incluindo o achado crítico de PII já exposta no repositório (resolvido em 2026-09-04) e o desenho do gate, em `research-amendment-2.json`. Next.js, Cloudflare Workers e Better Auth (recomendados em `research-amendment-1.json`) ficam adiados para quando a fase 2 precisar de autenticação/SSR de verdade."
+    }
+  ],
+  "traceability": {
+    "userVerbatimItems": [
+      "problema de filtro → FR-1",
+      "popups não funcionaram → FR-6",
+      "mais relacionamento entre leads → FR-4",
+      "acompanhar a jornada do lead → FR-3",
+      "parte interna do lead com conversões e oportunidades → FR-2",
+      "leads Comercial que vieram de campanha de marketing → FR-5",
+      "pesquisa ampla multidisciplinar → FR-13",
+      "projeto grande, passo a passo, várias horas, integrações → CON-8, ASM-6"
+    ],
+    "confirmedDecisions": [
+      "Decisão 1 (build vs buy comparativo) → FR-13, CON-7",
+      "Decisão 2 (backend real com banco de dados) → FR-7, ASM-1",
+      "Decisão 3 (formalizar via Spec Pipeline) → FR-14",
+      "Decisão 4 (bug de atribuição dentro do redesenho) → FR-5",
+      "Decisão 5 (somente leitura/análise, sem escrita bidirecional) → resolve OQ-6, confirma ASM-2",
+      "Decisão 6 (sem orçamento, foco em construção customizada) → resolve OQ-1, restringe FR-13",
+      "Decisão 7 (propor modelo de atribuição, não implementar regra pré-definida) → resolve OQ-7",
+      "Decisão 8 (múltiplos usuários/perfis desde o início) → resolve OQ-3, confirma ASM-4, eleva NFR-3",
+      "Decisão 9 (2026-09-04, foco em velocidade) → SDR IA/WhatsApp sai do escopo imediato (defere FR-12, CON-5 não aplicável); painel de MDFs nunca esteve no escopo (nada muda). Foco confirmado: Salesforce (leads/oportunidades), RD Station e anúncios pagos. Impacto real no plan/implementation.yaml: 1 subtask removida (2.19) de 100 — redução marginal de esforço, não estrutural."
+    ]
+  },
+  "nextPhase": {
+    "phase": "assess",
+    "agent": "@architect",
+    "command": "*analyze-impact",
+    "note": "Fase 1 (Gather) concluída. Nenhuma fase seguinte foi executada. openQuestions não bloqueantes permitem seguir para Assess."
+  }
+}

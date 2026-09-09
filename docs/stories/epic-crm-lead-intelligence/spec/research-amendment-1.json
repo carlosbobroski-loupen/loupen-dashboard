@@ -1,0 +1,855 @@
+{
+  "amendsFile": "research.json",
+  "amendmentId": "research-amendment-1",
+  "amendedAt": "2026-09-03T00:00:00Z",
+  "amendedBy": "@analyst",
+  "storyId": "epic-crm-lead-intelligence",
+  "amendmentReason": "Usuário rejeitou Windsor.ai e qualquer ferramenta paga (incluindo Supabase Pro) em 2026-09-03; não há VPS próprio disponível.",
+
+  "amendmentScope": {
+    "perspectivesReopened": ["1_desenvolvimento_arquitetura"],
+    "perspectivesUnchanged": [
+      "2_marketing_revops",
+      "3_dashboard_ux",
+      "4_planejamento",
+      "5_performance_growth"
+    ],
+    "note": "Restrição é exclusivamente de CUSTO e de INFRAESTRUTURA. Não altera taxonomia de atribuição, padrões de UX, faseamento Strangler Fig nem a leitura de que CAC por canal é inconfiável com os dados atuais. attributionModelProposal foi reavaliado apenas no ponto de resolução de identidade (ver revisedAttributionModelImpact).",
+    "newLockedDecisions": [
+      "Custo recorrente ZERO, sem exceção (endurece OQ-1: não é 'sem orçamento para plataforma de mercado', é 'nenhuma linha de assinatura, nem USD 25/mês de banco').",
+      "Windsor.ai FORA do desenho: plano gratuito limita demais o acesso aos dados e o usuário não aceita plano pago. Isso REVERTE o achado de maior impacto de esforço da pesquisa original.",
+      "Sem VPS/servidor próprio para banco de dados: self-host de Postgres ou Supabase CE em servidor da Loupen está descartado. O banco tem de ser managed/serverless free tier de terceiro.",
+      "n8n self-hosted (n8n.loupenapps.com.br) CONTINUA disponível e é para ser reaproveitado — mas agora escrevendo em banco REMOTO gratuito via connection string externa (resolve parcialmente OQ-4).",
+      "Consequência automática em FR-9: volta de 3 para 4 famílias de fonte a ingerir (Salesforce, RD Station, SDR IA WhatsApp e ADS), porque a camada de ads deixa de ter atalho via destination do Windsor.ai."
+    ]
+  },
+
+  "researchScope": {
+    "toolsAvailable": ["WebSearch", "WebFetch", "codebase"],
+    "toolsUnavailable": ["context7", "exa"],
+    "toolNote": "Context7 e EXA não conectados nesta sessão. Toda pesquisa externa via WebSearch/WebFetch, com URL por claim (Artigo IV — No Invention). Claims sem fonte primária estão em newUnverifiedClaims."
+  },
+
+  "supersededDependencies": [
+    "Windsor.ai",
+    "Supabase (Postgres gerenciado + Auth + RLS)"
+  ],
+
+  "supersessionDetail": [
+    {
+      "dependency": "Supabase (Postgres gerenciado + Auth + RLS)",
+      "previousDecision": "CREATE / preferred — plano Pro a USD 25/mês em produção",
+      "newDecision": "REJECTED por custo",
+      "rationale": "A recomendação original dependia explicitamente do Pro: o próprio research.json registra que o Free 'pausa projetos inativos após 7 dias e limita a 2 projetos ativos / 500 MB — inadequado para o artefato de produção; usar Free só para ambiente de desenvolvimento'. Com custo recorrente zero como restrição dura, o único Supabase disponível é justamente o que a pesquisa original já havia declarado inadequado para produção. Além do custo, o padrão de uso deste artefato (dashboard interno consultado em rajadas, dias sem acesso) colide frontalmente com pausa por inatividade que exige reativação manual.",
+      "whatIsLost": [
+        "RBAC via Custom Access Token Auth Hook + políticas RLS prontas no mesmo produto.",
+        "Auth gerenciado (magic link, OTP, social) sem código próprio.",
+        "O argumento 'autorização vive no banco, não reimplementada em cada rota de API' — que era o argumento decisivo contra Postgres puro."
+      ],
+      "howItIsReplaced": "Neon Free (banco) + Better Auth self-hospedado na própria app Next.js (auth+RBAC) + Neon RLS/pg_session_jwt como defesa em profundidade OPCIONAL. Ver newDependencies."
+    },
+    {
+      "dependency": "Windsor.ai",
+      "previousDecision": "REUSE / preferred — destination PostgreSQL removeria a camada de ads do escopo de construção",
+      "newDecision": "REJECTED por decisão do usuário (2026-09-03)",
+      "rationale": "O achado de maior impacto de esforço da pesquisa original ('reduz FR-9 de 4 famílias de fonte para 3') dependia de destination task para PostgreSQL. O usuário informou que o plano gratuito limita demais o acesso aos dados e não aceita plano pago. Nota de coerência: a pesquisa original já registrava em unverifiedClaims que o plano da Loupen NÃO era observável e que o Basic limita a 5 scheduled syncs de 1 tabela/dia — a decisão do usuário efetivamente RESOLVE esse unverifiedClaim pela via negativa.",
+      "whatIsLost": [
+        "Atalho de ingestão de ads sem código (Meta/Google/LinkedIn Ads e GA4 escrevendo direto na base).",
+        "Um caminho candidato para obter campos de campanha que o webhook n8n atual não entrega (objective, daily_budget/lifetime_budget, start_time/stop_time)."
+      ],
+      "howItIsReplaced": "n8n assume 100% da ingestão, inclusive ads. Custo incremental zero (instância já em produção). Mitigação do segundo item: os campos faltantes são um gap na FONTE — os nós HTTP internos do workflow n8n já pedem esses campos à API da plataforma, mas o nó de saída os descarta; obtê-los exige editar o mapeamento de saída do workflow, não contratar ferramenta.",
+      "sourceForMitigation": "codebase + diagnóstico interno do webhook ADS_API_URL (index.html:1209) registrado em 2026-07-10; não é claim de fonte externa"
+    }
+  ],
+
+  "newDependencies": [
+    {
+      "name": "Neon (serverless Postgres) — plano Free",
+      "type": "infrastructure",
+      "version": "plano Free, estado verificado em 2026-09-03",
+      "verified": true,
+      "source": "WebFetch (docs oficiais Neon)",
+      "decisionHierarchy": "CREATE",
+      "reversesPreviousDecision": "Sim. research.json marcava Neon como REJECTED. A rejeição se baseava em 'o diferencial que este projeto precisa é auth+RBAC maduro acoplado ao banco'. Com Supabase Pro fora por custo, o critério de decisão muda: a comparação passa a ser Neon Free vs Supabase Free — e nessa comparação Neon ganha em todos os eixos relevantes.",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://neon.com/docs/introduction/plans",
+        "relevantSections": ["Free plan allowances", "Scale to zero", "Postgres extensions"],
+        "additionalUrls": [
+          "https://neon.com/faqs/free-plan-limits-and-quotas",
+          "https://neon.com/docs/extensions/pg-extensions",
+          "https://neon.com/docs/extensions/pg_trgm",
+          "https://neon.com/docs/extensions/fuzzystrmatch",
+          "https://neon.com/docs/introduction/scale-to-zero",
+          "https://neon.com/docs/connect/connection-latency"
+        ]
+      },
+      "freeTierLimits": {
+        "storage": "0,5 GB por projeto",
+        "projects": "100 por organização",
+        "branches": "10 por projeto",
+        "compute": "100 CU-hours por projeto por mês — segundo a FAQ, suficiente para rodar um compute de 0,25 CU (~1 GB RAM) por cerca de 400 horas/mês",
+        "networkTransfer": "5 GB de transferência pública por projeto por mês",
+        "autoscaling": "até 2 CU (~8 GB RAM) quando ativo",
+        "auth": "até 60.000 MAU de Managed Better Auth incluídos (mas produto em BETA — ver newUnverifiedClaims)",
+        "outrosLimites": "1 dia de histórico de monitoramento, janela de instant restore de 6 h (limitada a 1 GB-mês de changes), 1 snapshot manual, suporte comunitário",
+        "price": "USD 0/mês; primeiro tier pago (Launch) é pay-as-you-go a USD 0,106 por CU-hour, sem mínimo mensal",
+        "sources": [
+          "https://neon.com/docs/introduction/plans",
+          "https://neon.com/faqs/free-plan-limits-and-quotas"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Scale-to-zero com retomada automática (diferença decisiva vs Supabase Free)",
+          "description": "No Neon Free o compute suspende após 5 minutos de inatividade e o ajuste é FIXO ('cannot be disabled'). Porém a retomada é AUTOMÁTICA na próxima conexão — 'Neon suspends a Postgres compute after a configurable idle window and resumes it on the next connection' — com cold start tipicamente sub-segundo (fontes convergem em 300–500 ms do first query ao first response; uma fonte secundária cita faixa de 500 ms–2 s). Isso é qualitativamente diferente da pausa por 7 dias de inatividade do Supabase Free, que exige reativação manual do projeto. Para um dashboard interno consultado em rajadas, retomada automática é requisito, não conforto.",
+          "codeExample": null,
+          "source": "https://neon.com/docs/introduction/scale-to-zero",
+          "additionalSources": [
+            "https://neon.com/docs/connect/connection-latency",
+            "https://neon.com/faqs/postgres-hosting-options-auto-pause-database"
+          ]
+        },
+        {
+          "name": "pg_trgm e fuzzystrmatch disponíveis via CREATE EXTENSION, sem restrição de plano documentada",
+          "description": "ESTE É O ACHADO QUE VIABILIZA O AMENDMENT. A lista oficial de extensões do Neon traz pg_trgm na versão 1.6 (Postgres 14–18) e fuzzystrmatch nas versões 1.1–1.2 conforme a versão do Postgres. A instalação é padrão: 'Unless otherwise noted, supported extensions can be installed using CREATE EXTENSION syntax'. A ÚNICA extensão com restrição explícita de plano na página é pg_repack ('Available only on paid Neon plans... must first be enabled by Neon Support'); pg_cron exige habilitação prévia mas sem menção a plano pago. Nem pg_trgm nem fuzzystrmatch aparecem em qualquer lista de restrição. Conclusão: o desenho de identidade Tier 2 do research.json original (pg_trgm + índice GIN/GiST + levenshtein/soundex/metaphone) roda INTACTO no Neon Free — nenhuma alternativa de fuzzy-match precisou ser pesquisada.",
+          "codeExample": "create extension if not exists pg_trgm;\ncreate extension if not exists fuzzystrmatch;\ncreate index lead_nome_trgm on lead using gin (nome_normalizado gin_trgm_ops);",
+          "source": "https://neon.com/docs/extensions/pg-extensions",
+          "additionalSources": [
+            "https://neon.com/docs/extensions/pg_trgm",
+            "https://neon.com/docs/extensions/fuzzystrmatch"
+          ],
+          "confidence": "high",
+          "confidenceNote": "A ausência de restrição de plano é inferida da ausência de menção (só pg_repack é marcado). Confirmação definitiva custa 2 minutos: criar projeto Free e rodar os dois CREATE EXTENSION. Ver newUnverifiedClaims."
+        },
+        {
+          "name": "Protocolo Postgres nativo sobre TLS — o nó Postgres do n8n conecta sem adaptação",
+          "description": "Neon expõe connection string Postgres padrão no formato postgresql://[role]:[password]@[hostname]/[database]?sslmode=require&channel_binding=require, com hostname de compute prefixado por 'ep-' (e variante -pooler para PgBouncer). O nó Postgres do n8n pede host, database, user, password e a opção SSL; para Neon a orientação é manter SSL em 'require', porque Neon exige conexão sobre SSL. Consequência prática: TODO o padrão de ingestão do research.json original (INSERT ... ON CONFLICT DO UPDATE idempotente, Execute Query em transação única, watermark em tabela sync_state) é preservado sem uma linha de reescrita.",
+          "codeExample": "-- inalterado em relação ao research.json original\nINSERT INTO lead (source_system, source_id, ...) VALUES (...)\nON CONFLICT (source_system, source_id) DO UPDATE SET ..., ingested_at = now();",
+          "source": "https://neon.com/docs/connect/connect-from-any-app",
+          "additionalSources": [
+            "https://docs.n8n.io/integrations/builtin/credentials/postgres",
+            "https://techmov.in/how-to-connect-n8n-with-neon-postgres-step-by-step-for-beginners/"
+          ],
+          "confidence": "high",
+          "riskNote": "Existe issue reportada no repositório do n8n (#31234) e thread de comunidade sobre o nó PostgreSQL forçando/ignorando configuração de SSL na nova UI em versões recentes. Isso NÃO afeta Neon (que exige SSL de qualquer forma), mas é um sinal de que o comportamento de SSL do nó mudou entre versões — verificar a versão do n8n da Loupen no spike de ingestão."
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["Supabase Free", "Prisma Postgres Free", "Aiven Free", "Cloudflare D1", "Turso"],
+        "conflicts": [
+          "0,5 GB de storage por projeto é o teto mais apertado do desenho. Dimensionamento: a base é da ordem de centenas de oportunidades e alguns milhares de leads (NFR-2 fala em 'ordem de centenas'), o que cabe folgadamente. O risco NÃO é a tabela lead — é o histórico de eventos de jornada (DM-10/FR-3) se OQ-9 decidir importar todo o histórico. Mitigação: fixar a janela de histórico em OQ-9 e manter eventos em tabela particionada por período, com purga/arquivamento acordado.",
+          "Cold start de 300–500 ms na primeira query após 5 min de inatividade impacta NFR-2 (tempo interativo). Mitigação: NFR-2 fala de tempo interativo para filtros e abertura de ficha, não de latência de primeiro byte após ociosidade; ainda assim OQ-5 (alvos de tempo de resposta) precisa ser fechado ciente desse comportamento, e o spec deve declarar o cold start como característica conhecida, não como bug.",
+          "Esgotar as 100 CU-hours do mês tem consequência DURA: 'Existing connections drop and new ones can't open' até o próximo período de faturamento ou upgrade. É o cenário de 'grátis que vira indisponibilidade'. Mitigação: manter scale-to-zero (é obrigatório no Free mesmo), evitar conexões persistentes de longa duração no n8n, e monitorar CU-hours consumidas.",
+          "Neon foi adquirida pela Databricks em 2025 (fonte secundária) — risco de mudança de política de plano gratuito no médio prazo. Ver newUnverifiedClaims."
+        ],
+        "costEvidence": "USD 0/mês. Nenhuma cobrança automática: o tier pago (Launch) é opt-in pay-as-you-go, não overage silencioso do Free — no Free o comportamento ao estourar é bloqueio, não fatura.",
+        "costSources": [
+          "https://neon.com/docs/introduction/plans",
+          "https://neon.com/faqs/free-plan-limits-and-quotas"
+        ],
+        "idsJustification": "CREATE inevitável (CON-6: não existe banco algum hoje). Entre os CREATEs possíveis, Neon é o que preserva o MAIOR número de decisões já tomadas na pesquisa original: mantém Postgres, mantém pg_trgm/fuzzystrmatch, mantém o nó Postgres do n8n, mantém o padrão de upsert idempotente. Trocar para SQLite (D1/Turso) descartaria os quatro."
+      }
+    },
+    {
+      "name": "Better Auth (self-hospedado na app Next.js)",
+      "type": "library",
+      "version": "MIT, repositório ativo (último push 2026-09-03, ~29,8k estrelas, não arquivado)",
+      "verified": true,
+      "source": "GitHub API + WebSearch",
+      "decisionHierarchy": "CREATE",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://www.better-auth.com/docs/introduction",
+        "relevantSections": ["Framework-agnostic TypeScript auth/authz framework", "Plugin ecosystem", "Access control"],
+        "additionalUrls": [
+          "https://github.com/better-auth/better-auth",
+          "https://www.devtoolsacademy.com/blog/betterauth-vs-nextauth",
+          "https://better-auth.com/blog/security-update-july-2026",
+          "https://neon.com/docs/guides/rls-tutorial"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Auth.js/NextAuth está em modo de manutenção — Better Auth é o caminho recomendado pelos próprios mantenedores",
+          "description": "PONTO 3 DA PESQUISA, e o resultado inverteu a hipótese da instrução. Auth.js v5 É estável (após mais de dois anos em beta, estabilizado no fim de 2024) e continua recebendo correções de segurança — quatro advisories foram corrigidos em julho de 2026 abrangendo @auth/core, next-auth v4 e v5. Porém, desde o início de 2026 o Auth.js está em modo de manutenção: recebe segurança, não recebe features, e o desenvolvimento ativo migrou para o Better Auth, que hoje mantém o projeto. Os próprios mantenedores recomendam Better Auth para projetos NOVOS. Como esta epic é greenfield na camada de app, adotar Auth.js seria entrar por uma porta que os donos da porta já indicaram como legado.",
+          "codeExample": null,
+          "source": "https://better-auth.com/blog/security-update-july-2026",
+          "additionalSources": ["https://github.com/nextauthjs/next-auth/discussions/13252"],
+          "confidence": "medium",
+          "confidenceNote": "A consolidação Auth.js→Better Auth vem de blog do próprio Better Auth e de discussion no repositório do next-auth (fontes com interesse na narrativa). O FATO verificável independentemente é o estado do repositório better-auth: MIT, 29,8k estrelas, push em 2026-09-03, não arquivado."
+        },
+        {
+          "name": "RBAC por perfil (marketing/comercial/direção) em nível de aplicação",
+          "description": "Better Auth se apresenta como 'authentication and authorization framework', não apenas authentication: para apps que precisam de RBAC fino (roles, permissions) ou agrupamento multi-tenant, ele oferece estrutura pronta via plugins de access control — diferença explícita frente ao NextAuth, que é solução de autenticação a ser estendida para autorização. Desenho proposto para NFR-3: tabela de usuários e sessões do Better Auth no MESMO banco Neon; papel (marketing | comercial | direcao) como atributo de usuário; e a autorização aplicada em DUAS camadas — (a) helper único de autorização chamado por todo Server Component/route handler que toca dados, e (b) opcionalmente Neon RLS como rede de segurança (dependência separada abaixo).",
+          "codeExample": null,
+          "source": "https://www.devtoolsacademy.com/blog/betterauth-vs-nextauth",
+          "confidence": "medium",
+          "confidenceNote": "A afirmação sobre plugins de RBAC vem de comparativo de terceiro (DevTools Academy) e a página de introdução oficial confirma 'plugin ecosystem' e 'access control' sem detalhar. Antes do Plan, ler a documentação dos plugins admin/organization do Better Auth para confirmar que o modelo de papéis cobre três perfis simples sem forçar o conceito de organização."
+        },
+        {
+          "name": "Riscos de mover a autorização do banco para a aplicação (trade-off explícito de NFR-3)",
+          "description": "Este é o custo real de abandonar o Supabase, e precisa entrar no spec como risco nomeado, não como detalhe. A literatura é consistente: RLS dá defesa em profundidade porque 'even if application logic fails, data remains protected', com 'consistent enforcement across all database connections' — uma vez habilitada, toda query, independentemente da origem, recebe automaticamente o filtro de linhas permitidas. Autorização só na aplicação reintroduz exatamente a classe de bug que a RLS elimina: o filtro esquecido em uma rota nova. O consenso da literatura não é 'escolha um', é combinar os dois: 'both application-level filtering and RLS together provide defense in depth: even if one mechanism has a bug, the other catches it'. Contrapontos honestos da RLS também documentados: mais difícil de depurar, pode distorcer as estimativas do planner, é por linha e não por coluna, decisões dependentes de contexto (ex.: temporais) são difíceis de expressar, e credencial vazada com acesso direto ao banco pode contornar o modelo.",
+          "codeExample": null,
+          "source": "https://www.svix.com/blog/row-level-security-defense-in-depth/",
+          "additionalSources": [
+            "https://www.permit.io/blog/postgres-rls-implementation-guide",
+            "https://www.bytebase.com/blog/postgres-row-level-security-limitations-and-alternatives/",
+            "https://mergify.com/blog/application-vs-database-where-should-permissions-live"
+          ],
+          "confidence": "medium",
+          "confidenceNote": "Fontes são blogs técnicos de vendors de autorização (Permit.io, Svix, Bytebase, Mergify) — direcionalmente convergentes entre si, mas com interesse comercial. O princípio de defesa em profundidade, porém, é padrão consolidado de segurança e não depende dessas fontes.",
+          "mitigations": [
+            "M1 — Ponto único de autorização: nenhuma query de dado de lead pode ser escrita fora de uma camada de acesso a dados que receba a sessão obrigatoriamente. Sem parâmetro de sessão, não compila.",
+            "M2 — Teste de autorização como parte do gate de QA: para cada perfil, um teste que prove que a rota NÃO retorna o que o perfil não pode ver. complexity.json já aponta ausência de rede de segurança (risk 5/5) — este é o primeiro lugar onde a rede tem de existir.",
+            "M3 — Neon RLS como segunda camada quando o custo de implementação se justificar (ver dependência seguinte). Não é obrigatória na fase 1, mas o SCHEMA deve ser desenhado para permitir habilitá-la depois sem migração de dados."
+          ]
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": [
+          "Auth.js/NextAuth v5 (estável, mas em modo de manutenção — sem features novas)",
+          "Managed Better Auth do Neon (grátis até 60k MAU no plano Free, mas em BETA)",
+          "Clerk / Auth0 / WorkOS free tiers (introduzem dependência de vendor com risco de custo futuro)"
+        ],
+        "conflicts": [
+          "Nenhuma parte da autenticação existe hoje (CON-6). É CREATE puro, e é o componente que a decisão anterior (Supabase) tinha tornado 'de graça'. O esforço de NFR-3 AUMENTA com este amendment — é o principal custo não-monetário da restrição de custo zero.",
+          "Managed Better Auth do Neon foi anunciado em julho de 2026 junto com Object Storage e Functions, todos em beta, 'free during the beta', explicitamente não feature-complete, e com preço a ser publicado antes do GA. Usar o serviço gerenciado hoje é adotar beta E aceitar preço futuro desconhecido — exatamente as duas coisas que este amendment existe para evitar. Recomendação: Better Auth self-hospedado na app (biblioteca MIT), com as tabelas no Neon, e NÃO o Managed Better Auth."
+        ],
+        "costEvidence": "USD 0. Biblioteca MIT rodando dentro da própria aplicação; não há tier pago obrigatório e não há MAU cobrado por terceiro.",
+        "costSources": ["https://github.com/better-auth/better-auth"]
+      }
+    },
+    {
+      "name": "Neon RLS + pg_session_jwt (defesa em profundidade OPCIONAL)",
+      "type": "infrastructure",
+      "version": "pg_session_jwt (extensão open source da Neon)",
+      "verified": true,
+      "source": "WebFetch (docs oficiais Neon) + WebSearch",
+      "decisionHierarchy": "CONSIDER (fase 2, não fase 1)",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://neon.com/docs/guides/rls-tutorial",
+        "relevantSections": ["RLS com provider JWT de terceiro", "auth.user_id() / auth.session()"],
+        "additionalUrls": [
+          "https://neon.com/blog/introducing-neon-authorize",
+          "https://neon.com/docs/extensions/pg_session_jwt",
+          "https://neon.com/docs/data-api/custom-authentication-providers",
+          "https://github.com/neondatabase/pg_session_jwt"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "RLS no Neon com qualquer emissor de JWT",
+          "description": "Recupera PARTE do que se perdeu ao abandonar o Supabase. O Neon RLS integra qualquer provider de autenticação ao Postgres: as chamadas ao banco são autenticadas com um JWT emitido pelo provider, verificado pelo Neon Proxy via a URL JWKS do provider, e a identidade fica disponível para políticas RLS e cláusulas WHERE. A extensão open source pg_session_jwt expõe as funções auth.user_id() e auth.session() para uso nas políticas. A documentação lista Better Auth (gerenciado), Auth0 e Clerk como exemplos e afirma que 'any JWT-issuing provider... can be used', com guia dedicado a providers customizados — ou seja, um Better Auth self-hospedado emitindo JWT com JWKS exposto é caminho suportado em princípio. Nenhuma menção a exigência de plano pago foi encontrada.",
+          "codeExample": "-- padrão análogo ao authorize() do Supabase, agora com identidade vinda do JWT verificado\ncreate policy \"perfil_le_leads\" on lead for select\n  using ( auth.user_id() is not null and perfil_tem_permissao(auth.user_id(), 'lead.select') );",
+          "source": "https://neon.com/docs/guides/rls-tutorial",
+          "additionalSources": ["https://neon.com/blog/introducing-neon-authorize"],
+          "confidence": "low",
+          "confidenceNote": "Dois pontos NÃO confirmados: (a) se pg_session_jwt/Neon RLS estão disponíveis no plano Free — a documentação de setup só exige 'criar conta e projeto', e a documentação de extensões não lista restrição, mas as buscas não trouxeram declaração explícita; (b) se um Better Auth SELF-HOSPEDADO (não o Managed do Neon) atende os requisitos de JWKS sem trabalho adicional relevante. Além disso, parte da documentação associa pg_session_jwt ao Neon Data API ('automatically configured when you enable the Neon Data API'), o que pode acoplar a RLS a um produto que este projeto não pretende usar. Ver newUnverifiedClaims."
+        }
+      ],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["apenas autorização em nível de aplicação (M1+M2 da dependência Better Auth)"],
+        "conflicts": [
+          "Adotar isso na fase 1 arriscaria repetir o erro que a pesquisa original apontou no Neon: apostar requisito de primeira fase (NFR-3) em superfície de produto pouco madura. Recomendação: fase 1 entrega autorização em aplicação (determinística, testável, sob controle total) e a RLS entra na fase 2 como segunda camada, desde que o SCHEMA da fase 1 já preveja as colunas de escopo necessárias."
+        ],
+        "costEvidence": "USD 0 se disponível no Free — não confirmado.",
+        "costSources": []
+      }
+    },
+    {
+      "name": "Cloudflare Workers / Pages (hospedagem do frontend Next.js)",
+      "type": "infrastructure",
+      "version": "Workers Free plan; Next.js via @opennextjs/cloudflare (1.0 GA em fevereiro de 2026) ou vinext",
+      "verified": true,
+      "source": "WebFetch (docs oficiais Cloudflare) + WebSearch",
+      "decisionHierarchy": "CREATE",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://developers.cloudflare.com/workers/platform/pricing/",
+        "relevantSections": ["Workers Free plan limits", "Workers KV free limits", "Cron Triggers"],
+        "additionalUrls": [
+          "https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/",
+          "https://opennext.js.org/cloudflare",
+          "https://github.com/opennextjs/opennextjs-cloudflare",
+          "https://developers.cloudflare.com/workers/platform/limits",
+          "https://developers.cloudflare.com/pages/platform/limits/"
+        ]
+      },
+      "freeTierLimits": {
+        "requests": "100.000 requisições por dia",
+        "cpuTime": "10 ms de CPU time por invocação",
+        "cronTriggers": "5 por conta no Free (250 no pago) — a documentação da Cloudflare tem inconsistência conhecida entre 'por Worker' e 'por conta'; ver newUnverifiedClaims",
+        "workersKV": "1 GB de storage; 100.000 leituras/dia; 1.000 escritas/dia; 1.000 deletes/dia; 1.000 list/dia",
+        "paidEntry": "cobrança mínima de USD 5/mês por conta caso seja necessário migrar para o plano pago",
+        "sources": [
+          "https://developers.cloudflare.com/workers/platform/pricing/",
+          "https://runhooks.app/blog/cloudflare-workers-cron-triggers-limits/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Vercel Hobby está DESCARTADO por termos de uso — e a leitura é literal, não interpretativa",
+          "description": "PONTO 4 DA PESQUISA, e o resultado é conclusivo contra a Vercel. As Fair Use Guidelines (atualizadas em 2026-07-29) dizem: 'Hobby teams are restricted to non-commercial personal use only. All commercial usage of the platform requires either a Pro or Enterprise plan.' E a definição de uso comercial é abrangente ao ponto de dispensar debate sobre 'ferramenta interna': 'Commercial usage is defined as any Deployment that is used for the purpose of financial gain of anyone involved in any part of the production of the project, INCLUDING A PAID EMPLOYEE OR CONSULTANT WRITING THE CODE.' No caso da Loupen, o código é escrito por funcionário remunerado da empresa. Pela definição publicada, o projeto é uso comercial — o que empurraria para o Pro a USD 20/usuário/mês, violando a restrição de custo zero. Não é zona cinzenta; a cláusula do 'paid employee writing the code' fecha a questão. A própria Vercel orienta contatar o suporte em caso de dúvida, e há threads de comunidade de 2026 com exatamente este cenário (ferramenta interna B2B) sem resposta definitiva favorável.",
+          "codeExample": null,
+          "source": "https://vercel.com/docs/limits/fair-use-guidelines",
+          "additionalSources": [
+            "https://vercel.com/docs/plans/hobby",
+            "https://community.vercel.com/t/does-an-internal-b2b-marketing-tool-count-as-commercial-usage-on-hobby/47890"
+          ],
+          "confidence": "high"
+        },
+        {
+          "name": "Cloudflare como alternativa sem restrição de uso comercial no plano gratuito",
+          "description": "A documentação de pricing dos Workers descreve o Free plan por limites técnicos (requisições/dia, CPU time, KV) e NÃO contém cláusula restringindo uso comercial nem exigindo assinatura — contraste direto com a linguagem explícita da Vercel. Fontes secundárias afirmam diretamente 'no credit card required, never expires, commercial use allowed'. Contexto histórico relevante: a Cloudflare REMOVEU a antiga Seção 2.8 (que proibia servir vídeo e proporção desproporcional de conteúdo não-HTML) do Self-Service Subscription Agreement, movendo restrições de conteúdo para os Service-Specific Terms — vídeo e arquivos grandes seguem restritos no CDN quando hospedados fora da Cloudflare. Para um dashboard interno (HTML/JSON, sem vídeo) nenhuma dessas restrições morde.",
+          "codeExample": null,
+          "source": "https://developers.cloudflare.com/workers/platform/pricing/",
+          "additionalSources": [
+            "https://www.freetiers.com/directory/cloudflare-workers",
+            "https://blog.cloudflare.com/updated-tos",
+            "https://community.cloudflare.com/t/is-cloudflare-pages-workers-free-plan-free-for-commercial-use/291741"
+          ],
+          "confidence": "medium",
+          "confidenceNote": "A ausência de restrição comercial é inferida da ausência de cláusula na documentação de pricing (que é o oposto do caso Vercel, onde a cláusula é explícita). A afirmação positiva 'commercial use allowed' vem de fonte secundária (freetiers.com) e de thread de comunidade — a thread oficial retornou HTTP 403 nesta sessão e não pôde ser lida. Ver newUnverifiedClaims."
+        },
+        {
+          "name": "Next.js App Router roda em Cloudflare Workers — com adaptador, e com um alvo móvel",
+          "description": "O adaptador @opennextjs/cloudflare alcançou 1.0 GA em fevereiro de 2026 e compila uma aplicação Next.js padrão em um Worker, suportando SSR, ISR, middleware e o componente Image, com todas as versões minor/patch do Next.js 16 e as últimas minors de 14 e 15. Requer o runtime Node.js (não o edge), que é o mais completo e dá acesso às APIs Node providas pelo runtime dos Workers — relevante porque Server Components consultando Postgres precisam do driver. RESSALVA IMPORTANTE DE 2026: desde o fim de agosto de 2026 a Cloudflare passou a recomendar 'vinext' como forma padrão de rodar Next.js em Workers, ao lado do OpenNext. Ter dois caminhos oficiais concorrentes seis meses após o GA do primeiro é sinal de imaturidade da camada de adaptação — não do Next.js, mas da combinação Next.js+Cloudflare.",
+          "codeExample": null,
+          "source": "https://opennext.js.org/cloudflare",
+          "additionalSources": [
+            "https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/",
+            "https://github.com/opennextjs/opennextjs-cloudflare",
+            "https://www.npmjs.com/package/@opennextjs/cloudflare"
+          ],
+          "confidence": "medium",
+          "confidenceNote": "GA de fevereiro/2026 e a recomendação de vinether de agosto/2026 vieram de páginas de documentação e blog; a coexistência OpenNext vs vinext deve ser reconfirmada imediatamente antes do Plan, porque muda em escala de meses."
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": [
+          "Cloudflare Pages (mesma conta/limites, caminho mais antigo)",
+          "Servir a app do MESMO servidor que já roda o n8n (custo incremental zero, mas contraria o espírito de 'sem servidor próprio' — ver revisedBuildPath.fallbacks)",
+          "Netlify / Render free tiers (não pesquisados nesta sessão)",
+          "Vercel Pro (USD 20/usuário/mês — VIOLA a restrição de custo zero)"
+        ],
+        "conflicts": [
+          "RISCO TÉCNICO PRINCIPAL DESTE AMENDMENT: 10 ms de CPU time por invocação no Free. Renderização server-side de página do App Router com agregações pode estourar esse orçamento. Não encontrei nesta sessão nenhuma medição de CPU time de app Next.js real sob OpenNext no Free plan — é um risco NÃO QUANTIFICADO e é o item que mais merece um spike curto antes de comprometer a stack. Mitigações naturais: fazer agregação no Postgres (não em JS), usar cache/ISR agressivamente e manter os Server Components finos.",
+          "1.000 escritas/dia no Workers KV é apertado se KV for usado para sessão; usar as tabelas de sessão do Better Auth no Neon em vez de KV.",
+          "Duas superfícies oficiais concorrentes (OpenNext e vinext) para rodar Next.js em Workers criam risco de retrabalho de deploy — não de produto.",
+          "NFR-6/NFR-2 não são afetados; o vínculo é operacional, não de modelo de dados."
+        ],
+        "costEvidence": "USD 0/mês no Workers Free. Se o limite for excedido, o plano pago tem cobrança mínima de USD 5/mês por conta — o que seria uma violação explícita da restrição do usuário e deve disparar reavaliação, não upgrade silencioso.",
+        "costSources": ["https://developers.cloudflare.com/workers/platform/pricing/"]
+      }
+    },
+    {
+      "name": "n8n (instância self-hosted da Loupen) — papel AMPLIADO",
+      "type": "service",
+      "version": "self-hosted em n8n.loupenapps.com.br",
+      "verified": true,
+      "source": "codebase",
+      "decisionHierarchy": "REUSE",
+      "amendsPreviousEntry": "Sim. A entrada original permanece válida em tudo; este amendment AMPLIA o escopo do n8n e confirma a conectividade remota.",
+      "existing": {
+        "installed": true,
+        "currentVersion": "em produção",
+        "usageLocations": [
+          "index.html:1209 — ADS_API_URL = https://n8n.loupenapps.com.br/webhook/loupen-ads-data-5f9ff8e85ea49e64",
+          "index.html:1210-1211 — GA4 passou a ser buscado pelo mesmo backend n8n",
+          "index.html:1840, 2560, 2893, 4379 — as 4 chamadas fetch() do artefato"
+        ]
+      },
+      "documentation": {
+        "url": "https://docs.n8n.io/integrations/builtin/credentials/postgres",
+        "relevantSections": ["Postgres credentials: host, database, user, password, SSL"],
+        "additionalUrls": [
+          "https://neon.com/docs/connect/connect-from-any-app",
+          "https://techmov.in/how-to-connect-n8n-with-neon-postgres-step-by-step-for-beginners/",
+          "https://blog.n8n.io/etl-pipeline/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "PONTO 5 CONFIRMADO — n8n escreve em banco remoto gratuito sem custo nem obstáculo estrutural",
+          "description": "O nó Postgres do n8n pede host/domínio, nome do banco, usuário, senha e a opção de usar SSL (mais a escolha de conectar ou não quando a validação SSL falha). A connection string do Neon fornece todos esses campos, e a orientação para Neon é manter SSL em 'require' porque o Neon exige conexão sobre SSL. Não há custo adicional em nenhuma das pontas: o n8n é self-hosted e o Neon Free não cobra por conexão. Ressalvas de rede/SSL levantadas: (a) usar o endpoint '-pooler' (PgBouncer) para evitar exaustão de conexões durante execuções paralelas; (b) o Neon Free tem 5 GB/mês de transferência pública por projeto — ingestão diária de centenas/milhares de linhas está muito abaixo disso, mas recarga completa de histórico repetida não está; (c) existe issue aberta no repositório do n8n (#31234) e thread de comunidade sobre o nó PostgreSQL forçando/ignorando SSL na nova UI — irrelevante para Neon (que exige SSL) mas indica que o comportamento mudou entre versões.",
+          "codeExample": "postgresql://[role]:[password]@ep-xxxx-pooler.[region].aws.neon.tech/[database]?sslmode=require&channel_binding=require",
+          "source": "https://docs.n8n.io/integrations/builtin/credentials/postgres",
+          "additionalSources": [
+            "https://neon.com/docs/connect/connect-from-any-app",
+            "https://github.com/n8n-io/n8n/issues/31234"
+          ],
+          "confidence": "high"
+        },
+        {
+          "name": "n8n assume a camada de ads que era do Windsor.ai — e o padrão já existe",
+          "description": "Com Windsor.ai fora, FR-9 volta a 4 famílias de fonte. O impacto de esforço é MENOR do que a reversão sugere, por um motivo concreto: o workflow de ads já existe e já roda em produção (index.html:1209, Meta Ads e GA4 pelo mesmo backend n8n). O que muda não é construir ingestão de ads — é acrescentar um destino Postgres ao workflow que hoje só responde a um webhook. Isso é ADAPT de um workflow existente, não CREATE. Nota de escopo herdada de diagnóstico interno (2026-07-10): o nó de saída desse workflow descarta objective, daily_budget/lifetime_budget e start_time/stop_time mesmo que os nós HTTP internos já os peçam à API da plataforma — se esses campos forem requisito, a correção é editar o mapeamento de saída do workflow (custo zero), não contratar ferramenta.",
+          "codeExample": null,
+          "source": "codebase + diagnóstico interno do webhook ADS_API_URL (não é claim de fonte externa)",
+          "confidence": "high"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["cron + script próprio", "Airbyte self-hosted"],
+        "conflicts": [
+          "Concentração de risco operacional: com Windsor.ai fora, o n8n passa a ser ponto único de falha para 100% da ingestão. O sinal de incompletude exigido por NFR-1/AC-8.1 (contagem origem vs destino em sync_state) deixa de ser boa prática e passa a ser o único mecanismo de detecção quando a ingestão falha silenciosamente — que é literalmente o modo de falha do EC-6 (44 de 236 linhas).",
+          "O n8n roda em servidor da Loupen. Se esse servidor cair, a ingestão para. A restrição do usuário é sobre não hospedar BANCO em servidor próprio; a dependência de servidor próprio para INGESTÃO permanece e é herdada de CON-9/ASM-3, não introduzida aqui."
+        ],
+        "costEvidence": "USD 0 incremental — instância já existe e já roda em produção.",
+        "costSources": []
+      }
+    },
+    {
+      "name": "Cloudflare D1 (SQLite serverless)",
+      "type": "infrastructure",
+      "version": "Free tier, estado verificado em 2026-09-03",
+      "verified": true,
+      "source": "WebSearch + docs Cloudflare",
+      "decisionHierarchy": "REJECTED",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://developers.cloudflare.com/changelog/post/2026-09-01-d1-free-tier-limit-enforcement/",
+        "relevantSections": ["Free tier daily query limit enforcement"],
+        "additionalUrls": [
+          "https://developers.cloudflare.com/d1/best-practices/query-d1/",
+          "https://developers.cloudflare.com/d1/tutorials/build-an-api-to-access-d1/",
+          "https://freetier.co/articles/cloudflare-d1-free-tier-limits-pricing-and-alternatives"
+        ]
+      },
+      "freeTierLimits": {
+        "rowsRead": "5 milhões de linhas lidas por dia (por conta)",
+        "rowsWritten": "100.000 linhas escritas por dia (por conta)",
+        "storage": "5 GB no total, somando todos os bancos",
+        "enforcement": "A partir de 2026-09-01 as queries no Workers Free FALHAM ao exceder os limites diários de leitura/escrita — via Workers Binding API e via REST API — retornando erro até o reset à meia-noite UTC. Ao estourar storage, o D1 bloqueia novos inserts, mudanças de schema, criação de índice e de trigger; leituras existentes continuam.",
+        "sources": [
+          "https://developers.cloudflare.com/changelog/post/2026-09-01-d1-free-tier-limit-enforcement/",
+          "https://freetier.co/articles/cloudflare-d1-free-tier-limits-pricing-and-alternatives"
+        ]
+      },
+      "patterns": [],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["Neon Free"],
+        "conflicts": [
+          "MOTIVO 1 (decisivo) — não há pg_trgm nem fuzzystrmatch. SQLite não tem similaridade por trigramas nem levenshtein/soundex nativos; como o MySQL, exigiria extensão ou implementação customizada. Todo o Tier 2 do desenho de identidade (EC-7) teria de ser reimplementado em código de aplicação, sem índice GIN/GiST para viabilizar o custo em tabela grande. Isso descarta a única solução JÁ desenhada e justificada para o problema mais difícil da epic.",
+          "MOTIVO 2 — acesso externo é HTTP, não protocolo Postgres. 'D1 currently requires you to query it via a Cloudflare Worker'; existe REST API com endpoints /query e /raw, e o padrão documentado é levantar uma API HTTP em Worker na frente do D1. Funciona para o n8n (nó HTTP Request), mas descarta o nó Postgres, o INSERT ... ON CONFLICT DO UPDATE do padrão de upsert e o 'Execute Query em transação única' — três decisões já validadas na pesquisa original.",
+          "MOTIVO 3 — o teto de 100.000 linhas escritas/dia por CONTA é compartilhado com qualquer outro uso de D1 na conta e, desde 2026-09-01, é enforcement duro com falha de query. Recarga histórica (OQ-9) estouraria isso trivialmente."
+        ],
+        "rejectionReason": "5 GB de storage é 10x o Neon Free, e é o único eixo em que o D1 ganha. Perde nos três eixos que importam para esta epic: fuzzy match, protocolo de conexão e limite de escrita.",
+        "costEvidence": "USD 0 no Workers Free.",
+        "costSources": ["https://developers.cloudflare.com/workers/platform/pricing/"]
+      }
+    },
+    {
+      "name": "Turso (libSQL / SQLite serverless)",
+      "type": "infrastructure",
+      "version": "Free plan, estado verificado em 2026-09-03",
+      "verified": true,
+      "source": "WebSearch",
+      "decisionHierarchy": "REJECTED",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://turso.tech/pricing",
+        "relevantSections": ["Free plan limits"],
+        "additionalUrls": [
+          "https://turso.tech/what-is-turso",
+          "https://github.com/tursodatabase",
+          "https://www.theregister.com/databases/2026/07/29/after-rewriting-sqlite-in-rust-turso-turns-its-sights-on-postgres/5279835",
+          "https://costbench.com/software/database-as-service/turso/free-plan/"
+        ]
+      },
+      "freeTierLimits": {
+        "databases": "100 bancos / 100 bancos ativos por mês",
+        "storage": "5 GB no total",
+        "rowsRead": "500 milhões de linhas lidas por mês",
+        "rowsWritten": "10 milhões de linhas escritas por mês",
+        "paidEntry": "Developer a USD 4,99/mês (bancos ilimitados, 9 GB, 2,5 bilhões de leituras)",
+        "sources": [
+          "https://turso.tech/pricing",
+          "https://costbench.com/software/database-as-service/turso/free-plan/"
+        ]
+      },
+      "patterns": [],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["Neon Free"],
+        "conflicts": [
+          "Mesmo MOTIVO 1 do D1, que é o argumento decisivo: SQLite sem pg_trgm/fuzzystrmatch obriga a reimplementar o Tier 2 do desenho de identidade (EC-7) fora do banco.",
+          "Bifurcação de produto com risco de maturidade: o libSQL (fork de SQLite em C) é o que está production-ready e o que roda o Turso Cloud hoje; o 'Turso Database' (reescrita completa em Rust, ex-Limbo) está em BETA, e o próprio time recomenda cautela para aplicações mission-critical e backups independentes até atingirem o nível de confiabilidade do SQLite. Também há esforço novo de compatibilidade Postgres anunciado em julho de 2026 — sinal de plataforma em movimento rápido, não de estabilidade.",
+          "Os limites de leitura/escrita são mensais (mais generosos que o D1 diário), mas isso não compensa a perda do fuzzy match no banco."
+        ],
+        "rejectionReason": "Free tier objetivamente mais generoso que o Neon em storage (5 GB vs 0,5 GB) e sem enforcement diário. Rejeitado pelo mesmo motivo estrutural do D1: SQLite quebra o desenho de resolução de identidade já validado, que é o item mais difícil e mais crítico da epic.",
+        "costEvidence": "USD 0 no Free.",
+        "costSources": ["https://turso.tech/pricing"]
+      }
+    },
+    {
+      "name": "Prisma Postgres Free / Aiven Free / Supabase Free (fallbacks de banco)",
+      "type": "infrastructure",
+      "version": "avaliados como plano B, não recomendados como primário",
+      "verified": false,
+      "source": "WebSearch (fontes secundárias agregadoras)",
+      "decisionHierarchy": "REFERENCE_ONLY",
+      "existing": { "installed": false, "currentVersion": null, "usageLocations": [] },
+      "documentation": {
+        "url": "https://www.koyeb.com/blog/top-postgresql-database-free-tiers-in-2026",
+        "relevantSections": ["Permanent free tiers, no credit card"],
+        "additionalUrls": [
+          "https://swyftstack.com/blog/free-postgresql-hosting",
+          "https://github.com/freebase-cloud/free-postgres-hosting",
+          "https://www.bytebase.com/blog/postgres-hosting-options-pricing-comparison/",
+          "https://neon.com/guides/neon-vs-supabase-free-plan"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "Existe mais de um Postgres gratuito permanente — o risco de lock-in de fornecedor é baixo",
+          "description": "Fontes agregadoras de 2026 relatam que Neon, Supabase e Aiven oferecem bancos Postgres pequenos indefinidamente a USD 0, sem cartão e sem prazo. Números relatados: Prisma Postgres 500 MB / 100.000 operações / até 50 bancos, sem cartão; Aiven uma VM dedicada com 1 CPU, 1 GB RAM e 1 GB de storage, sem escolha de cloud/região e sem connection pooling nem service integrations no plano gratuito; Supabase Free 500 MB de banco, 2 projetos ativos por organização. Valor estratégico deste achado: como todos falam protocolo Postgres, migrar de provedor é pg_dump/pg_restore, não reescrita — o que torna a aposta no Neon Free reversível a baixo custo. Isso é a principal mitigação do risco 'e se o Neon mudar a política do plano gratuito'.",
+          "codeExample": null,
+          "source": "https://www.koyeb.com/blog/top-postgresql-database-free-tiers-in-2026",
+          "additionalSources": ["https://swyftstack.com/blog/free-postgresql-hosting"],
+          "confidence": "low",
+          "confidenceNote": "Todos os números vêm de blogs agregadores (Koyeb, Swyftstack, freebase-cloud, Bytebase), não das páginas oficiais de cada provedor, e há divergência entre fontes sobre o storage do Aiven (1 GB vs 5 GB). Servem para provar que EXISTEM alternativas, não para dimensionar nenhuma delas. Ver newUnverifiedClaims."
+        }
+      ],
+      "compatibility": {
+        "preferred": false,
+        "alternatives": ["Neon Free (primário)"],
+        "conflicts": [
+          "Supabase Free: descartado como primário por pausa de projeto após inatividade com reativação manual (registrado na pesquisa original) e por 2 projetos ativos por organização.",
+          "Aiven Free: sem connection pooling no plano gratuito é um problema real para ingestão via n8n com paralelismo; sem escolha de região impacta latência e, potencialmente, a discussão de LGPD em OQ-8.",
+          "Prisma Postgres Free: 100.000 operações no free tier é limite de uso, não de storage — não dimensionado nesta sessão."
+        ],
+        "costEvidence": "USD 0 em todos, segundo fontes secundárias.",
+        "costSources": []
+      }
+    }
+  ],
+
+  "revisedBuildPath": {
+    "name": "Construção customizada com stack 100% gratuito, sem servidor próprio para banco",
+    "supersedes": "buildVsBuyComparison.buildPath do research.json",
+    "stack": "n8n (existente, self-hosted) como ÚNICA camada de ingestão, inclusive ads → Neon Free (Postgres serverless, pg_trgm + fuzzystrmatch habilitados) como base → Better Auth self-hospedado (MIT) na app, com tabelas no Neon, e autorização por perfil em nível de aplicação → Next.js 16 App Router + nuqs como superfície → Cloudflare Workers Free como hospedagem (via @opennextjs/cloudflare ou vinext) → design system extraído do index.html atual",
+    "whatChangedFromOriginal": [
+      "Supabase (Pro, USD 25/mês) → Neon Free (USD 0). Motivo: custo zero exigido.",
+      "Auth+RLS gerenciados pelo Supabase → Better Auth self-hospedado + autorização em nível de aplicação, com Neon RLS/pg_session_jwt como segunda camada opcional na fase 2. Este é o único ponto onde a restrição de custo AUMENTA o esforço de construção.",
+      "Windsor.ai com destination PostgreSQL para ads → n8n assume ads (workflow já existente ganha destino Postgres). FR-9 volta de 3 para 4 famílias de fonte, mas como ADAPT de workflow existente, não CREATE.",
+      "Hospedagem indefinida (OQ-4 aberto, 'USD 0-20/mês') → Cloudflare Workers Free, com Vercel Hobby EXPLICITAMENTE descartada por termos de uso, não por preço.",
+      "pg_trgm + fuzzystrmatch: INALTERADO. Confirmados disponíveis no Neon via CREATE EXTENSION, sem restrição de plano documentada."
+    ],
+    "pros": [
+      "Custo recorrente USD 0 verificável linha a linha, satisfazendo a restrição dura do usuário sem sacrificar o desenho técnico central.",
+      "Preserva quatro decisões já validadas na pesquisa original: Postgres como banco, pg_trgm/fuzzystrmatch para identidade, nó Postgres do n8n, e o padrão de upsert idempotente com watermark. Nenhuma delas sobreviveria a uma troca para SQLite (D1/Turso).",
+      "Reaproveita o ativo em produção que continua disponível (n8n, index.html:1209), inclusive para ads — REUSE > ADAPT > CREATE segue respeitado no eixo de ingestão.",
+      "Retomada automática do compute (scale-to-zero com wake em 300–500 ms) é compatível com o padrão de uso real de um dashboard interno consultado em rajadas — diferente da pausa por inatividade com reativação manual do Supabase Free.",
+      "Sem servidor próprio para banco: Neon é managed por terceiro, atendendo a restrição 3 do usuário.",
+      "Reversibilidade: como tudo é Postgres padrão e Better Auth é MIT rodando na própria app, trocar de provedor de banco é pg_dump/pg_restore e trocar de host é redeploy. Não há lock-in proprietário em nenhuma camada — em contraste direto com o desenho original, cuja autorização vivia como política RLS acoplada ao Supabase Auth."
+    ],
+    "cons": [
+      "NFR-3 fica MAIS CARO em esforço: autenticação e RBAC passam de 'configurar produto' para 'construir e testar', e a autorização sai da rede de segurança do banco para a disciplina do código. É o preço real da restrição de custo zero e precisa estar no spec como risco nomeado, com as mitigações M1/M2/M3.",
+      "FR-9 volta de 3 para 4 famílias de fonte a ingerir, revertendo o achado de maior impacto de esforço da pesquisa original.",
+      "Concentração de risco: n8n passa a ser ponto único de falha de 100% da ingestão. O sinal de incompletude de NFR-1/AC-8.1 deixa de ser boa prática e passa a ser o único detector do modo de falha do EC-6.",
+      "Limite de 10 ms de CPU por invocação no Cloudflare Workers Free é um risco técnico NÃO QUANTIFICADO para SSR do App Router. Nenhuma medição de app Next.js real sob esse teto foi encontrada nesta sessão.",
+      "0,5 GB de storage por projeto no Neon é o teto mais apertado do desenho; o vetor de estouro é o histórico de eventos de jornada (DM-10/FR-3) caso OQ-9 decida importar todo o histórico.",
+      "Todos os riscos de PII/LGPD do desenho original permanecem, agravados por um detalhe: OQ-8 continua aberto e agora os dados pessoais ficam em provedor cuja região não foi definida nesta pesquisa. OQ-4 fica parcialmente resolvido (provedores escolhidos), mas a questão de REGIÃO DE DADOS segue aberta e passa a ser bloqueante para OQ-8.",
+      "Cinco 'grátis' empilhados, cada um com sua própria política. A superfície de risco de mudança de termos é maior do que em um único fornecedor pago."
+    ],
+    "estimatedRecurringCost": {
+      "database": "USD 0 — Neon Free. Ressalva real: 0,5 GB de storage por projeto e 100 CU-hours/projeto/mês; ao esgotar CU-hours, conexões existentes caem e novas não abrem até o próximo período. É um limite que causa INDISPONIBILIDADE, não fatura — o que é preferível sob custo zero, mas tem de ser monitorado.",
+      "auth": "USD 0 — Better Auth é MIT, roda na própria aplicação, sem MAU cobrado por terceiro. NÃO usar o Managed Better Auth do Neon: está em beta e o preço será publicado antes do GA.",
+      "hosting_frontend": "USD 0 — Cloudflare Workers Free (100k req/dia, 10 ms CPU/invocação, 5 cron triggers/conta). Ressalva real: o plano pago tem cobrança MÍNIMA de USD 5/mês por conta; se o teto de 10 ms de CPU se mostrar inviável para SSR, o upgrade viola a restrição do usuário e a decisão precisa voltar à mesa, não ser tomada por conveniência.",
+      "ingestion": "USD 0 incremental — n8n self-hosted já em produção. Windsor.ai removido do desenho, portanto zero exposição ao limite de scheduled syncs que estava em unverifiedClaims.",
+      "total": "USD 0,00/mês recorrente",
+      "riskOfForcedUpgrade": [
+        {
+          "trigger": "Storage do Neon passar de 0,5 GB no projeto",
+          "likelihood": "média — depende inteiramente da decisão de OQ-9 (janela de histórico)",
+          "costIfTriggered": "Launch pay-as-you-go a USD 0,106/CU-hour, sem mínimo mensal",
+          "mitigation": "Fechar OQ-9 com janela de histórico explícita; particionar eventos por período; política de arquivamento acordada ANTES da primeira carga."
+        },
+        {
+          "trigger": "10 ms de CPU por invocação insuficientes para SSR do App Router no Cloudflare Free",
+          "likelihood": "não quantificada — é o risco mais mal medido deste amendment",
+          "costIfTriggered": "Workers Paid com mínimo de USD 5/mês por conta",
+          "mitigation": "SPIKE ANTES DO PLAN: deploy de uma página representativa (filtros + agregação) sob OpenNext no Free e medição de CPU time real. Alternativa de custo zero: agregar no Postgres, cachear agressivamente, ou servir a app do mesmo servidor que já roda o n8n (ver fallbacks)."
+        },
+        {
+          "trigger": "Neon mudar a política do plano gratuito (foi adquirida pela Databricks em 2025, segundo fonte secundária)",
+          "likelihood": "baixa no curto prazo, real no médio",
+          "costIfTriggered": "migração para outro Postgres gratuito",
+          "mitigation": "Nenhuma feature proprietária do Neon no caminho crítico. Se Neon RLS/pg_session_jwt for adotado na fase 2, isso deixa de ser verdade — motivo adicional para manter a autorização primária na aplicação."
+        },
+        {
+          "trigger": "Cloudflare interpretar o uso como fora dos termos do plano gratuito",
+          "likelihood": "baixa — a documentação de pricing não traz cláusula de uso comercial, ao contrário da Vercel",
+          "costIfTriggered": "Workers Paid, mínimo USD 5/mês",
+          "mitigation": "Ler o Self-Serve Subscription Agreement da Cloudflare antes do deploy (não foi possível nesta sessão: a thread oficial da comunidade retornou HTTP 403). Está em newUnverifiedClaims."
+        }
+      ],
+      "sources": [
+        "https://neon.com/docs/introduction/plans",
+        "https://neon.com/faqs/free-plan-limits-and-quotas",
+        "https://developers.cloudflare.com/workers/platform/pricing/",
+        "https://vercel.com/docs/limits/fair-use-guidelines",
+        "https://github.com/better-auth/better-auth"
+      ]
+    },
+    "fallbacks": [
+      {
+        "scenario": "10 ms de CPU do Cloudflare Free se mostrar inviável para SSR",
+        "option": "Servir a app Next.js do MESMO servidor que já hospeda o n8n (n8n.loupenapps.com.br), atrás do Cloudflare como CDN gratuito.",
+        "cost": "USD 0 incremental",
+        "caveat": "[AUTO-DECISION] Isso NÃO viola literalmente a restrição do usuário, que é sobre não hospedar BANCO em servidor próprio — o banco continuaria no Neon. Mas contraria o espírito de 'não quero depender de servidor próprio' e adiciona responsabilidade operacional. Registrado como fallback a ser CONFIRMADO com o usuário, não como plano ativo. Razão de registrar: é a única saída de custo zero se o teto de CPU bloquear, e deixá-la implícita seria esconder do usuário que existe alternativa antes de aceitar USD 5/mês."
+      },
+      {
+        "scenario": "Neon Free se mostrar apertado em storage",
+        "option": "Migrar para outro Postgres gratuito (Aiven, Prisma Postgres) via pg_dump/pg_restore, ou reduzir a janela de histórico em OQ-9.",
+        "cost": "USD 0",
+        "caveat": "Números dos fallbacks vêm de fontes secundárias e divergem entre si — dimensionar na página oficial do provedor antes de migrar."
+      },
+      {
+        "scenario": "Autorização em nível de aplicação se mostrar frágil na revisão de QA",
+        "option": "Habilitar Neon RLS com pg_session_jwt como segunda camada.",
+        "cost": "USD 0 se disponível no Free — NÃO confirmado",
+        "caveat": "Exige que o schema da fase 1 já tenha as colunas de escopo. É requisito de DESIGN da fase 1 mesmo que a implementação fique para a fase 2."
+      }
+    ],
+    "estimatedEffort": "A estimativa de complexity.json ('3+ dias', tratar como epic/programa multi-story) permanece e sobe marginalmente. Dois deltas: (+) autenticação e RBAC passam de configuração de produto para construção com testes; (+) ingestão de ads volta ao escopo, porém como ADAPT de workflow existente. Nenhum dos dois muda a classe de complexidade (COMPLEX); ambos aumentam o volume dentro dela. Com CON-8 e ASM-6, a leitura realista continua sendo multi-semana em fases."
+  },
+
+  "revisedAttributionModelImpact": "CONFIRMADO: a troca de banco NÃO afeta o attributionModelProposal do research.json original — nem no desenho, nem na implementação. Duas razões verificadas na leitura do artefato original. (1) O algoritmo de resolução de origem é 100% agnóstico de banco: os seis sinais S1-S6 são todos determinísticos (Ad ID presente em Campanha_LinkedIn__c, match de e-mail normalizado, LeadSource contra CAMPANHA_RULES, evento de conversão do RD Station, vocabulário controlado de outbound, e o terminal 'Não atribuído'), avaliados first-match-wins na INGESTÃO, e nenhum deles usa similaridade textual. Os cinco invariantes (I1-I5) são regras de aplicação e de teste, não features de banco: qualquer Postgres — e mesmo um SQLite — os suportaria. A taxonomia, a hierarquia tracked > self-reported, o threshold de 15% de Não atribuído e a separação first-touch/last-touch/influência também não têm dependência de infraestrutura. (2) O ÚNICO ponto de contato com o banco é a resolução de identidade cross-fonte (EC-7, proposedIdentityResolutionDesign) e ele está INTEGRALMENTE PRESERVADO: o Tier 1 determinístico (e-mail normalizado, telefone E.164, ConvertedAccountId, UUID do RD Station) é igualdade exata e roda em qualquer lugar; o Tier 2 probabilístico depende de pg_trgm (similarity + índice GIN/GiST) e fuzzystrmatch (levenshtein/soundex/metaphone), e ambos estão confirmados disponíveis no Neon via CREATE EXTENSION, sem restrição de plano documentada (pg_trgm 1.6, fuzzystrmatch 1.1-1.2, Postgres 14-18; a única extensão com restrição explícita de plano pago é pg_repack). Também permanecem inalteradas as três tabelas do identity graph (person, identity_edge, identity_candidate) e os quatro invariantes de identidade, incluindo 'nunca merge automático' e 'registro de origem nunca é destruído'. CONSEQUÊNCIA CRÍTICA E DIRECIONAL: esta preservação é o argumento central para escolher Neon em vez de Cloudflare D1 ou Turso. Se o banco tivesse sido SQLite, o Tier 2 teria de ser reimplementado em código de aplicação sem índice de similaridade, o que reabriria o item mais difícil da epic (complexity.json exige spike dedicado para EC-7) e degradaria a solução já desenhada. Portanto: a restrição de custo zero NÃO custou nada ao modelo de atribuição — mas custaria muito se a escolha de banco tivesse ido para SQLite. RESSALVA HERDADA, INALTERADA: a normalização de telefone para E.164 continua tendo de acontecer no n8n antes do insert, porque nenhuma fonte encontrada (nem na pesquisa original, nem nesta) cobre normalização E.164 dentro do Postgres. Continua em unverifiedClaims da pesquisa original.",
+
+  "newUnverifiedClaims": [
+    {
+      "claim": "pg_trgm e fuzzystrmatch são habilitáveis via CREATE EXTENSION no plano FREE do Neon (e não apenas 'no Neon').",
+      "reason": "A página oficial de extensões lista ambas como suportadas nas versões 14-18 e afirma que extensões suportadas se instalam com CREATE EXTENSION 'unless otherwise noted'. A única restrição de plano explícita na página é para pg_repack ('available only on paid Neon plans'). A ausência de menção a pg_trgm/fuzzystrmatch é forte evidência de que não há restrição, mas é inferência por ausência, não afirmação positiva.",
+      "action": "needs_validation",
+      "howToValidate": "Criar um projeto Neon Free e executar: create extension if not exists pg_trgm; create extension if not exists fuzzystrmatch; select similarity('Joao Silva','Joäo Silva');. Custo: 2 minutos. É o PRIMEIRO teste a fazer, porque é a premissa que sustenta todo este amendment.",
+      "impactIfFalse": "CRÍTICO. Se falhar, o Tier 2 da resolução de identidade (EC-7) precisa de outra solução e o amendment inteiro precisa ser reaberto na escolha de banco."
+    },
+    {
+      "claim": "O plano Free do Neon permite uso comercial/interno de empresa.",
+      "reason": "Nem a página de plans nem a FAQ de limites do Free contêm qualquer declaração sobre uso comercial, requisito de cartão de crédito ou suspensão por inatividade — o silêncio contrasta com a cláusula explícita da Vercel. A afirmação positiva 'commercial use allowed' aparece apenas em blog agregador de terceiro (swyftstack).",
+      "action": "needs_validation",
+      "howToValidate": "Ler os Terms of Service da Neon antes do deploy de produção. É o mesmo tipo de armadilha que desqualificou o Vercel Hobby — não repetir o erro de assumir.",
+      "impactIfFalse": "ALTO. Invalidaria a escolha de banco por motivo contratual, não técnico."
+    },
+    {
+      "claim": "O plano gratuito dos Cloudflare Workers permite uso comercial/interno de empresa.",
+      "reason": "A documentação de pricing dos Workers descreve o Free plan apenas por limites técnicos, sem cláusula de uso comercial nem exigência de assinatura. A afirmação positiva vem de fonte secundária (freetiers.com) e de thread de comunidade — a thread oficial da Cloudflare Community retornou HTTP 403 nesta sessão e não pôde ser lida.",
+      "action": "needs_validation",
+      "howToValidate": "Ler o Self-Serve Subscription Agreement da Cloudflare e os Service-Specific Terms de Workers/Pages. Nota: a antiga Seção 2.8 (restrição a conteúdo não-HTML) foi removida do acordo self-service, mas restrições de conteúdo migraram para os Service-Specific Terms — verificar se algo alcança uma app SSR.",
+      "impactIfFalse": "ALTO. Sem Vercel Hobby (descartada por termos) e sem Cloudflare Free, não sobra hospedagem gratuita de terceiro no desenho, e o fallback passa a ser servir do próprio servidor do n8n."
+    },
+    {
+      "claim": "Uma app Next.js 16 App Router com Server Components consultando Postgres cabe no limite de 10 ms de CPU por invocação do Cloudflare Workers Free.",
+      "reason": "Nenhuma medição de CPU time de aplicação Next.js real sob OpenNext no plano Free foi encontrada nesta sessão. O limite de 10 ms/invocação está confirmado na documentação oficial; o consumo real da app não está.",
+      "action": "needs_validation",
+      "howToValidate": "SPIKE de meio dia antes do Plan: deploy de uma página representativa (filtros combináveis + agregação de KPIs) via @opennextjs/cloudflare no Free e medir o CPU time reportado nos logs. É o segundo teste mais importante deste amendment, depois das extensões.",
+      "impactIfFalse": "MÉDIO-ALTO. Forçaria Workers Paid (mínimo USD 5/mês, violando a restrição), ou o fallback de servir do servidor do n8n, ou renderização mais estática com agregação empurrada para o Postgres."
+    },
+    {
+      "claim": "Neon RLS / pg_session_jwt está disponível no plano Free e funciona com um Better Auth SELF-HOSPEDADO (não o Managed do Neon) como emissor de JWT.",
+      "reason": "O tutorial de RLS não menciona exigência de plano pago e a documentação afirma que qualquer provider emissor de JWT com URL JWKS é suportado. Porém parte da documentação associa pg_session_jwt ao Neon Data API ('automatically configured when you enable the Neon Data API'), o que pode acoplar a RLS a um produto que este projeto não pretende usar. Nenhuma fonte confirmou o caminho self-hospedado no Free.",
+      "action": "needs_validation",
+      "howToValidate": "Ler https://neon.com/docs/data-api/custom-authentication-providers e o README de github.com/neondatabase/pg_session_jwt. Baixa urgência: é fase 2, não fase 1.",
+      "impactIfFalse": "BAIXO. A autorização primária fica em nível de aplicação de qualquer forma; isto era defesa em profundidade opcional."
+    },
+    {
+      "claim": "Os plugins de RBAC do Better Auth cobrem três perfis simples (marketing/comercial/direção) sem forçar o modelo conceitual de 'organização'/multi-tenant.",
+      "reason": "A página oficial de introdução confirma 'plugin ecosystem' e 'access control' sem detalhar; a afirmação de que há 'ready-made structure' para roles e permissions vem de comparativo de terceiro (DevTools Academy). A documentação dos plugins admin/organization não foi lida nesta sessão.",
+      "action": "needs_validation",
+      "howToValidate": "Ler a documentação dos plugins admin e organization do Better Auth antes do Plan. Se o modelo de papéis exigir organização, avaliar se um campo 'perfil' próprio na tabela de usuário é mais simples que o plugin.",
+      "impactIfFalse": "BAIXO-MÉDIO. Aumenta o esforço de NFR-3, mas não invalida a escolha: papel como coluna do usuário mais um helper de autorização é implementável sem plugin."
+    },
+    {
+      "claim": "Auth.js está em modo de manutenção desde o início de 2026 e passou a ser mantido pelo time do Better Auth, que recomenda Better Auth para projetos novos.",
+      "reason": "Fontes são um post no blog do próprio Better Auth e uma discussion no repositório do next-auth — ambas com interesse na narrativa da consolidação. O que é verificável de forma independente é o estado do repositório better-auth (MIT, 29,8k estrelas, push em 2026-09-03, não arquivado) e o fato de haver advisories de segurança corrigidos em julho de 2026 abrangendo @auth/core e next-auth v4/v5.",
+      "action": "acceptable_risk",
+      "howToValidate": "Checar a data do último release do next-auth no npm e o repositório do Auth.js. Não é bloqueante: a escolha por Better Auth se sustenta pelos próprios méritos (MIT, ativo, authz de primeira classe), independentemente do estado do Auth.js.",
+      "impactIfFalse": "BAIXO."
+    },
+    {
+      "claim": "Cloudflare recomenda 'vinext' como forma padrão de rodar Next.js em Workers desde o fim de agosto de 2026, ao lado do OpenNext.",
+      "reason": "Encontrado em resumo de busca, não confirmado por leitura direta de página oficial da Cloudflare nesta sessão. O GA 1.0 do @opennextjs/cloudflare em fevereiro de 2026 é a informação mais bem sustentada.",
+      "action": "needs_validation",
+      "howToValidate": "Ler https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/ imediatamente antes do Plan. Este item muda em escala de meses.",
+      "impactIfFalse": "BAIXO. Afeta a escolha da ferramenta de deploy, não a viabilidade."
+    },
+    {
+      "claim": "Números de free tier de Aiven, Prisma Postgres e Supabase Free citados como fallbacks (em especial 1 GB vs 5 GB de storage no Aiven).",
+      "reason": "Todos vêm de blogs agregadores (Koyeb, Swyftstack, freebase-cloud, Bytebase) que divergem entre si. Nenhuma página oficial de provedor foi consultada para esses três.",
+      "action": "acceptable_risk",
+      "howToValidate": "Só validar se e quando um fallback for acionado. Servem aqui para provar que existem alternativas de migração, não para dimensionar.",
+      "impactIfFalse": "BAIXO."
+    },
+    {
+      "claim": "Limite de cron triggers do Cloudflare Workers no plano Free (5 por conta).",
+      "reason": "Existe issue aberta no repositório de documentação da Cloudflare (#29326) sobre inconsistência entre 'por Worker' e 'por conta'; algumas fontes citam 3 por Worker no Free. O número exato não foi lido em página oficial nesta sessão.",
+      "action": "acceptable_risk",
+      "howToValidate": "Ler https://developers.cloudflare.com/workers/platform/limits se cron no Worker for necessário. Nota: a ingestão agendada é responsabilidade do n8n, não do Worker — este limite provavelmente não é vinculante para esta epic.",
+      "impactIfFalse": "BAIXO."
+    },
+    {
+      "claim": "Neon foi adquirida pela Databricks em 2025, o que constitui risco de mudança de política de plano gratuito.",
+      "reason": "Mencionado em blog agregador de terceiro (swyftstack), não confirmado em fonte primária nesta sessão.",
+      "action": "acceptable_risk",
+      "howToValidate": "Não é bloqueante. A mitigação (portabilidade via pg_dump para outro Postgres gratuito) vale independentemente de a aquisição ser verdadeira.",
+      "impactIfFalse": "BAIXO."
+    }
+  ],
+
+  "newRecommendations": [
+    {
+      "type": "prefer",
+      "subject": "Neon Free (Postgres serverless) como base consolidada, em substituição ao Supabase",
+      "rationale": "Sob custo recorrente zero, a comparação relevante deixa de ser Neon vs Supabase Pro e passa a ser Neon Free vs Supabase Free — e nessa comparação o Neon ganha nos três eixos que importam: (1) retomada automática do compute após 5 min de inatividade (wake em 300–500 ms) contra pausa de projeto por inatividade com reativação manual no Supabase Free, o que é decisivo para um dashboard consultado em rajadas; (2) pg_trgm 1.6 e fuzzystrmatch 1.1-1.2 habilitáveis via CREATE EXTENSION sem restrição de plano documentada, preservando INTEGRALMENTE o desenho de identidade Tier 2 já validado para EC-7; (3) 100 projetos com 10 branches cada contra 2 projetos ativos por organização, permitindo dev e produção separados de graça. Contrapartida honesta: 0,5 GB de storage por projeto é apertado e 100 CU-hours/mês, se esgotadas, causam indisponibilidade (conexões caem e novas não abrem).",
+      "priority": "P0",
+      "traceTo": ["FR-7", "FR-8", "FR-9", "EC-7", "NFR-1", "NFR-2", "OQ-1", "OQ-4"],
+      "sources": [
+        "https://neon.com/docs/introduction/plans",
+        "https://neon.com/faqs/free-plan-limits-and-quotas",
+        "https://neon.com/docs/extensions/pg-extensions",
+        "https://neon.com/docs/introduction/scale-to-zero"
+      ],
+      "supersedes": "recommendations[0] do research.json ('Supabase (Postgres + Auth + RLS) como base e camada de autorização')"
+    },
+    {
+      "type": "avoid",
+      "subject": "Cloudflare D1 e Turso (qualquer banco SQLite) para esta epic",
+      "rationale": "Ambos têm free tier objetivamente mais generoso que o Neon em storage (5 GB contra 0,5 GB) e devem ser rejeitados de qualquer forma, por um motivo estrutural único e suficiente: SQLite não tem similaridade por trigramas nem levenshtein/soundex/metaphone nativos, o que obrigaria a reimplementar o Tier 2 da resolução de identidade (EC-7) em código de aplicação, sem índice GIN/GiST para viabilizar o custo. EC-7 é o item que complexity.json já marca como exigindo spike dedicado — degradar a única solução desenhada para ele em troca de storage é péssima troca. Motivos secundários: o D1 só é consultável via Worker ou REST API (/query, /raw), o que descartaria o nó Postgres do n8n, o upsert com ON CONFLICT e o 'Execute Query em transação única'; e desde 2026-09-01 o D1 FALHA queries ao exceder 100.000 linhas escritas/dia por conta. No Turso, o 'Turso Database' (reescrita em Rust) ainda está em beta com recomendação do próprio time de cautela para uso mission-critical.",
+      "priority": "P0",
+      "traceTo": ["EC-7", "FR-8", "FR-9", "DM-1", "DM-2"],
+      "sources": [
+        "https://developers.cloudflare.com/changelog/post/2026-09-01-d1-free-tier-limit-enforcement/",
+        "https://developers.cloudflare.com/d1/best-practices/query-d1/",
+        "https://turso.tech/pricing",
+        "https://www.theregister.com/databases/2026/07/29/after-rewriting-sqlite-in-rust-turso-turns-its-sights-on-postgres/5279835"
+      ]
+    },
+    {
+      "type": "prefer",
+      "subject": "Better Auth self-hospedado (MIT) para autenticação e RBAC, com autorização primária em nível de aplicação",
+      "rationale": "Sem Supabase, NFR-3 precisa de solução própria. Better Auth é a escolha por três razões verificáveis: licença MIT com repositório ativo (push em 2026-09-03, ~29,8k estrelas, não arquivado); posicionamento como framework de autenticação E autorização, com estrutura de roles/permissions via plugins, diferente do NextAuth que é autenticação a estender; e zero custo, zero MAU cobrado, zero vendor lock-in, porque roda dentro da própria app com as tabelas no Neon. Auth.js/NextAuth v5 é estável e ainda recebe correções de segurança (advisories de julho de 2026), mas está em modo de manutenção desde o início de 2026, com desenvolvimento ativo migrado para o Better Auth e recomendação dos próprios mantenedores de usar Better Auth em projetos novos — esta epic é greenfield na camada de app.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "ASM-4", "OQ-3", "OQ-1"],
+      "sources": [
+        "https://github.com/better-auth/better-auth",
+        "https://www.better-auth.com/docs/introduction",
+        "https://better-auth.com/blog/security-update-july-2026",
+        "https://www.devtoolsacademy.com/blog/betterauth-vs-nextauth"
+      ]
+    },
+    {
+      "type": "avoid",
+      "subject": "Managed Better Auth do Neon (e Neon Object Storage / Functions) na fase 1",
+      "rationale": "O plano Free do Neon inclui até 60.000 MAU de Managed Better Auth, o que é tentador. Mas os três produtos foram anunciados em julho de 2026 em BETA, 'free during the beta', explicitamente não feature-complete, com preço a ser publicado antes do GA. Adotá-los seria cometer os dois erros que este amendment existe para evitar simultaneamente: apostar requisito de primeira fase (NFR-3) em produto beta — exatamente a crítica que a pesquisa original fez ao Neon — e aceitar uma linha de custo futuro desconhecida sob restrição de custo zero. Usar a BIBLIOTECA Better Auth self-hospedada dá o mesmo resultado funcional sem nenhum dos dois riscos.",
+      "priority": "P1",
+      "traceTo": ["NFR-3", "OQ-1"],
+      "sources": [
+        "https://neon.com/docs/auth/overview",
+        "https://neon.com/docs/auth/roadmap",
+        "https://neon.com/docs/introduction/plans"
+      ]
+    },
+    {
+      "type": "avoid",
+      "subject": "Vercel Hobby como hospedagem — descartada por TERMOS DE USO, não por preço",
+      "rationale": "As Fair Use Guidelines da Vercel (atualizadas em 2026-07-29) são explícitas: 'Hobby teams are restricted to non-commercial personal use only. All commercial usage of the platform requires either a Pro or Enterprise plan.' E a definição de uso comercial elimina o debate sobre 'é ferramenta interna': 'any Deployment that is used for the purpose of financial gain of anyone involved in any part of the production of the project, including a paid employee or consultant writing the code'. O código desta epic é escrito por funcionário remunerado da Loupen. Pela definição publicada, é uso comercial, o que exigiria Pro a USD 20/usuário/mês — violando a restrição. Registrar isso explicitamente no spec é importante porque Vercel Hobby é o default mental de todo projeto Next.js e seria escolhido por inércia.",
+      "priority": "P0",
+      "traceTo": ["OQ-1", "OQ-4"],
+      "sources": [
+        "https://vercel.com/docs/limits/fair-use-guidelines",
+        "https://vercel.com/docs/plans/hobby"
+      ]
+    },
+    {
+      "type": "prefer",
+      "subject": "Cloudflare Workers Free como hospedagem, com spike obrigatório de CPU time antes do compromisso",
+      "rationale": "É a única hospedagem gratuita pesquisada nesta sessão cuja documentação de pricing NÃO traz cláusula restringindo uso comercial — contraste direto com a Vercel. Free plan: 100.000 requisições/dia, 10 ms de CPU por invocação, KV com 1 GB e 100k leituras/dia. Next.js 16 App Router é suportado via @opennextjs/cloudflare (1.0 GA em fevereiro de 2026, cobrindo todas as minors do 16 e as últimas do 14/15, com SSR, ISR, middleware e Image), no runtime Node.js — necessário para Server Components consultarem Postgres. DUAS RESSALVAS QUE PRECISAM ESTAR NO SPEC: (1) o limite de 10 ms de CPU por invocação é o risco técnico não quantificado deste amendment e exige spike de medição antes do Plan; (2) desde o fim de agosto de 2026 a Cloudflare passou a recomendar 'vinext' ao lado do OpenNext — dois caminhos oficiais concorrentes seis meses após o GA do primeiro indicam imaturidade da camada de adaptação, e a escolha deve ser reconfirmada imediatamente antes do Plan.",
+      "priority": "P0",
+      "traceTo": ["NFR-2", "OQ-1", "OQ-4"],
+      "sources": [
+        "https://developers.cloudflare.com/workers/platform/pricing/",
+        "https://opennext.js.org/cloudflare",
+        "https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/"
+      ]
+    },
+    {
+      "type": "prefer",
+      "subject": "n8n assume 100% da ingestão, inclusive ads, escrevendo no Neon via connection string externa",
+      "rationale": "PONTO 5 CONFIRMADO sem obstáculo: o nó Postgres do n8n aceita host, database, user, password e SSL; a connection string do Neon fornece todos, e a orientação para Neon é SSL='require' porque o Neon exige conexão sobre SSL. Custo zero nas duas pontas. Recomendações operacionais: usar o endpoint '-pooler' (PgBouncer) para evitar exaustão de conexões em execuções paralelas, e observar o teto de 5 GB/mês de transferência pública por projeto do Neon Free (irrelevante para ingestão delta diária, relevante para recargas completas repetidas). Com Windsor.ai fora, o workflow de ads existente (index.html:1209, Meta Ads e GA4 já pelo mesmo backend) ganha um destino Postgres — isso é ADAPT de workflow em produção, não CREATE de ingestão nova, o que atenua bastante a reversão de FR-9 de 3 para 4 famílias de fonte. Todo o padrão original é preservado: INSERT ... ON CONFLICT DO UPDATE idempotente, Execute Query em transação única, watermark por SystemModstamp em tabela sync_state.",
+      "priority": "P0",
+      "traceTo": ["FR-8", "FR-9", "EC-6", "NFR-1", "NFR-6", "CON-9", "ASM-3"],
+      "sources": [
+        "https://docs.n8n.io/integrations/builtin/credentials/postgres",
+        "https://neon.com/docs/connect/connect-from-any-app",
+        "https://blog.n8n.io/etl-pipeline/"
+      ],
+      "supersedes": "recommendations[1] do research.json ('Windsor.ai com destination PostgreSQL para toda a camada de ads')"
+    },
+    {
+      "type": "consider",
+      "subject": "Autorização em duas camadas: helper único na aplicação (fase 1) + Neon RLS/pg_session_jwt (fase 2)",
+      "rationale": "Este é o trade-off que o usuário precisa aceitar consciente. A literatura de segurança é convergente: RLS dá defesa em profundidade porque protege o dado mesmo quando a lógica da aplicação falha, com enforcement consistente em toda conexão ao banco; autorização só na aplicação reintroduz a classe de bug 'filtro esquecido na rota nova'. O consenso não é escolher um dos dois, é combinar. Desenho proposto: FASE 1 entrega autorização determinística e testável na aplicação, com três mitigações não negociáveis — (M1) nenhuma query de dado de lead escrita fora de uma camada de acesso que receba a sessão obrigatoriamente; (M2) teste por perfil provando que a rota NÃO retorna o que o perfil não pode ver, entrando no gate de QA; (M3) schema desenhado desde já com as colunas de escopo necessárias para habilitar RLS depois sem migração de dados. FASE 2 habilita Neon RLS com pg_session_jwt como segunda camada — a documentação afirma suportar qualquer emissor de JWT com URL JWKS, mas a disponibilidade no Free e o caminho com Better Auth self-hospedado NÃO estão confirmados.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "NFR-7", "OQ-3", "OQ-8"],
+      "sources": [
+        "https://www.svix.com/blog/row-level-security-defense-in-depth/",
+        "https://www.permit.io/blog/postgres-rls-implementation-guide",
+        "https://www.bytebase.com/blog/postgres-row-level-security-limitations-and-alternatives/",
+        "https://neon.com/docs/guides/rls-tutorial"
+      ]
+    },
+    {
+      "type": "consider",
+      "subject": "Fechar OQ-9 (janela de histórico) ANTES da primeira carga — deixou de ser planejamento e virou restrição de infraestrutura",
+      "rationale": "Com 0,5 GB de storage por projeto no Neon Free, OQ-9 muda de natureza. No desenho original (Supabase Pro, 8 GB) a janela de histórico era decisão de produto; agora é o principal gatilho de upgrade forçado do stack gratuito. O vetor de risco não é a tabela lead nem a de oportunidades — a base é da ordem de centenas de oportunidades — e sim o histórico de eventos de jornada (DM-10/FR-3), que cresce por lead e por evento. Recomendações concretas: fixar janela explícita em OQ-9; particionar eventos por período; definir política de arquivamento/purga acordada antes da primeira carga; e medir o tamanho real após a primeira ingestão delta para extrapolar.",
+      "priority": "P1",
+      "traceTo": ["OQ-9", "ASM-5", "FR-3", "DM-10", "NFR-1"],
+      "sources": [
+        "https://neon.com/faqs/free-plan-limits-and-quotas",
+        "https://neon.com/docs/introduction/plans"
+      ]
+    },
+    {
+      "type": "consider",
+      "subject": "OQ-4 fica parcialmente resolvido, mas REGIÃO DE DADOS passa a ser bloqueante para OQ-8 (LGPD)",
+      "rationale": "Este amendment escolhe os provedores (Neon para banco, Cloudflare para app) e nessa medida fecha metade de OQ-4. Mas abre um item que o desenho anterior também tinha e que agora fica mais visível: dados pessoais de leads (nome, e-mail, telefone/WhatsApp) passam a residir em provedor estrangeiro cuja REGIÃO não foi definida nesta pesquisa. O Neon permite escolher região ao criar o projeto (o Aiven Free notoriamente não permite, o que é motivo adicional para não usá-lo como fallback se LGPD apertar). Com OQ-8 ainda aberto, a região deve ser decidida junto com a política de dados pessoais, não depois — trocar a região depois significa recriar o projeto e recarregar tudo.",
+      "priority": "P1",
+      "traceTo": ["OQ-4", "OQ-8", "NFR-3"],
+      "sources": ["https://neon.com/docs/introduction/plans"]
+    },
+    {
+      "type": "consider",
+      "subject": "Elevar o sinal de incompletude de NFR-1/AC-8.1 a requisito de primeira classe — n8n virou ponto único de falha",
+      "rationale": "Com Windsor.ai removido, o n8n concentra 100% da ingestão. A contagem origem vs destino em sync_state deixa de ser boa prática de ETL e passa a ser o ÚNICO mecanismo capaz de detectar exatamente o modo de falha que originou esta epic: ingestão parcial silenciosa (44 de 236 linhas, EC-6). Não há segundo pipeline para comparar. O spec deve tratar 'agregado derivado de sync parcial exibido sem sinalização' como defeito bloqueante, e a métrica de completude por fonte deve estar visível na superfície, ao lado da métrica de cobertura de atribuição (AC-12.2).",
+      "priority": "P0",
+      "traceTo": ["NFR-1", "EC-6", "FR-8", "AC-8.1", "AC-12.2"],
+      "sources": ["https://blog.n8n.io/etl-pipeline/"]
+    },
+    {
+      "type": "consider",
+      "subject": "Manter a recomendação híbrida de ferramenta interna de verificação, agora sobre Neon",
+      "rationale": "O hybridRecommendation do research.json (Appsmith CE ou Metabase self-hosted como superfície de verificação de dados nas fases 1-2, antes do frontend próprio) permanece válido e apenas troca o banco de baixo: aponta para o Neon em vez do Supabase, via a mesma connection string Postgres. Uma ressalva NOVA introduzida por este amendment: 'self-hosted' significa rodar em algum lugar, e o único lugar disponível sem custo é o servidor que já roda o n8n. Isso reintroduz dependência de servidor próprio para uma ferramenta que é explicitamente descartável. Alternativa mais alinhada à restrição: usar o console SQL do próprio Neon e queries de verificação versionadas no repositório como substituto de baixo custo na fase 1, deixando Appsmith/Metabase para quando houver necessidade real de superfície.",
+      "priority": "P2",
+      "traceTo": ["FR-13", "NFR-5"],
+      "sources": ["https://queryplane.com/blog/top-retool-alternatives/"]
+    }
+  ],
+
+  "summary": "Custo zero é atendível sem degradar o desenho técnico. O achado que sustenta isso: pg_trgm e fuzzystrmatch estão disponíveis no Neon via CREATE EXTENSION sem restrição de plano documentada (só pg_repack exige plano pago), logo a resolução de identidade do EC-7 sobrevive intacta no free tier. Stack revisado: n8n (existente) assume 100% da ingestão, inclusive ads, escrevendo no Neon Free via SSL='require'; Better Auth self-hospedado (MIT) com autorização por perfil na aplicação; Next.js 16 App Router em Cloudflare Workers Free. Total USD 0,00/mês. Três trade-offs: (1) NFR-3 fica mais caro — sem RLS gerenciada, a autorização sai do banco para a disciplina do código, exigindo ponto único de acesso a dados e teste por perfil no gate de QA; (2) FR-9 volta de 3 para 4 famílias de fonte com a saída do Windsor.ai, atenuado por o workflow de ads já existir; (3) o n8n vira ponto único de falha da ingestão, elevando o sinal de incompletude de NFR-1 a bloqueante. Letra miúda que pode virar custo: 0,5 GB de storage no Neon (OQ-9 vira restrição de infraestrutura) e 10 ms de CPU por invocação no Cloudflare Free, risco não quantificado que exige spike. Vercel Hobby foi descartada por termos de uso, não por preço.",
+
+  "nextPhase": {
+    "phase": "spec",
+    "agent": "@pm",
+    "command": "*write-spec",
+    "note": "Este amendment PATCHEIA research.json; leia os dois juntos. Precedência: onde houver conflito, o amendment vence (é posterior e reflete decisão do usuário de 2026-09-03). Atenção do @pm em cinco pontos, além dos três da nota original. (1) Reverter no spec toda menção a Supabase e Windsor.ai — em especial o achado 'FR-9 encolhe de 4 para 3 famílias de fonte', que está REVERTIDO. (2) O custo passa a ser USD 0,00/mês, mas o spec deve carregar riskOfForcedUpgrade explicitamente: 'grátis' aqui tem quatro gatilhos nomeados de upgrade. (3) Dois spikes viram pré-requisito do Plan, na ordem: (a) validar CREATE EXTENSION pg_trgm/fuzzystrmatch em projeto Neon Free — 2 minutos, e é a premissa que sustenta o amendment inteiro; (b) medir CPU time real de uma página App Router sob OpenNext no Cloudflare Free — meio dia. (4) O trade-off de autorização (RLS gerenciada → aplicação) precisa aparecer como RISCO NOMEADO com as mitigações M1/M2/M3, não como detalhe de implementação; é o custo não-monetário da restrição de custo zero. (5) OQ-4 fica parcialmente resolvido (provedores escolhidos), mas REGIÃO DE DADOS abre e passa a ser bloqueante para OQ-8/LGPD — decidir região junto com a política de dados pessoais, porque trocar depois exige recriar o projeto. O attributionModelProposal segue INALTERADO e continua devendo entrar no spec como PROPOSTA sujeita a validação do usuário."
+  }
+}

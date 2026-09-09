@@ -1,0 +1,764 @@
+{
+  "amendsFile": "research-amendment-1.json",
+  "amendmentId": "research-amendment-2",
+  "amendedAt": "2026-09-04T00:00:00Z",
+  "amendedBy": "@analyst",
+  "storyId": "epic-crm-lead-intelligence",
+  "readingOrder": [
+    "research.json (base)",
+    "research-amendment-1.json (patch de custo zero)",
+    "research-amendment-2.json (este — patch de escopo de fase 1 e de gate de acesso)"
+  ],
+  "precedence": "Onde houver conflito, este amendment vence: é posterior e reflete decisões do usuário de 2026-09-04. Ele NÃO revoga o amendment 1 no eixo de custo (custo recorrente zero continua sendo restrição dura); ele ADIA a maior parte do stack que o amendment 1 escolheu.",
+
+  "amendmentReason": "Três decisões do usuário em 2026-09-04 mudam o que é 'fase 1 utilizável' e obrigam a reabrir o eixo de hospedagem e de segurança de acesso: (1) manter GitHub Pages como hospedagem, porque é onde o dashboard já está publicado hoje; (2) manter o MESMO paradigma do index.html atual (página única em HTML/CSS/JS vanilla, sem framework e sem build step), evoluindo-o com mais views e dados vindos de uma API real, em vez de reescrever em Next.js; (3) adiar autenticação com perfis (NFR-3) para uma fase posterior. A consequência dessas três decisões combinadas é que os dados pessoais de leads que a ficha 360 vai expor ficariam publicamente acessíveis na internet sem nenhuma barreira — o que levou o usuário a escolher, como mitigação, um gate de acesso via Cloudflare Access exigindo e-mail @loupen.com.br, sob a condição de continuar gratuito. Este amendment pesquisa a viabilidade desse gate e desenha sua topologia.",
+
+  "researchScope": {
+    "toolsAvailable": ["WebSearch", "WebFetch", "codebase", "git"],
+    "toolsUnavailable": ["context7", "exa"],
+    "toolNote": "Context7 e EXA indisponíveis nesta sessão, como no amendment 1. Toda pesquisa externa via WebSearch/WebFetch, com URL por claim (Artigo IV — No Invention). Claims sem fonte primária estão em newUnverifiedClaims. Dois números de free tier NÃO puderam ser lidos em página oficial e estão registrados como needs_validation em vez de afirmados.",
+    "pointsResearched": [
+      "P1 — Cloudflare Access (Zero Trust) plano gratuito em 2026: seats e política por domínio de e-mail com one-time PIN",
+      "P2 — Cloudflare Access na frente de um domínio que aponta para GitHub Pages: conflito de HTTPS e como resolver",
+      "P3 — CORS do n8n para chamadas a partir do domínio do dashboard",
+      "P4 — Se o Access protege também as chamadas de API que o navegador faz ao n8n (a brecha), e mitigação gratuita"
+    ]
+  },
+
+  "confirmedFactsFromSession": [
+    {
+      "id": "F-1",
+      "fact": "O repositório carlosbobroski-loupen/loupen-dashboard (conta PESSOAL, não organização) já está publicado via GitHub Pages hoje: branch main, path /, status 'built', em https://carlosbobroski-loupen.github.io/loupen-dashboard/. Repositório público, site público, sem autenticação.",
+      "verifiedBy": "usuário via gh api (não é claim de pesquisa)",
+      "corroboratedInCodebase": "git remote origin = https://github.com/carlosbobroski-loupen/loupen-dashboard.git"
+    },
+    {
+      "id": "F-2",
+      "fact": "GitHub Pages privado só existe no GitHub Enterprise Cloud e só para repositórios de ORGANIZAÇÃO. Não há Pages privado no plano gratuito para esta conta pessoal.",
+      "verifiedBy": "usuário na documentação oficial do GitHub",
+      "corroboratedByResearch": "Confirmado independentemente nesta sessão: Pages é disponível 'in public repositories with GitHub Free', e em repositórios privados a partir do GitHub Pro/Team/Enterprise; e mesmo em repositório privado o SITE continua público, exceto em organização no Enterprise Cloud.",
+      "sources": [
+        "https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits",
+        "https://docs.github.com/get-started/learning-about-github/githubs-products",
+        "https://smartscope.blog/en/Tips/GitHub/github-pages-private-repository/"
+      ]
+    },
+    {
+      "id": "F-3",
+      "fact": "Decisão: manter GitHub Pages como hospedagem e manter o paradigma do index.html atual (HTML/CSS/JS vanilla, 5.014 linhas, 16 views, sem framework e sem build step), evoluindo-o. Não migrar para Next.js/React nesta fase.",
+      "verifiedBy": "usuário",
+      "corroboratedInCodebase": "complexity.json já havia inventariado 5.014 linhas / 429 KB / 16 views / 142 funções / zero package.json e zero tooling de build."
+    },
+    {
+      "id": "F-4",
+      "fact": "Decisão: adiar autenticação e perfis de usuário. NFR-3 (autenticação com perfis marketing/comercial/direção) deixa de ser requisito da primeira fase utilizável e vira melhoria de fase posterior.",
+      "verifiedBy": "usuário",
+      "impactOnPriorArtifacts": "Isto REVERTE parcialmente a resolução de OQ-3 registrada em requirements.json (2026-09-03), que havia ELEVADO NFR-3 a requisito de primeira fase. A resposta de OQ-3 continua verdadeira quanto a QUEM vai usar (múltiplos usuários, múltiplos perfis); o que mudou é QUANDO a permissão por perfil é implementada."
+    },
+    {
+      "id": "F-5",
+      "fact": "Decisão de mitigação escolhida pelo usuário: gate de acesso via Cloudflare Access (Zero Trust) na frente de um domínio próprio que aponta para o GitHub Pages, exigindo e-mail corporativo @loupen.com.br. Não é 'sistema de login com perfis' — é um portão de 'isso é da Loupen ou não é'. Condição: continuar gratuito.",
+      "verifiedBy": "usuário"
+    }
+  ],
+
+  "criticalFindingPreexistingExposure": {
+    "severity": "CRITICAL",
+    "headline": "A exposição de dados pessoais NÃO é um risco futuro da ficha 360 — ela já está materializada hoje, em produção, e o gate de acesso não a resolve por completo.",
+    "verifiedEvidence": [
+      "index.html:4373 contém `const SRD_IA_LEADS = [{\"nome\":\"Erika\",\"tel\":\"+5567991569523\", ...}]` — array estático com dados de leads reais embutido no artefato.",
+      "Contagem no arquivo atual: 391 ocorrências de \"nome\" e 365 telefones em formato E.164 dentro desse array.",
+      "Três e-mails reais (pessoa física e corporativos) também aparecem no arquivo — endereços REDIGIDOS deste documento em 2026-09-09, antes do primeiro envio ao repositório remoto: listá-los aqui re-vazaria no repositório público exatamente a PII que este achado existe para denunciar. Para auditar, consultar o array SRD_IA_LEADS no histórico do git citado abaixo.",
+      "O array está no HISTÓRICO do git público: `git log -S\"SRD_IA_LEADS\"` retorna os commits 511e383 e 64165b0, e d86260a atualizou o snapshot.",
+      "Como o repositório é público, esse conteúdo é acessível por três caminhos independentes: (a) o site do GitHub Pages, (b) a página do arquivo no repositório, (c) o histórico do git / API do GitHub."
+    ],
+    "whyItMattersForThisAmendment": "O gate do Cloudflare Access cobre APENAS o caminho (a). Os caminhos (b) e (c) permanecem abertos, porque são propriedades do repositório e não do site. Portanto o gate, isoladamente, é uma mitigação PARCIAL para o problema que o usuário quer resolver. Registrar isso não é preciosismo: é literalmente o mesmo modo de falha que o usuário quer evitar na ficha 360, já acontecendo.",
+    "constraintThatMakesItHard": "Tornar o repositório privado resolveria (b) e (c) — mas DESLIGA o GitHub Pages numa conta pessoal no plano gratuito, porque Pages em repositório privado exige GitHub Pro. Ou seja: 'manter GitHub Pages grátis' e 'repositório privado' são mutuamente exclusivos neste plano.",
+    "mitigationOptions": [
+      {
+        "option": "M-A — Nunca mais embutir PII no artefato + purgar o histórico",
+        "detail": "A epic já resolve o lado do futuro: FR-7 move os dados para um backend consultável, então o index.html deixa de carregar arrays de leads. Falta o lado do passado: remover o array do arquivo atual e reescrever o histórico (git filter-repo / filter-branch + force push) para eliminar os commits que carregam os 365 telefones. Custo: zero em dinheiro, mas exige force push (autoridade de @devops) e invalida clones/forks existentes.",
+        "cost": "USD 0",
+        "residualRisk": "Conteúdo de repositório público pode ter sido indexado/clonado/cacheado por terceiros (incluindo caches da API do GitHub). Reescrever histórico reduz exposição futura, não desfaz exposição passada."
+      },
+      {
+        "option": "M-B — Repositório privado + trocar a hospedagem para Cloudflare Pages",
+        "detail": "Cloudflare Pages aceita conectar repositório GitHub PRIVADO e não expõe nenhuma URL github.io. Isso elimina (a), (b) e (c) de uma vez e mantém custo zero, ao preço de sair do GitHub Pages — o que contraria F-3. A URL *.pages.dev continua pública e teria de ser coberta pelo Access também.",
+        "cost": "USD 0",
+        "residualRisk": "Contraria a decisão do usuário de manter GitHub Pages; e a superfície *.pages.dev precisa de política própria.",
+        "sources": ["https://dev.to/sanchitkd/how-i-built-a-fully-private-portfolio-using-github-and-cloudflare-for-free-3e3b"]
+      },
+      {
+        "option": "M-C — GitHub Pro (repositório privado + Pages privado? NÃO)",
+        "detail": "GitHub Pro permite Pages a partir de repositório privado, mas o SITE continua público. Pages com site privado só existe em organização no Enterprise Cloud. Portanto Pro resolveria (b) e (c) mas não substituiria o Access. Além disso é assinatura paga — viola a restrição de custo zero do amendment 1.",
+        "cost": "assinatura mensal — VIOLA custo zero",
+        "recommendation": "descartado"
+      }
+    ],
+    "recommendation": "M-A é a opção compatível com todas as decisões do usuário (mantém GitHub Pages, mantém custo zero) e deve ser tratada como PRÉ-REQUISITO da fase 1, não como tarefa de limpeza opcional. M-B fica registrada como alternativa superior em segurança, para o caso de o usuário aceitar trocar de hospedagem."
+  },
+
+  "phase1Scope": {
+    "description": "Redefine o que é 'fase 1 utilizável': sem autenticação por perfil (NFR-3 adiado), mesma estrutura vanilla HTML/CSS/JS do index.html atual (não Next.js, não React, sem build step), hospedado em GitHub Pages (já em uso hoje), com um gate de acesso via Cloudflare Access exigindo e-mail @loupen.com.br na frente de um domínio próprio proxiado pela Cloudflare. Os dados deixam de ser arrays estáticos embutidos e passam a vir de uma API real (n8n lendo o Neon Free), consumida por fetch() — que é exatamente o padrão que o artefato JÁ usa hoje para o ADS_API_URL.",
+    "whatStaysFromAmendment1": [
+      "Custo recorrente zero como restrição dura.",
+      "Neon Free como banco consolidado, com pg_trgm + fuzzystrmatch para a resolução de identidade do EC-7 (premissa que continua sendo o primeiro spike a validar).",
+      "n8n self-hosted como única camada de ingestão, inclusive ads, escrevendo no Neon via SSL='require'.",
+      "Windsor.ai FORA do desenho; FR-9 permanece com 4 famílias de fonte.",
+      "Vercel Hobby permanece descartada por termos de uso (irrelevante agora, já que não há app Next.js na fase 1, mas o registro continua válido para a fase 2)."
+    ],
+    "whatIsNewInPhase1": [
+      "Um domínio próprio (ou subdomínio) com DNS na Cloudflare, proxiado, apontando para o GitHub Pages.",
+      "Uma Access Application self-hosted cobrindo esse hostname, com política Allow / Include / 'Emails ending in' @loupen.com.br e login por one-time PIN.",
+      "Uma camada de leitura de dados exposta pelo n8n como endpoint HTTP consumido por fetch() — continuação do padrão ADS_API_URL, não invenção nova.",
+      "Fechamento da brecha do ponto 4 (endpoint de dados público) — ver accessGateDesign.apiGapClosure.",
+      "Pré-requisito de higiene: remover PII embutida do artefato e do histórico (criticalFindingPreexistingExposure.M-A)."
+    ],
+    "whatIsDeferredToPhase2": [
+      "NFR-3 completo (autenticação com perfis marketing/comercial/direção e permissão diferenciada por perfil). O gate do Access é binário: entra quem tem e-mail @loupen.com.br. Não há noção de perfil, nem de escopo de dado por perfil.",
+      "Next.js 16 App Router — só necessário se/quando houver requisito de SSR, rotas endereçáveis server-side ou autorização por perfil no servidor.",
+      "Cloudflare Workers / Pages como hospedagem da aplicação (o adaptador @opennextjs/cloudflare, o risco não quantificado de 10 ms de CPU por invocação e a disputa OpenNext vs vinext saem do caminho crítico da fase 1 — e com eles sai o principal risco técnico não medido do amendment 1).",
+      "Better Auth (self-hospedado) — só necessário quando NFR-3 completo entrar em escopo. Enquanto o gate for por domínio de e-mail, não há tabela de usuário, sessão nem papel a manter.",
+      "Neon RLS / pg_session_jwt como defesa em profundidade — já era fase 2 no amendment 1 e continua.",
+      "nuqs / gerenciamento de estado de filtro em URL via biblioteca — na fase 1 isso é resolvido com History API nativa, coerente com o paradigma vanilla."
+    ],
+    "consequenceForFR6AndAC": {
+      "note": "FR-6/AC-6.1 exige que o detalhe do lead seja 'endereçável/retomável', e FR-1/AC-1.2 exige preservar o estado do filtro na navegação. Sem framework de roteamento, isso passa a ser responsabilidade de history.pushState + parsing de query string/hash no próprio index.html. É perfeitamente factível em vanilla JS e NÃO exige Next.js — mas precisa ser escrito no spec como requisito explícito de implementação, porque hoje o artefato navega por showView() sem refletir estado na URL (index.html:222-223 mostram o padrão atual de navegação por botão).",
+      "traceTo": ["FR-6", "AC-6.1", "FR-1", "AC-1.2"]
+    }
+  },
+
+  "supersededDependencies": [
+    {
+      "dependency": "Next.js 16 App Router (+ React, TypeScript, Tailwind, nuqs)",
+      "previousDecision": "CREATE / preferred — superfície da aplicação no amendment 1 e no research.json original",
+      "newDecision": "DEFERRED para fase 2",
+      "notRejected": true,
+      "rationale": "Decisão do usuário (F-3): manter o paradigma vanilla do index.html e evoluí-lo. Não é rejeição técnica — é sequenciamento. O gatilho objetivo para reabrir é o momento em que NFR-3 completo (autorização por perfil) entrar em escopo, porque autorização confiável exige um lado servidor que decida o que devolver, e um arquivo estático servido por CDN não tem esse lado.",
+      "whatIsLost": [
+        "Roteamento e estado de URL prontos (o que empurra FR-6/AC-6.1 e FR-1/AC-1.2 para History API manual).",
+        "Server Components consultando Postgres diretamente — na fase 1 o navegador fala com o n8n, não com o banco.",
+        "Tipagem estática e componentização, com o custo de manutenção continuando concentrado num arquivo único que já tem 5.014 linhas (complexity.json marca scope 5/5 justamente por isso).",
+        "A rede de segurança de autorização no servidor — que é exatamente o que o gate do Access substitui de forma grosseira nesta fase."
+      ],
+      "whatIsGained": [
+        "Elimina da fase 1 o risco técnico mais mal medido do amendment 1: o teto de 10 ms de CPU por invocação do Cloudflare Workers Free para SSR do App Router, que exigia spike de meio dia e não tinha nenhuma medição encontrada.",
+        "Elimina a dependência do adaptador Next.js↔Cloudflare, cuja imaturidade o amendment 1 registrou (dois caminhos oficiais concorrentes — OpenNext e vinext — seis meses após o GA do primeiro).",
+        "Zero build step: mantém o ciclo de entrega que o usuário já opera (commit → Pages), sem CI a criar."
+      ]
+    },
+    {
+      "dependency": "Cloudflare Workers / Pages como hospedagem da aplicação",
+      "previousDecision": "CREATE / preferred no amendment 1",
+      "newDecision": "DEFERRED para fase 2 como HOSPEDAGEM. Porém a CONTA Cloudflare volta como dependência de fase 1, para DNS, proxy, Universal SSL e Access — e opcionalmente um Worker mínimo de proxy de API (ver accessGateDesign.apiGapClosure).",
+      "notRejected": true,
+      "rationale": "A hospedagem sai porque GitHub Pages fica. Mas a Cloudflare entra pela porta do Zero Trust: o Access só funciona sobre hostname proxiado em zona ativa da conta. Ou seja, o amendment não remove a Cloudflare do desenho — muda o papel dela de 'onde a app roda' para 'quem controla a porta'."
+    },
+    {
+      "dependency": "Better Auth (self-hospedado na app Next.js)",
+      "previousDecision": "CREATE / preferred no amendment 1 — auth + RBAC por perfil",
+      "newDecision": "DEFERRED para fase 2",
+      "notRejected": true,
+      "rationale": "Decisão do usuário (F-4): perfis ficam para depois. Sem perfis e sem servidor de aplicação, não há onde nem por que rodar Better Auth na fase 1.",
+      "importantConsequence": "As três mitigações M1/M2/M3 que o amendment 1 exigia para NFR-3 (ponto único de autorização, teste de autorização por perfil no gate de QA, schema preparado para RLS) NÃO desaparecem — elas ficam pendentes junto com NFR-3. A única que deve ser antecipada para a fase 1 é M3: desenhar o SCHEMA já com as colunas de escopo necessárias, porque schema é o que fica caro de mudar depois. Isso é custo quase zero agora e evita migração de dados na fase 2."
+    }
+  ],
+
+  "newDependencies": [
+    {
+      "name": "Cloudflare Zero Trust / Access — plano Free",
+      "type": "service",
+      "verified": true,
+      "verificationLevel": "parcial — funcionalidade confirmada em docs oficiais; o NÚMERO de seats do Free não foi lido em página oficial de pricing nesta sessão",
+      "decisionHierarchy": "CREATE",
+      "documentation": {
+        "url": "https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/",
+        "additionalUrls": [
+          "https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/",
+          "https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/",
+          "https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/",
+          "https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/"
+        ]
+      },
+      "freeTierLimits": {
+        "seats": "Até 50 usuários / 50 seats de Access sem custo. ESTE NÚMERO NÃO FOI CONFIRMADO EM PÁGINA OFICIAL DE PRICING NESTA SESSÃO — ver newUnverifiedClaims UC-1.",
+        "seatSemantics": "Segundo a documentação oficial, seats são consumidos por USUÁRIO ao se autenticar em uma aplicação (ou ao enrolar um dispositivo no cliente Cloudflare One), não por dispositivo. Uma pessoa com vários dispositivos consome um seat.",
+        "logRetention": "24 horas de retenção de log de atividade no Free (contra 30 dias no pago), segundo fonte terceira.",
+        "behaviorOnExceeding": "Fonte terceira relata que ao passar do limite novos usuários são BLOQUEADOS, não cobrados silenciosamente — coerente com o padrão de free tiers da Cloudflare registrado no amendment 1 (limite causa indisponibilidade, não fatura). Não confirmado em fonte oficial.",
+        "firstPaidTier": "USD 7 por usuário/mês (pay-as-you-go), segundo fontes terceiras.",
+        "dimensioningForLoupen": "Marketing + comercial + direção da Loupen está a uma ordem de magnitude de distância de 50 seats. O limite não é vinculante para este caso, mesmo com folga generosa.",
+        "sources": [
+          "https://blog.cloudflare.com/zero-trust-week-setting-up-cloudflare-one-as-a-small-business/",
+          "https://developers.cloudflare.com/cloudflare-one/faq/getting-started-faq/",
+          "https://costbench.com/software/business-vpn/cloudflare-zero-trust/free-plan/",
+          "https://zerometric.net/research/cloudflare-zero-trust-free-plan-limits-2026/",
+          "https://controld.com/blog/cloudflare-zero-trust-pricing/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "PONTO 1 CONFIRMADO — política por domínio de e-mail é caso de uso documentado, com exemplo literal",
+          "description": "A página oficial de políticas comuns traz exatamente o padrão pedido pelo usuário, como exemplo de primeira linha: Action=Allow, Rule type=Include, Selector='Emails ending in', Value=@example.com. A documentação registra ainda que é possível somar vários domínios no mesmo Include ('for example, @example.com and @example.co.uk'). Não há nada de exótico no pedido: 'só quem tem e-mail @loupen.com.br entra' é a política canônica de Access para funcionários.",
+          "codeExample": "Access Application: dashboard.<dominio-loupen>\n  Policy: \"Loupen apenas\"\n    Action: Allow\n    Include: Emails ending in -> @loupen.com.br\n    (opcional) Require: Login Methods -> One-time PIN",
+          "source": "https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/",
+          "confidence": "high"
+        },
+        {
+          "name": "PONTO 1 CONFIRMADO — one-time PIN por e-mail dispensa identity provider pago (Google Workspace, Okta etc.)",
+          "description": "A documentação oficial descreve o OTP como alternativa a integrar um identity provider: 'Cloudflare Access can send a one-time PIN (OTP) to approved email addresses as an alternative to integrating an identity provider'. O PIN expira 10 minutos após a solicitação. Não há qualquer menção a exigência de plano pago para OTP. RESSALVA OPERACIONAL IMPORTANTE, também da doc oficial: 'OTP is no longer added automatically, but you can set it up at any time' — em organizações Zero Trust novas o padrão passou a ser o identity provider da própria Cloudflare, então o OTP tem de ser habilitado explicitamente, não se pode assumir que já está lá. E o Cloudflare só envia o e-mail se a política permitir aquele endereço: quem não bate a política não recebe PIN nenhum.",
+          "codeExample": null,
+          "source": "https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/",
+          "confidence": "high",
+          "operationalNote": "Se o gateway de e-mail da Loupen filtrar os PINs, a doc oficial instrui a liberar o domínio remetente notify.cloudflare.com, o endereço noreply@notify.cloudflare.com e uma lista de IPs. Há várias threads de comunidade sobre PIN não entregue — é o modo de falha mais comum do OTP e deve entrar no checklist de implantação."
+        },
+        {
+          "name": "AVISO OFICIAL que precisa entrar no spec — OTP sem restrição de domínio é porta escancarada",
+          "description": "A própria documentação da Cloudflare adverte, textualmente: 'Adding Login Methods: One-time PIN as an Include rule without restricting email domains allows anyone with any email address to receive a code and access the application. Always pair OTP with specific email domains or an email list in the Include rule.' Traduzindo para o risco desta epic: se a política for configurada errada — OTP no Include SEM o 'Emails ending in' — o gate fica pior que inútil, porque dá aparência de proteção enquanto qualquer pessoa do mundo com qualquer e-mail entra. Dado que há 365 telefones de leads em jogo, esta é a linha de configuração mais crítica do desenho inteiro e merece verificação explícita, não confiança.",
+          "codeExample": null,
+          "source": "https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/",
+          "confidence": "high"
+        },
+        {
+          "name": "Access é deny-by-default e exige hostname em zona ativa da conta",
+          "description": "A criação de uma self-hosted application escolhe o domínio de um dropdown, e 'domains must belong to an active zone in your Cloudflare account'. Todas as aplicações de Access são deny by default: 'a user must match an Allow policy before they are granted access'. Isso tem duas consequências de projeto: (a) é obrigatório ter um domínio (ou subdomínio) cuja zona DNS esteja na Cloudflare — não dá para colocar Access na frente de carlosbobroski-loupen.github.io, porque essa zona não é da Loupen; (b) o comportamento default é seguro (nega), o que é a orientação correta para dado pessoal.",
+          "codeExample": null,
+          "source": "https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/",
+          "additionalSources": ["https://developers.cloudflare.com/cloudflare-one/applications/configure-apps"],
+          "confidence": "high"
+        },
+        {
+          "name": "Ganho colateral relevante para OQ-8/LGPD: log de quem acessou",
+          "description": "O Access registra os logins por usuário. Com 24h de retenção no Free (fonte terceira), não é trilha de auditoria de longo prazo, mas é infinitamente melhor que o estado atual, em que não existe nenhum registro de quem acessou dado pessoal de lead — porque não existe barreira nenhuma. Para OQ-8 isso é um argumento concreto a favor do gate, além da barreira em si.",
+          "codeExample": null,
+          "source": "https://costbench.com/software/business-vpn/cloudflare-zero-trust/free-plan/",
+          "confidence": "low",
+          "confidenceNote": "Retenção de 24h no Free vem de fonte terceira, não de página oficial."
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": [
+          "GitHub Pages privado (INEXISTENTE neste plano — F-2)",
+          "Cloudflare Pages + repositório privado (M-B: mais seguro, mas troca a hospedagem)",
+          "Basic auth no artefato (impossível: GitHub Pages serve estático, sem servidor para exigir credencial)",
+          "Senha em JavaScript no próprio index.html (segurança teatral: a senha e os dados chegam ao navegador de qualquer forma — deve ser explicitamente rejeitada no spec)",
+          "Obscuridade da URL (não é controle de acesso)"
+        ],
+        "conflicts": [
+          "Exige um domínio com DNS na Cloudflare. Se nenhum domínio da Loupen estiver na Cloudflare hoje, isso é um pré-requisito de infraestrutura, com troca de nameservers — operação de risco baixo mas que afeta e-mail e outros serviços do domínio se feita sem inventário prévio dos registros DNS.",
+          "O gate é BINÁRIO e não substitui NFR-3: quem entra vê tudo. Direção, marketing e comercial verão os mesmos dados. Isso tem de estar escrito no spec como limitação aceita, não como equivalente a controle de acesso por perfil.",
+          "O gate cobre a superfície HTML no hostname protegido. NÃO cobre automaticamente os endpoints de dados em outro hostname — é a brecha do ponto 4, tratada em accessGateDesign.apiGapClosure.",
+          "Não cobre o repositório público nem o histórico do git (criticalFindingPreexistingExposure)."
+        ],
+        "costEvidence": "USD 0/mês dentro do free tier de seats. Nenhum cartão de crédito exigido segundo fontes terceiras (não confirmado oficialmente).",
+        "costSources": ["https://blog.cloudflare.com/zero-trust-week-setting-up-cloudflare-one-as-a-small-business/"],
+        "idsJustification": "CREATE inevitável — não existe hoje nenhuma camada de controle de acesso no artefato. Entre os CREATEs possíveis, é o de menor esforço: configuração de painel, zero código, zero build, zero alteração no index.html."
+      }
+    },
+    {
+      "name": "Domínio próprio com DNS/proxy na Cloudflare + Universal SSL, na frente do GitHub Pages",
+      "type": "infrastructure",
+      "verified": true,
+      "verificationLevel": "mecanismo confirmado em docs oficiais; a combinação específica GitHub Pages + proxy ligado é sustentada por docs da Cloudflare sobre modos SSL e por evidência convergente de comunidade, não por doc oficial do GitHub",
+      "decisionHierarchy": "CREATE",
+      "documentation": {
+        "url": "https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full/",
+        "additionalUrls": [
+          "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site",
+          "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/troubleshooting-custom-domains-and-github-pages",
+          "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-526/",
+          "https://blog.jakelee.co.uk/how-to-disable-cloudflare-proxying-with-github-pages/",
+          "https://github.com/orgs/community/discussions/162723"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "PONTO 2 — o conflito de HTTPS é REAL e bem documentado: proxy ligado impede o GitHub de emitir o certificado",
+          "description": "O ponto levantado na instrução está correto e é o obstáculo central. Com o proxy da Cloudflare ligado (nuvem laranja), o GitHub não consegue provisionar o certificado Let's Encrypt do domínio customizado, porque não enxerga os registros DNS apontando para ele: 'Cloudflare enables their HTTP/DNS proxy feature by default, meaning GitHub isn't able to see the DNS records required to generate an HTTPS certificate'. O sintoma clássico do desencontro entre certificado do GitHub e proxy é o erro 526 (Invalid SSL certificate), que a própria Cloudflare documenta como 'Cloudflare is unable to verify the SSL certificate on your origin server'. Guias de comunidade convergem para a receita padrão: manter o registro em DNS only para o GitHub emitir o certificado, e a guia da Cloudflare para GitHub Pages recomenda apenas ligar o proxy depois, se quiser cache. O caminho 'DNS only' é o que a maioria dos tutoriais ensina — e é justamente o caminho que INVIABILIZA o Access, porque Access exige hostname proxiado.",
+          "codeExample": null,
+          "source": "https://blog.jakelee.co.uk/how-to-disable-cloudflare-proxying-with-github-pages/",
+          "additionalSources": [
+            "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-526/",
+            "https://github.com/orgs/community/discussions/162723",
+            "https://2dayapp.com/en/posts/github-pages-custom-domain-cloudflare-dns/"
+          ],
+          "confidence": "high"
+        },
+        {
+          "name": "PONTO 2 RESOLVIDO — modo SSL/TLS 'Full' (não Strict) elimina o conflito de certificado, por definição documentada",
+          "description": "ESTE É O ACHADO QUE VIABILIZA O GATE SOBRE GITHUB PAGES. A documentação oficial do modo Full é explícita: 'The certificate presented by the origin will not be validated in any way' e o certificado do origin 'can be expired, self-signed, or not even have a matching CN/SAN entry for the hostname requested'. Consequência direta: com o proxy LIGADO e o modo em Full, não importa que o GitHub nunca tenha emitido certificado para o domínio customizado — a Cloudflare fecha a conexão com o origin do GitHub por HTTPS e aceita o certificado *.github.io apresentado, enquanto o navegador do usuário recebe o certificado da Cloudflare (Universal SSL, gratuito). O erro 526 acontece em Full (Strict), que valida; em Full, não. O que NÃO se deve usar é o modo Flexible (Cloudflare→origin em HTTP puro), porque combinado com o 'Enforce HTTPS' do GitHub gera loop de redirecionamento — modo de falha reportado em vários guias.",
+          "codeExample": "Cloudflare > SSL/TLS > Overview: Full  (NAO 'Full (Strict)', NAO 'Flexible')\nDNS: CNAME dashboard -> carlosbobroski-loupen.github.io  [Proxied / nuvem laranja]\nGitHub > Settings > Pages > Custom domain: dashboard.<dominio-loupen>\nGitHub > Settings > Pages > Enforce HTTPS: DESMARCADO (o TLS do visitante e' da Cloudflare)",
+          "source": "https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full/",
+          "confidence": "medium",
+          "confidenceNote": "O comportamento do modo Full é afirmação oficial e inequívoca. O que é inferência é que o GitHub Pages responde ao handshake TLS com SNI de um domínio para o qual não emitiu certificado, apresentando o certificado *.github.io e roteando pelo header Host / arquivo CNAME. É o comportamento esperado de um servidor com vhost, e é consistente com os relatos de 526 (que só existem porque o GitHub RESPONDE com um certificado que a Cloudflare recusa em modo Strict) — mas não foi validado empiricamente nesta sessão. Ver newUnverifiedClaims UC-2."
+        },
+        {
+          "name": "Definir o domínio customizado no GitHub é o que FECHA a URL github.io — e é o que torna o gate efetivo",
+          "description": "Sem isso, o gate é contornável em um clique: bastaria acessar https://carlosbobroski-loupen.github.io/loupen-dashboard/ para pular o Access. A documentação do GitHub sobre domínios customizados descreve redirecionamentos automáticos entre variantes de domínio, e fontes secundárias afirmam que ao configurar o domínio customizado as requisições ao domínio padrão github.io passam a redirecionar para ele. Se isso se confirmar, o conteúdo deixa de ser SERVIDO em github.io e passa a ser redirecionado ao hostname protegido pelo Access — que é exatamente o efeito desejado. ATENÇÃO: é um redirecionamento, não uma barreira de autenticação; o gate continua sendo o Access no destino. E há uma incompatibilidade de arquitetura a registrar: essa mesma propriedade IMPEDE o desenho alternativo de usar um Cloudflare Worker como reverse proxy buscando o conteúdo em github.io, porque o Worker receberia o redirecionamento de volta para o domínio customizado, criando um laço. Ou seja, 'domínio customizado no GitHub' e 'Worker reverse-proxy para github.io' são mutuamente exclusivos — e o primeiro é o correto, porque é o único que fecha a URL pública.",
+          "codeExample": null,
+          "source": "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site",
+          "confidence": "medium",
+          "confidenceNote": "A leitura direta da página 'About custom domains and GitHub Pages' nesta sessão NÃO confirmou o redirecionamento de github.io para o domínio customizado (a página trata de tipos de domínio, DNS e verificação). A afirmação vem do resumo de busca sobre a página de 'Managing a custom domain' e de fontes secundárias. É o item mais importante a validar empiricamente, porque dele depende a eficácia do gate. Ver newUnverifiedClaims UC-3."
+        },
+        {
+          "name": "Registro CAA: se existir CAA na zona, precisa permitir letsencrypt.org",
+          "description": "A documentação de troubleshooting do GitHub é explícita: 'at least one CAA record must exist with the value letsencrypt.org for your site to be accessible over HTTPS'. No desenho aqui recomendado (proxy ligado + Full), o certificado que importa para o navegador é o da Cloudflare, não o do GitHub — então esse requisito perde criticidade. Mas se a zona tiver CAA restritivo, ele pode atrapalhar a emissão do Universal SSL da Cloudflare também. Regra prática: ou não ter CAA, ou ter CAA que permita as autoridades usadas pela Cloudflare e pelo Let's Encrypt.",
+          "codeExample": null,
+          "source": "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/troubleshooting-custom-domains-and-github-pages",
+          "confidence": "high"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": [
+          "Subdomínio de loupenapps.com.br (ex.: dashboard.loupenapps.com.br). RECOMENDADO como primeira opção: é a zona onde o n8n já vive (n8n.loupenapps.com.br), portanto é provável que já esteja na Cloudflare, e coloca dashboard e API na MESMA zona — o que simplifica muito o fechamento da brecha do ponto 4.",
+          "Subdomínio de um domínio institucional (ex.: dashboard.loupen.com.br) — mais apresentável, mas exige que essa zona esteja/entre na Cloudflare, o que envolve o domínio de e-mail corporativo.",
+          "Cloudflare Pages com repositório privado (M-B) — dispensa toda a discussão de certificado e de github.io, mas troca a hospedagem."
+        ],
+        "conflicts": [
+          "Ligar o proxy quebra a emissão/renovação do certificado do próprio GitHub. Aceitável em modo Full (que não valida nada), mas significa que 'Enforce HTTPS' do GitHub deixa de ser o mecanismo de HTTPS — quem garante HTTPS ao usuário é a Cloudflare. Se alguém desligar o proxy no futuro sem reprovisionar o certificado do GitHub, o site pode ficar sem HTTPS válido.",
+          "Modo Full deixa o trecho Cloudflare→GitHub cifrado mas NÃO autenticado. Para conteúdo que já é público hoje isso é irrelevante; se algum dia o artefato passar a conter dado sensível servido pelo Pages, essa fraqueza importa. Reforça a regra de nunca voltar a embutir PII no artefato.",
+          "Trocar nameservers de um domínio para a Cloudflare afeta todos os registros daquela zona, inclusive MX de e-mail. Exige inventário de DNS antes, e não é operação a fazer no meio de uma implantação."
+        ],
+        "costEvidence": "USD 0/mês. Plano Free da Cloudflare inclui DNS, proxy e Universal SSL. Custo do domínio em si é pré-existente (a Loupen já opera loupenapps.com.br e o e-mail @loupen.com.br).",
+        "costSources": []
+      }
+    },
+    {
+      "name": "n8n — endpoints de leitura de dados para o dashboard (CORS + autenticação de webhook)",
+      "type": "service",
+      "verified": true,
+      "decisionHierarchy": "ADAPT",
+      "amendsPreviousEntry": "Amplia a entrada de n8n do amendment 1: além de INGERIR para o Neon, o n8n passa a SERVIR os dados de leitura ao dashboard via HTTP, continuando o padrão que já existe hoje.",
+      "existing": {
+        "installed": true,
+        "currentVersion": "self-hosted em n8n.loupenapps.com.br, em produção",
+        "usageLocations": [
+          "index.html:1209 — ADS_API_URL apontando para https://n8n.loupenapps.com.br/webhook/loupen-ads-data-...",
+          "index.html:1210-1211 — GA4 pelo mesmo backend n8n",
+          "index.html:1840, 2560, 2893, 4379 — as 4 chamadas fetch() do artefato"
+        ]
+      },
+      "documentation": {
+        "url": "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/",
+        "additionalUrls": [
+          "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.respondtowebhook/",
+          "https://github.com/n8n-io/n8n/issues/18528",
+          "https://community.n8n.io/t/how-to-restrict-cors-to-specific-origin-in-n8n-webhook-node/46587"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "PONTO 3 CONFIRMADO — o lugar certo de configurar CORS é a opção 'Allowed Origins (CORS)' do nó Webhook, não o Respond to Webhook",
+          "description": "A documentação oficial do nó Webhook descreve a opção literalmente: 'Set the permitted cross-origin domains. Enter a comma-separated list of URLs allowed for cross-origin non-preflight requests. Use * (default) to allow all origins.' Isso explica por que o CORS 'já funciona' hoje sem ninguém ter configurado nada: o default é *, ou seja, qualquer origem — inclusive o github.io atual e qualquer outro site do mundo. Para a nova API a recomendação é trocar o * pelo hostname exato do dashboard. Dois detalhes que a doc esclarece: a opção cobre requisições non-preflight, e requisições com preflight disparam um OPTIONS antes — então cabeçalhos e métodos precisam ser compatíveis. O nó 'Respond to Webhook' tem a opção 'Response Headers' ('Define the response headers to send'), pela qual se pode enviar Access-Control-Allow-Origin manualmente, mas isso é o caminho de exceção: usar as duas coisas ao mesmo tempo é receita de header duplicado/conflitante.",
+          "codeExample": "Webhook node > Options > Allowed Origins (CORS):\n  https://dashboard.loupenapps.com.br\n\n// no index.html o padrao de consumo permanece identico ao de hoje:\nconst LEADS_API_URL = 'https://dashboard.loupenapps.com.br/api/leads';\nconst r = await fetch(LEADS_API_URL, { credentials: 'same-origin' });",
+          "source": "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/",
+          "additionalSources": ["https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.respondtowebhook/"],
+          "confidence": "high"
+        },
+        {
+          "name": "Armadilha conhecida: múltiplas origens em Allowed Origins podem retornar o header errado",
+          "description": "Existe issue aberta no repositório do n8n reportando que a lógica de CORS do webhook define o Access-Control-Allow-Origin incorretamente quando MÚLTIPLAS origens são configuradas, devolvendo a origem errada e causando falha de CORS. Recomendação prática derivada: configurar UMA origem só (o hostname do dashboard). Isso é fácil de respeitar no desenho recomendado — e é um argumento adicional para o desenho same-origin do apiGapClosure, no qual não existe CORS nenhum para dar errado.",
+          "codeExample": null,
+          "source": "https://github.com/n8n-io/n8n/issues/18528",
+          "confidence": "medium",
+          "confidenceNote": "Issue de repositório oficial (fonte primária para o bug), mas não verifiquei se está corrigida na versão do n8n da Loupen. A versão do n8n em produção continua não inventariada — pendência herdada do amendment 1."
+        },
+        {
+          "name": "O nó Webhook tem autenticação nativa: Basic auth, Header auth e JWT auth",
+          "description": "A documentação oficial lista os métodos de autenticação do nó Webhook: Basic auth, Header auth, JWT auth e None. Isso é o que permite fechar a brecha do ponto 4 do lado do n8n sem escrever código de autenticação: o endpoint de dados passa a exigir um segredo em header, e rejeita quem não o tem. RESSALVA DECISIVA: se esse segredo estiver no JavaScript do index.html, ele é público — qualquer visitante o lê no DevTools. Portanto Header auth só é mitigação real se o segredo for injetado por algo que o navegador não controla, ou seja, na borda (ver apiGapClosure). Colocar segredo em código de front-end deve ser explicitamente REJEITADO no spec, para não ser feito por conveniência.",
+          "codeExample": null,
+          "source": "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/",
+          "confidence": "high"
+        },
+        {
+          "name": "Variáveis de ambiente globais de CORS existem, mas são de escopo da instância",
+          "description": "Fontes de comunidade e conteúdo de terceiros citam N8N_CORS_ENABLED e N8N_CORS_ALLOW_ORIGIN como forma de controlar o middleware de CORS da instância inteira, com lista separada por vírgulas. Como a instância da Loupen serve outros workflows além do dashboard, mexer em configuração global é mais arriscado que configurar por nó. Recomendação: usar a opção por nó e não tocar nas variáveis globais.",
+          "codeExample": null,
+          "source": "https://community.n8n.io/t/how-to-restrict-cors-to-specific-origin-in-n8n-webhook-node/46587",
+          "confidence": "low",
+          "confidenceNote": "Nomes de variáveis vieram de resumo de busca e fontes de comunidade, não de leitura direta da página de variáveis de ambiente do n8n. Não usar sem confirmar na doc oficial."
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": ["expor os dados como JSON estático commitado (é o modelo atual — rejeitado por FR-7 e por ser a causa da exposição de PII)"],
+        "conflicts": [
+          "O n8n continua ponto único de falha de ingestão E agora também de leitura. O risco de concentração registrado no amendment 1 aumenta: se o n8n cair, o dashboard não ingere e nem exibe. Mitigação honesta: o dashboard deve degradar de forma explícita (mensagem de fonte indisponível com horário), coerente com INT-6 e EC-8, jamais exibir zero.",
+          "Latência: navegador → Cloudflare → n8n → Neon (com cold start de scale-to-zero de 300–500 ms possível). OQ-5 continua aberto e agora tem um salto de rede a mais para considerar.",
+          "Sem Access na frente, o endpoint é público — é a brecha do ponto 4."
+        ],
+        "costEvidence": "USD 0 incremental — instância já em produção.",
+        "costSources": []
+      }
+    },
+    {
+      "name": "Cloudflare Origin Rules + URL Rewrite Rules + Request Header Modification (fechamento no-code da brecha do ponto 4)",
+      "type": "infrastructure",
+      "verified": true,
+      "verificationLevel": "Origin Rules confirmadas em doc oficial, inclusive plano e limites. URL rewrite e header modification confirmadas quanto à capacidade, mas a disponibilidade no plano Free NÃO foi lida em página oficial.",
+      "decisionHierarchy": "CREATE (configuração, zero código)",
+      "documentation": {
+        "url": "https://developers.cloudflare.com/rules/origin-rules/",
+        "additionalUrls": [
+          "https://developers.cloudflare.com/rules/origin-rules/features/",
+          "https://developers.cloudflare.com/rules/transform/url-rewrite/",
+          "https://developers.cloudflare.com/rules/transform/request-header-modification/"
+        ]
+      },
+      "freeTierLimits": {
+        "originRules": "'Origin Rules are available on Free, Pro, Business, and Enterprise plans', com 10 regras no Free (25 Pro, 50 Business, 300 Enterprise).",
+        "requirement": "'Origin Rules require that you proxy the DNS records of your domain (or subdomain) through Cloudflare.' — o que é o MESMO requisito do Access, portanto não adiciona restrição nova.",
+        "urlRewrite": "Permite reescrever 'the URI path, the query string, or both'; explicitamente 'You cannot rewrite the hostname using a URL rewrite rule'. Limites por plano não lidos.",
+        "requestHeaderModification": "Permite 'Set the value of an HTTP request header to a literal string value'. Limites por plano não lidos.",
+        "sources": [
+          "https://developers.cloudflare.com/rules/origin-rules/",
+          "https://developers.cloudflare.com/rules/transform/url-rewrite/",
+          "https://developers.cloudflare.com/rules/transform/request-header-modification/"
+        ]
+      },
+      "patterns": [
+        {
+          "name": "ACHADO QUE FECHA A BRECHA SEM CÓDIGO — Origin Rule pode mandar /api/* do hostname protegido para o n8n, inclusive em outra zona da mesma conta",
+          "description": "A doc de features das Origin Rules responde exatamente a pergunta que importa: o override de 'DNS record' 'allows you to override the resolved hostname of incoming requests, which controls which origin server Cloudflare sends the request to', e a restrição é 'You must specify a valid hostname in a DNS record override that is a hostname on the same Cloudflare account (possibly on a different zone)'. Ou seja: dashboard.<zona A>/api/* pode ser roteado para n8n.loupenapps.com.br mesmo que sejam zonas diferentes, desde que as duas zonas estejam na MESMA conta Cloudflare. Complementos necessários: o override de Host header 'allows you to rewrite the HTTP Host header of incoming requests' (o n8n precisa receber o Host dele para casar o webhook), e a doc registra que um override de Host atualiza o SNI para o mesmo valor, com possibilidade de override de SNI separado. Efeito arquitetural: o endpoint de dados passa a viver no MESMO hostname protegido pelo Access. Isso resolve DUAS coisas de uma vez — o Access passa a cobrir as chamadas de API (mesmo hostname, mesmo cookie CF_Authorization) e o CORS desaparece do problema, porque as chamadas passam a ser same-origin.",
+          "codeExample": "# Origin Rule (Free, ate 10 regras)\nQuando: hostname eq \"dashboard.loupenapps.com.br\" and starts_with(http.request.uri.path, \"/api/\")\nEntao: DNS record override -> n8n.loupenapps.com.br\n       Host header override -> n8n.loupenapps.com.br\n\n# URL Rewrite Rule (reescreve o caminho, nao o host)\n/api/leads  ->  /webhook/loupen-leads-<sufixo>\n\n# Request Header Modification (segredo injetado na borda, invisivel ao navegador)\nSet static: X-Loupen-Api-Key: <segredo>   (validado pelo Header auth do no Webhook do n8n)",
+          "source": "https://developers.cloudflare.com/rules/origin-rules/features/",
+          "additionalSources": ["https://developers.cloudflare.com/rules/origin-rules/"],
+          "confidence": "medium",
+          "confidenceNote": "Cada peça está confirmada em doc oficial isoladamente. A COMPOSIÇÃO das três (Origin Rule + URL rewrite + header injection sobre o mesmo hostname, tendo o GitHub Pages como origin default e o n8n como origin de /api/*) não foi encontrada documentada como receita, e a disponibilidade de Transform Rules no Free não foi lida em página oficial. É desenho derivado de primitivas confirmadas, não receita citada. Ver newUnverifiedClaims UC-4 e UC-5."
+        },
+        {
+          "name": "Fallback com código mínimo: um Worker de 15 linhas na rota /api/*",
+          "description": "Se a composição de regras não funcionar (ou se Transform Rules não estiverem no Free), o caminho equivalente é um Cloudflare Worker na rota dashboard.../api/*, que faz fetch do webhook do n8n injetando o header secreto do lado do servidor. A própria documentação de CORS do Access aponta Workers como a solução para autenticação automatizada entre superfícies protegidas. NOTA DE ESCOPO: isso reintroduz UM Worker, mas não reintroduz Next.js nem hospedagem da aplicação em Workers — o teto de 10 ms de CPU por invocação é irrelevante para um proxy que só repassa uma requisição, ao contrário do SSR do App Router que era o risco não quantificado do amendment 1.",
+          "codeExample": null,
+          "source": "https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/",
+          "confidence": "medium"
+        }
+      ],
+      "compatibility": {
+        "preferred": true,
+        "alternatives": [
+          "Access diretamente na frente de n8n.loupenapps.com.br (ver apiGapClosure.optionC — funciona para máquina, é frágil para navegador e pode quebrar webhooks de terceiros)",
+          "Service token do Access (CF-Access-Client-Id / CF-Access-Client-Secret) — desenhado para sistemas automatizados, não para navegador; inútil se o segredo tiver de estar no front-end",
+          "Nada (aceitar o endpoint público) — deve ser uma escolha consciente e registrada, não um esquecimento"
+        ],
+        "conflicts": [
+          "Depende de as duas zonas (a do dashboard e loupenapps.com.br) estarem na MESMA conta Cloudflare. Se não estiverem, a saída natural é usar um subdomínio da própria loupenapps.com.br para o dashboard, o que torna tudo same-zone.",
+          "Free tem 10 Origin Rules. Suficiente com folga aqui, mas é um orçamento compartilhado com qualquer outro uso da zona.",
+          "Regras de borda são configuração invisível no código: se ninguém documentar, a próxima pessoa não vai entender por que /api/ responde de outro servidor. Exige registro em docs/architecture."
+        ],
+        "costEvidence": "USD 0/mês — Origin Rules explicitamente disponíveis no plano Free segundo doc oficial.",
+        "costSources": ["https://developers.cloudflare.com/rules/origin-rules/"]
+      }
+    }
+  ],
+
+  "accessGateDesign": {
+    "goal": "Impedir que qualquer pessoa na internet leia dados pessoais de leads (nome, e-mail, telefone/WhatsApp) no dashboard, exigindo e-mail @loupen.com.br para entrar, sem custo recorrente, sem construir sistema de login e sem sair do GitHub Pages.",
+    "prerequisites": [
+      "PR-1 — A Loupen precisa ter um domínio (ou subdomínio) cuja zona DNS esteja na Cloudflare, na mesma conta. RECOMENDAÇÃO: usar dashboard.loupenapps.com.br, porque é a zona onde o n8n já vive; isso maximiza a chance de já estar na Cloudflare e coloca dashboard e API na mesma zona. NÃO VERIFICADO se essa zona está na Cloudflare hoje — é a primeira coisa a checar.",
+      "PR-2 — Remover a PII embutida do index.html (SRD_IA_LEADS em index.html:4373) e purgar o histórico do git. Sem isso, o gate protege a porta enquanto a janela continua aberta. Requer force push, portanto autoridade de @devops.",
+      "PR-3 — Inventariar os registros DNS atuais da zona escolhida ANTES de qualquer mudança de nameserver, para não afetar e-mail/MX e outros serviços."
+    ],
+    "topology": {
+      "step1_dns": "CNAME dashboard -> carlosbobroski-loupen.github.io, com proxy LIGADO (nuvem laranja). Proxy é requisito tanto do Access quanto das Origin Rules.",
+      "step2_github": "Em Settings > Pages, definir o Custom domain = dashboard.loupenapps.com.br. É isso que faz a URL carlosbobroski-loupen.github.io/loupen-dashboard/ passar a redirecionar para o hostname protegido, em vez de continuar servindo o conteúdo. Deixar 'Enforce HTTPS' DESMARCADO: o HTTPS do visitante passa a ser fornecido pela Cloudflare.",
+      "step3_ssl": "Cloudflare > SSL/TLS = Full. NÃO 'Full (Strict)' (causaria 526, porque o certificado do origin não casa com o hostname) e NÃO 'Flexible' (causaria loop de redirecionamento se o GitHub forçar HTTPS).",
+      "step4_access_app": "Zero Trust > Access > Applications > Add self-hosted application, domínio = dashboard.loupenapps.com.br, cobrindo o hostname inteiro (todos os caminhos, incluindo /api/*).",
+      "step5_policy": "Policy única: Action=Allow, Include = 'Emails ending in' -> @loupen.com.br. Método de login = One-time PIN (habilitar explicitamente, porque a doc diz que o OTP não é mais adicionado automaticamente). Access é deny-by-default, então nada além dessa política é necessário para bloquear o resto do mundo.",
+      "step6_api_same_origin": "Origin Rule: requisições a dashboard.loupenapps.com.br/api/* têm DNS record e Host header sobrescritos para n8n.loupenapps.com.br; URL Rewrite converte /api/<recurso> no caminho real do webhook; Request Header Modification injeta o segredo estático que o Header auth do nó Webhook do n8n valida.",
+      "step7_n8n": "Nos nós Webhook que servem o dashboard: Authentication = Header auth (com o segredo do step 6) e Allowed Origins (CORS) = o hostname do dashboard (uma origem só, para evitar a issue #18528). Com o desenho same-origin do step 6, o CORS deixa de ser o mecanismo de defesa e passa a ser apenas cinto de segurança.",
+      "step8_frontend": "No index.html, as chamadas passam a apontar para caminhos relativos (/api/leads) em vez de para o domínio do n8n, e usam credentials: 'same-origin' — que é o que a documentação de CORS do Access recomenda para que o cookie CF_Authorization acompanhe as requisições."
+    },
+    "whyThisClosesTheGithubIoBypass": "Porque o conteúdo deixa de ser servido em github.io: com Custom domain configurado, as requisições ao domínio padrão são redirecionadas para o domínio customizado — que está atrás do Access. É a peça de que depende a eficácia de todo o desenho, e é o item nº 1 a validar empiricamente (UC-3). Se o redirecionamento não acontecer como esperado, o gate é contornável e o desenho precisa de outra resposta (por exemplo M-B: Cloudflare Pages com repositório privado, onde não existe URL alternativa).",
+    "apiGapClosure": {
+      "gapConfirmed": true,
+      "gapStatement": "PONTO 4 CONFIRMADO — a brecha é real. O Cloudflare Access protege hostnames, não 'a aplicação'. Se o dashboard estiver em dashboard.loupenapps.com.br protegido e as chamadas de dados forem para n8n.loupenapps.com.br/webhook/..., o segundo hostname continua público: qualquer pessoa que descubra a URL do webhook baixa o JSON com os dados pessoais, sem passar pelo gate. E não é uma URL difícil de descobrir — hoje ela está em texto claro no index.html (index.html:1209 traz ADS_API_URL completo) e no histórico do repositório público. A pessoa veria 'a página vazia' e o dado inteiro pelo endpoint, exatamente como a instrução previu.",
+      "whyNaiveCrossOriginAccessDoesNotWork": "A documentação de CORS do Access explica por que 'basta colocar Access no n8n também' não resolve para navegador: 'For a CORS request to reach a site protected by Access, the request must include a valid CF-Authorization cookie'; a aplicação precisa usar credentials nas requisições fetch/XHR; e se o usuário ainda não estiver logado naquele hostname, 'the request will return a CORS error' — porque o fluxo de login do Access é um redirecionamento que uma chamada fetch não consegue completar. A própria Cloudflare, para o caso de duas superfícies protegidas conversando, aponta a solução de 'automated authentication via Cloudflare Workers'. Conclusão: proteger o hostname do n8n com Access resolve o acesso direto por curl, mas cria fragilidade no caminho legítimo do navegador.",
+      "options": [
+        {
+          "id": "optionA",
+          "name": "RECOMENDADA — API same-origin no hostname protegido, via Origin Rule (no-code)",
+          "how": "Caminho /api/* do hostname protegido roteado por Origin Rule para o n8n, com Host header override, URL rewrite do caminho e injeção de header secreto na borda.",
+          "coversTheGap": "SIM, por duas camadas independentes: (1) o Access cobre /api/* porque é o mesmo hostname da Access Application — não há segundo hostname a proteger nem CORS a negociar; (2) mesmo que alguém chame o webhook do n8n diretamente, o Header auth do n8n rejeita, porque o segredo só existe na configuração de borda da Cloudflare e nunca chega ao navegador.",
+          "cost": "USD 0",
+          "code": "nenhum",
+          "risks": [
+            "Composição de três primitivas não documentada como receita (UC-4).",
+            "Disponibilidade de Transform Rules no Free não confirmada oficialmente (UC-5).",
+            "Exige as duas zonas na mesma conta Cloudflare (mitigável usando subdomínio da própria zona do n8n)."
+          ]
+        },
+        {
+          "id": "optionB",
+          "name": "FALLBACK — Worker mínimo na rota /api/*",
+          "how": "Worker na rota dashboard.../api/* faz fetch do webhook do n8n adicionando o header secreto no servidor.",
+          "coversTheGap": "SIM, mesmas duas camadas da opção A, com o segredo em Worker Secret em vez de regra de borda.",
+          "cost": "USD 0 (Workers Free: 100.000 requisições/dia; o teto de 10 ms de CPU é irrelevante para um proxy simples)",
+          "code": "~15 linhas",
+          "risks": ["Reintroduz um componente de código e um deploy, contra o espírito de 'sem build step' da fase 1."]
+        },
+        {
+          "id": "optionC",
+          "name": "NÃO RECOMENDADA como solução única — Access na frente do hostname do n8n",
+          "how": "Access Application sobre n8n.loupenapps.com.br, limitada aos caminhos de webhook que servem o dashboard, com Service Auth token para chamadores automatizados.",
+          "coversTheGap": "PARCIALMENTE. Bloqueia acesso direto anônimo, mas o caminho do navegador fica cross-origin e sujeito ao erro de CORS quando o usuário não tem cookie daquele hostname. RISCO ADICIONAL SÉRIO: se a Access Application pegar caminhos de webhook usados por sistemas externos (Meta, RD Station, qualquer callback), esses sistemas passam a receber a tela de login do Access e a integração quebra silenciosamente. Só é aceitável com escopo de caminho cirúrgico.",
+          "cost": "USD 0",
+          "risks": ["Quebrar webhooks de terceiros", "CORS frágil no caminho legítimo"]
+        },
+        {
+          "id": "optionD",
+          "name": "REJEITAR EXPLICITAMENTE — segredo compartilhado no JavaScript do front-end",
+          "how": "index.html envia X-Api-Key hardcoded ao n8n.",
+          "coversTheGap": "NÃO. É segurança teatral: o segredo está no código que qualquer visitante baixa e no repositório público. Registrado aqui para que não seja adotado por conveniência sob a aparência de 'ter autenticação'.",
+          "cost": "USD 0",
+          "risks": ["Falsa sensação de proteção — pior que não ter, porque desestimula a solução real"]
+        }
+      ],
+      "recommendation": "optionA como desenho primário, optionB como fallback imediato se qualquer premissa de optionA falhar na validação. optionC apenas como camada extra sobre A/B, nunca sozinha. optionD proibida."
+    },
+    "whatTheGateDoesNotCover": [
+      "NÃO cobre o repositório público nem o histórico do git — só o PR-2 cobre (criticalFindingPreexistingExposure).",
+      "NÃO substitui NFR-3: é binário, sem perfis. Quem entra vê tudo, inclusive dados que a fase 2 pretende restringir por perfil.",
+      "NÃO protege contra vazamento por quem tem acesso legítimo (compartilhar tela, exportar, encaminhar). Nenhum controle técnico da fase 1 endereça isso.",
+      "NÃO resolve OQ-8 (política de LGPD). Melhora a postura de forma material e verificável, e dá log de acesso — mas política de tratamento de dado pessoal continua sendo decisão de negócio pendente. Registro honesto: a exposição já ocorrida (365 telefones em repositório público) é um fato que uma eventual avaliação de LGPD terá de considerar; não é conclusão jurídica, é o fato.",
+      "NÃO resolve a região de dados. Os dados pessoais continuarão no Neon, em região a definir — pendência aberta pelo amendment 1 e ainda bloqueante para OQ-8."
+    ]
+  },
+
+  "revisedPhase1Stack": "Fase 1 (mínima e utilizável, sem login por perfil): GitHub Pages continua servindo um ÚNICO artefato HTML/CSS/JS vanilla, evolução direta do index.html atual (sem framework, sem build step, sem package.json), com estado de view/filtro/ficha refletido na URL via History API nativa para atender FR-6/AC-6.1 e FR-1/AC-1.2. Os dados deixam de ser arrays embutidos e passam a vir por fetch() de caminhos relativos /api/*, continuação literal do padrão ADS_API_URL que já existe em index.html:1209. Esses caminhos são roteados na borda da Cloudflare para os webhooks do n8n (Origin Rule + URL rewrite + injeção de header secreto), e o n8n lê o Neon Free — mantendo intactas todas as decisões de dados do amendment 1 (Postgres, pg_trgm/fuzzystrmatch para EC-7, upsert idempotente com watermark, n8n como única camada de ingestão inclusive ads). Todo o hostname fica atrás de uma Access Application do Cloudflare Zero Trust com uma política Allow / Include / 'Emails ending in' @loupen.com.br e login por one-time PIN, no plano Free. O domínio customizado é configurado no GitHub Pages para que a URL github.io deixe de servir o conteúdo e passe a redirecionar para o hostname protegido; o modo SSL/TLS fica em Full, o que remove o conflito entre o certificado do GitHub e o proxy da Cloudflare. Custo recorrente: USD 0,00/mês. Fora da fase 1 e adiado para a fase 2: Next.js/React, Cloudflare Workers como hospedagem, Better Auth, RBAC por perfil e Neon RLS — dos quais apenas o desenho do SCHEMA com colunas de escopo deve ser antecipado agora, porque schema é o que sai caro mudar depois.",
+
+  "newUnverifiedClaims": [
+    {
+      "id": "UC-1",
+      "claim": "O plano Free do Cloudflare Zero Trust inclui 50 seats/usuários em 2026, com 24h de retenção de log, e bloqueia (em vez de cobrar) ao exceder.",
+      "reason": "A fonte primária mais forte encontrada é o blog oficial da Cloudflare, que afirma 'up to 50 users at no cost' e 'up to 50 seats of Access are available at no cost' — mas o post é de 2020. As páginas oficiais de pricing (cloudflare.com/plans/zero-trust-services) NÃO renderizaram tabela de números nesta sessão, exatamente o mesmo problema que o usuário relatou. A confirmação de que o número CONTINUA 50 em 2026, e os detalhes de retenção de log e comportamento ao exceder, vêm de fontes terceiras (costbench, atualizada em 2026-08-22; zerometric; controld), convergentes entre si mas com interesse comercial em comparativos.",
+      "action": "needs_validation",
+      "howToValidate": "Abrir o painel Zero Trust > Settings > Billing na conta da Loupen: o número de seats do plano ativo aparece ali. Custo: 1 minuto. Alternativa: ler o Cloudflare One self-serve subscription agreement.",
+      "impactIfFalse": "BAIXO. Marketing + comercial + direção da Loupen está a uma ordem de magnitude do limite. Mesmo que o Free tenha caído para 10 ou 25 seats, o desenho não muda."
+    },
+    {
+      "id": "UC-2",
+      "claim": "Com o proxy da Cloudflare ligado e SSL/TLS em 'Full', o GitHub Pages responde ao handshake TLS de um domínio customizado para o qual não emitiu certificado (apresentando o certificado *.github.io) e roteia corretamente pelo header Host / arquivo CNAME.",
+      "reason": "O comportamento do modo Full é afirmação oficial e inequívoca ('will not be validated in any way'; aceita CN/SAN que não casa). O que é inferência é a metade do GitHub: que ele termina o TLS e serve o site mesmo sem certificado próprio para aquele hostname. É consistente com todos os relatos de erro 526 (que só existem porque o GitHub responde com um certificado que a Cloudflare recusa em modo Strict), mas não foi validado empiricamente e não está afirmado na documentação do GitHub.",
+      "action": "needs_validation",
+      "howToValidate": "Teste de 15 minutos: criar um subdomínio de teste, CNAME proxiado para carlosbobroski-loupen.github.io, definir o Custom domain no GitHub, SSL/TLS em Full, e abrir no navegador. Se der 502/525/526, testar o modo Flexible com 'Enforce HTTPS' desmarcado. Se nenhum funcionar, cair para M-B (Cloudflare Pages).",
+      "impactIfFalse": "ALTO. É a premissa técnica que permite ter Access (que exige proxy) e GitHub Pages ao mesmo tempo. Se falhar, a decisão de manter GitHub Pages (F-3) fica em conflito com a decisão de ter o gate (F-5), e o usuário tem de escolher: trocar para Cloudflare Pages, ou aceitar o dashboard público."
+    },
+    {
+      "id": "UC-3",
+      "claim": "Ao configurar um Custom domain no GitHub Pages, as requisições à URL padrão carlosbobroski-loupen.github.io/loupen-dashboard/ passam a REDIRECIONAR para o domínio customizado, deixando de servir o conteúdo.",
+      "reason": "A leitura direta de 'About custom domains and GitHub Pages' nesta sessão não confirmou o redirecionamento (a página trata de tipos de domínio, DNS e verificação, e menciona redirecionamentos automáticos entre variantes de domínio). A afirmação vem do resumo de busca sobre a página 'Managing a custom domain for your GitHub Pages site' e de fontes secundárias. Nota adicional: o caso aqui é uma PROJECT page (URL com o caminho /loupen-dashboard/), não uma user page — o comportamento de redirecionamento pode diferir do caso apex.",
+      "action": "needs_validation",
+      "howToValidate": "Depois de configurar o Custom domain, acessar https://carlosbobroski-loupen.github.io/loupen-dashboard/ numa janela anônima e verificar se responde 301 para o domínio customizado (e se, ao seguir o redirecionamento, cai na tela de login do Access). É a validação MAIS IMPORTANTE deste amendment: dela depende toda a eficácia do gate.",
+      "impactIfFalse": "CRÍTICO. Se o github.io continuar servindo o conteúdo, o gate é contornável por uma URL que já está publicada e indexada. Nesse cenário a única saída de custo zero é M-B (Cloudflare Pages com repositório privado, sem URL alternativa)."
+    },
+    {
+      "id": "UC-4",
+      "claim": "A composição Origin Rule (DNS record + Host header override) + URL Rewrite Rule + Request Header Modification funciona sobre um hostname cujo origin default é o GitHub Pages, roteando apenas /api/* para o n8n em outra zona da mesma conta.",
+      "reason": "Cada primitiva está confirmada em documentação oficial, incluindo a frase decisiva de que o override de DNS record aceita 'a hostname on the same Cloudflare account (possibly on a different zone)'. O que não foi encontrado é a receita composta, nem qualquer relato de alguém fazendo isso com GitHub Pages como origin default. É desenho derivado, não caminho trilhado.",
+      "action": "needs_validation",
+      "howToValidate": "Spike de 1 hora: criar a Origin Rule + URL rewrite num subdomínio de teste e chamar /api/<recurso> pelo navegador, verificando se a resposta vem do n8n e se o Access exige login antes. Se falhar, aplicar optionB (Worker).",
+      "impactIfFalse": "MÉDIO. Existe fallback direto e de custo zero (Worker de ~15 linhas). O que muda é 'zero código' virar 'quase zero código'."
+    },
+    {
+      "id": "UC-5",
+      "claim": "URL Rewrite Rules e Request Header Modification (Transform Rules) estão disponíveis no plano Free da Cloudflare, e o valor do header injetado nunca é visível ao cliente.",
+      "reason": "A capacidade está confirmada ('Set the value of an HTTP request header to a literal string value'; reescrita de path e query string, mas não de hostname). A disponibilidade por plano e os limites por plano NÃO estavam nas páginas lidas — ao contrário das Origin Rules, cuja tabela de planos e limites foi lida integralmente. A invisibilidade do header para o cliente é propriedade estrutural (modificação de header de REQUISIÇÃO acontece na borda, a caminho do origin), mas não está afirmada textualmente na página.",
+      "action": "needs_validation",
+      "howToValidate": "Verificar a tabela de availability nas páginas de Transform Rules, ou simplesmente abrir o painel: se a opção existir na conta Free, existe. Custo: 2 minutos.",
+      "impactIfFalse": "MÉDIO. Sem Transform Rules no Free, o segredo tem de ser injetado por Worker (optionB) e o rewrite de caminho também — o que consolida optionB como solução em vez de fallback."
+    },
+    {
+      "id": "UC-6",
+      "claim": "A zona loupenapps.com.br (onde vive n8n.loupenapps.com.br) está hospedada na Cloudflare, na mesma conta que seria usada para o Zero Trust.",
+      "reason": "Nada nesta sessão confirma isso. O que se sabe é que a Loupen opera n8n.loupenapps.com.br e o domínio de e-mail loupen.com.br. Se nenhuma zona estiver na Cloudflare, todo o desenho passa a depender de migrar nameservers.",
+      "action": "needs_validation",
+      "howToValidate": "Checar no painel da Cloudflare quais zonas existem na conta, e/ou consultar os nameservers de loupenapps.com.br e loupen.com.br. Custo: 2 minutos. É PRÉ-REQUISITO PR-1 e deve ser a PRIMEIRA verificação, antes de qualquer outra.",
+      "impactIfFalse": "MÉDIO-ALTO. Não invalida o desenho, mas transforma a fase 1 num projeto que inclui migração de DNS de um domínio corporativo — operação com risco para e-mail se feita sem inventário. Precisa de janela e de dono."
+    },
+    {
+      "id": "UC-7",
+      "claim": "A opção 'Allowed Origins (CORS)' com múltiplas origens tem bug de header incorreto na versão do n8n em produção na Loupen.",
+      "reason": "A issue #18528 do repositório oficial do n8n reporta o bug, mas a versão do n8n da Loupen continua não inventariada (pendência herdada do amendment 1) e não se sabe se a correção já está aplicada.",
+      "action": "acceptable_risk",
+      "howToValidate": "Configurar UMA origem só — o que é a recomendação de qualquer forma. No desenho same-origin recomendado, o CORS deixa de estar no caminho crítico.",
+      "impactIfFalse": "BAIXO."
+    },
+    {
+      "id": "UC-8",
+      "claim": "As variáveis de ambiente N8N_CORS_ENABLED e N8N_CORS_ALLOW_ORIGIN existem e controlam CORS globalmente na instância.",
+      "reason": "Vem de resumo de busca e conteúdo de comunidade/terceiros, não de leitura direta da página oficial de variáveis de ambiente do n8n.",
+      "action": "needs_validation",
+      "howToValidate": "Ler a referência de variáveis de ambiente na documentação do n8n antes de tocar em configuração global. Recomendação independente da validação: NÃO usar — configurar por nó, porque a instância serve outros workflows.",
+      "impactIfFalse": "BAIXO."
+    },
+    {
+      "id": "UC-9",
+      "claim": "Configurar a Access Application no hostname inteiro cobre automaticamente o caminho /api/* roteado por Origin Rule para outro origin.",
+      "reason": "É a leitura direta do modelo do Access (aplicação definida por domínio, opcionalmente por caminho; deny by default; enforcement na borda ANTES do roteamento ao origin). Não encontrei documentação que trate explicitamente da interação entre Access e Origin Rules, isto é, da ordem de execução entre enforcement de Zero Trust e override de origin.",
+      "action": "needs_validation",
+      "howToValidate": "No mesmo spike de UC-4: chamar /api/<recurso> em janela anônima, sem cookie do Access, e confirmar que a resposta é a tela/erro de autenticação do Access e NÃO o JSON do n8n. Este teste é o critério de aceite do fechamento da brecha do ponto 4.",
+      "impactIfFalse": "ALTO para o desenho da API, mas com rede: mesmo se o Access não cobrir /api/*, a segunda camada (Header auth do n8n com segredo injetado na borda) continua bloqueando chamadas diretas. Foi por isso que o desenho foi montado com DUAS camadas e não com uma."
+    },
+    {
+      "id": "UC-10",
+      "claim": "Remover a PII do histórico do git (rewrite + force push) elimina a exposição.",
+      "reason": "Elimina a exposição FUTURA pelos caminhos (b) e (c). Não desfaz cópias, clones, forks, caches de API do GitHub ou indexação por terceiros ocorridos enquanto o conteúdo estava público — nenhuma fonte pode garantir isso.",
+      "action": "acceptable_risk",
+      "howToValidate": "Não é validável: é limitação inerente. O que se pode fazer é reduzir a janela agindo cedo.",
+      "impactIfFalse": "MÉDIO — muda a expectativa sobre o resultado da limpeza, não a decisão de fazê-la."
+    }
+  ],
+
+  "newRecommendations": [
+    {
+      "type": "prefer",
+      "subject": "Cloudflare Access (Zero Trust Free) com política 'Emails ending in @loupen.com.br' + one-time PIN, sobre subdomínio proxiado apontando para o GitHub Pages",
+      "rationale": "É o único controle de acesso real, gratuito e sem código encontrado que é compatível com as três decisões do usuário simultaneamente (manter GitHub Pages, manter paradigma vanilla, adiar login por perfil). A funcionalidade está confirmada em documentação oficial em todos os pontos que importam: a política por domínio de e-mail é o exemplo canônico da doc ('Allow / Include / Emails ending in / @example.com'); o one-time PIN é explicitamente 'an alternative to integrating an identity provider', dispensando Google Workspace ou IdP pago; e o Access é deny-by-default, o comportamento correto para dado pessoal. O free tier de 50 seats está a uma ordem de magnitude do time da Loupen — embora o número de 2026 não tenha sido lido em página oficial (UC-1). Ganho colateral para OQ-8: passa a existir log de quem acessou, onde hoje não existe nada.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "OQ-3", "OQ-8", "FR-2", "DM-1"],
+      "sources": [
+        "https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/",
+        "https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/",
+        "https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/",
+        "https://blog.cloudflare.com/zero-trust-week-setting-up-cloudflare-one-as-a-small-business/"
+      ]
+    },
+    {
+      "type": "prefer",
+      "subject": "SSL/TLS em modo 'Full' (nem Strict, nem Flexible) como forma de conciliar proxy da Cloudflare com GitHub Pages",
+      "rationale": "Resolve o conflito de HTTPS que a instrução levantou, e resolve por definição documentada, não por gambiarra: no modo Full 'the certificate presented by the origin will not be validated in any way' e o certificado do origin pode não ter 'a matching CN/SAN entry for the hostname requested'. Ou seja, o fato de o GitHub não conseguir emitir certificado para o domínio customizado enquanto o proxy está ligado — problema real e amplamente documentado, cujo sintoma é o erro 526 — deixa de importar, porque quem entrega HTTPS ao navegador é o Universal SSL da Cloudflare. 'Full (Strict)' quebra (valida e recusa). 'Flexible' é pior ainda: combinado com o 'Enforce HTTPS' do GitHub, gera loop de redirecionamento. A metade não confirmada é o comportamento do GitHub no handshake (UC-2) e ela merece um teste de 15 minutos antes de qualquer commitment.",
+      "priority": "P0",
+      "traceTo": ["OQ-4", "NFR-3"],
+      "sources": [
+        "https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full/",
+        "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-5xx-errors/error-526/",
+        "https://blog.jakelee.co.uk/how-to-disable-cloudflare-proxying-with-github-pages/"
+      ]
+    },
+    {
+      "type": "prefer",
+      "subject": "Expor os dados como caminho /api/* do MESMO hostname protegido, em vez de chamar o domínio do n8n diretamente",
+      "rationale": "É a decisão de arquitetura mais importante deste amendment, e ela fecha a brecha do ponto 4 sem custo. Chamar n8n.loupenapps.com.br do navegador cria dois problemas de uma vez: um hostname público servindo dado pessoal (a brecha), e a fragilidade documentada de CORS com Access ('if you make a simple CORS request to an Access-protected domain and have not yet logged in, the request will return a CORS error', porque o login é um redirecionamento que o fetch não completa). Colocar a API no mesmo hostname elimina os dois: o Access cobre o caminho porque é o mesmo hostname, e não existe cross-origin. A Origin Rule é o mecanismo, e a doc confirma que o override de DNS record aceita 'a hostname on the same Cloudflare account (possibly on a different zone)', com Origin Rules disponíveis no Free (10 regras). Camada 2, independente: Header auth no nó Webhook do n8n com o segredo injetado na borda — de modo que a chamada direta ao webhook, mesmo com a URL em mãos, é rejeitada. Duas camadas foram desenhadas de propósito, porque UC-9 (Access cobrir /api/*) ainda não está validado.",
+      "priority": "P0",
+      "traceTo": ["FR-7", "NFR-3", "AC-2.1", "EC-8"],
+      "sources": [
+        "https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/",
+        "https://developers.cloudflare.com/rules/origin-rules/features/",
+        "https://developers.cloudflare.com/rules/origin-rules/",
+        "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/"
+      ]
+    },
+    {
+      "type": "avoid",
+      "subject": "Qualquer segredo de API dentro do JavaScript do index.html",
+      "rationale": "O nó Webhook do n8n oferece Basic auth, Header auth e JWT auth, e é tentador simplesmente colocar a chave no fetch() do front-end. Isso não é mitigação: o segredo chega ao navegador de todos os visitantes e, pior, seria commitado num repositório PÚBLICO — o mesmo canal por onde hoje vazam 365 telefones de leads. Se um segredo for necessário, ele tem de ser injetado na borda (Transform Rule ou Worker Secret), onde o navegador não o vê. Registrar isso como proibição explícita é necessário porque é o atalho que qualquer pessoa tomaria sob pressão de prazo.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "OQ-8"],
+      "sources": ["https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/"]
+    },
+    {
+      "type": "avoid",
+      "subject": "Configurar one-time PIN como Include sem restringir domínio de e-mail",
+      "rationale": "Advertência textual da documentação oficial: 'Adding Login Methods: One-time PIN as an Include rule without restricting email domains allows anyone with any email address to receive a code and access the application. Always pair OTP with specific email domains or an email list in the Include rule.' Traduzido para o risco desta epic: um erro de uma linha na configuração transforma o gate em porta aberta com aparência de fechada — o pior estado possível, porque ninguém vai desconfiar. Deve entrar como item de checklist verificado por segunda pessoa (ou por teste com e-mail externo) antes de publicar qualquer ficha de lead.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "OQ-8"],
+      "sources": ["https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/"]
+    },
+    {
+      "type": "prefer",
+      "subject": "Tratar a remoção da PII do index.html e do histórico do git como PRÉ-REQUISITO bloqueante da fase 1",
+      "rationale": "Não é higiene opcional: é o mesmo risco que o usuário quer evitar, já materializado. Verificado no codebase: index.html:4373 carrega SRD_IA_LEADS com 391 nomes e 365 telefones E.164 de leads reais, mais três e-mails de pessoas identificáveis, e o array está em commits do repositório PÚBLICO (511e383, 64165b0, d86260a). O gate do Access protege o site; não protege o repositório nem o histórico. Como Pages em repositório privado exige GitHub Pro (o que violaria custo zero) e Pages continua público mesmo com repositório privado fora do Enterprise Cloud de organização, o único caminho compatível com todas as decisões do usuário é: parar de embutir PII (a epic já faz isso via FR-7) e purgar o histórico com force push, sob autoridade de @devops. Limitação honesta (UC-10): isso reduz exposição futura, não desfaz a passada.",
+      "priority": "P0",
+      "traceTo": ["FR-7", "NFR-3", "OQ-8", "DM-1", "CON-6"],
+      "sources": [
+        "https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits",
+        "https://docs.github.com/get-started/learning-about-github/githubs-products",
+        "https://smartscope.blog/en/Tips/GitHub/github-pages-private-repository/"
+      ]
+    },
+    {
+      "type": "consider",
+      "subject": "Usar dashboard.loupenapps.com.br em vez de um subdomínio de loupen.com.br",
+      "rationale": "Três vantagens concretas. (1) É a zona onde o n8n já vive, então é a zona com maior chance de já estar na Cloudflare — evitando migrar nameservers do domínio que hospeda o e-mail corporativo, operação com risco real para MX. (2) Coloca dashboard e API na MESMA zona, o que remove a dependência de 'mesma conta, zonas diferentes' da Origin Rule e simplifica o desenho. (3) Mantém o domínio institucional fora do caminho crítico de uma implantação experimental. Contrapartida: é uma URL menos apresentável para direção. Como o gate é por e-mail e não por URL, a estética não afeta a segurança.",
+      "priority": "P1",
+      "traceTo": ["OQ-4"],
+      "sources": ["https://developers.cloudflare.com/rules/origin-rules/features/"]
+    },
+    {
+      "type": "consider",
+      "subject": "Registrar Cloudflare Pages + repositório privado como plano B nomeado, não como ideia solta",
+      "rationale": "Se UC-2 (Full mode com GitHub Pages) ou UC-3 (redirecionamento do github.io) falharem na validação, o desenho da fase 1 perde a perna de hospedagem e o usuário precisa de uma alternativa pronta, não de uma nova rodada de pesquisa. Cloudflare Pages aceita repositório GitHub PRIVADO e não expõe nenhuma URL github.io — o que resolve simultaneamente o gate, a URL alternativa, o repositório público e o histórico, mantendo custo zero. Custos da troca: sai do GitHub Pages (contraria F-3), introduz um passo de deploy conectado ao repositório, e a URL *.pages.dev precisa entrar na Access Application. Ainda assim é a opção com a MELHOR postura de segurança de todo o leque, e o usuário deve saber que ela existe antes de aceitar o desenho principal como definitivo.",
+      "priority": "P1",
+      "traceTo": ["OQ-4", "NFR-3", "OQ-8"],
+      "sources": ["https://dev.to/sanchitkd/how-i-built-a-fully-private-portfolio-using-github-and-cloudflare-for-free-3e3b"]
+    },
+    {
+      "type": "consider",
+      "subject": "Antecipar apenas a mitigação M3 do amendment 1 (schema com colunas de escopo), deixando M1 e M2 com o NFR-3 adiado",
+      "rationale": "Com NFR-3 adiado, as três mitigações que o amendment 1 exigia (M1 ponto único de autorização, M2 teste de autorização por perfil no gate de QA, M3 schema preparado para RLS) ficam pendentes junto com ele. Duas delas podem esperar sem custo; M3 não, porque schema é o artefato mais caro de mudar depois — mudar schema com dados carregados significa migração. Custo de antecipar: quase nulo (é decisão de modelagem, não código). Benefício: quando NFR-3 e Neon RLS entrarem na fase 2, não haverá migração de dados. Deixar M3 para depois é o tipo de economia que se paga com juros.",
+      "priority": "P1",
+      "traceTo": ["NFR-3", "FR-7", "EC-7"],
+      "sources": []
+    },
+    {
+      "type": "consider",
+      "subject": "Reescrever a métrica de NFR-3 no spec para refletir a fase 1 real, em vez de deixar o requisito em contradição com a decisão do usuário",
+      "rationale": "A métrica atual de NFR-3 em requirements.json diz 'permissões diferenciadas por perfil (marketing/comercial/direção) implementadas desde a primeira fase utilizável'. Isso deixou de ser verdade com F-4 e vai colidir com o gate do Critique (Fase 5), porque o spec não conseguirá rastrear a afirmação. Proposta de redação em duas partes, ambas verificáveis: FASE 1 — 'nenhum endpoint com dado de lead acessível sem passar por um gate de identidade corporativa; nenhum dado pessoal de lead presente no artefato estático nem no histórico do repositório'; FASE 2 — 'permissões diferenciadas por perfil'. Assim o requisito continua existindo, deixa de mentir sobre o prazo, e cada metade fica testável. Nota de coerência: OQ-3 continua RESOLVIDO quanto a quem usa; o que este amendment muda é o cronograma da permissão, não a resposta.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "OQ-3", "ASM-4", "FR-14", "AC-14.2"],
+      "sources": []
+    },
+    {
+      "type": "consider",
+      "subject": "Escrever no spec que o gate é binário e NÃO é controle de acesso por perfil",
+      "rationale": "Risco de expectativa, e é o tipo de mal-entendido que só aparece depois de alguém ver um dado que não devia. Uma vez dentro do gate, qualquer pessoa com e-mail @loupen.com.br vê TUDO: todos os leads, todos os telefones, todas as oportunidades, todos os valores de MRR. Isso inclui pessoas da Loupen que não são de marketing, comercial ou direção. Se houver dado que não possa ser visto por qualquer funcionário, a fase 1 NÃO é adequada para ele e esse dado tem de ficar fora até a fase 2 — o que é uma decisão de produto que o usuário precisa tomar conscientemente, não descobrir depois. Mitigação parcial de custo zero disponível hoje: a política de Include pode listar e-mails específicos em vez do domínio inteiro, restringindo a quem realmente precisa, ao custo de manutenção manual da lista.",
+      "priority": "P0",
+      "traceTo": ["NFR-3", "OQ-3", "OQ-8", "FR-2"],
+      "sources": ["https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/"]
+    },
+    {
+      "type": "consider",
+      "subject": "Sequência de validação obrigatória antes do Plan, em ordem de risco decrescente",
+      "rationale": "São seis checagens, cinco delas de minutos, e a ordem importa porque as primeiras podem invalidar as seguintes. (1) UC-6 — as zonas estão na Cloudflare, na mesma conta? 2 min; se não, a fase 1 inclui migração de DNS. (2) UC-3 — o Custom domain faz o github.io redirecionar? É a validação que decide se o gate funciona; se falhar, ir para Cloudflare Pages. (3) UC-2 — Full mode serve o GitHub Pages com proxy ligado? 15 min num subdomínio de teste. (4) UC-9 + UC-4 — o Access cobre /api/* roteado por Origin Rule? 1 h, e o critério de aceite é: chamada anônima a /api/* devolve autenticação, não JSON. (5) UC-5 — Transform Rules existem no Free? 2 min no painel. (6) UC-1 — quantos seats o Free dá hoje? 1 min no painel de billing. Somando: menos de duas horas para converter o desenho inteiro de 'plausível' em 'verificado'. Herdado do amendment 1 e ainda válido como spike nº 0: CREATE EXTENSION pg_trgm/fuzzystrmatch no Neon Free, 2 minutos, porque é a premissa que sustenta o desenho de dados.",
+      "priority": "P0",
+      "traceTo": ["FR-14", "AC-14.1"],
+      "sources": []
+    },
+    {
+      "type": "consider",
+      "subject": "Aceitar que o artefato único de 5.014 linhas é dívida técnica assumida, e limitá-la explicitamente",
+      "rationale": "Manter o paradigma vanilla é decisão legítima do usuário e tem vantagens reais (zero build, ciclo de entrega já dominado, elimina o risco não quantificado de CPU do Workers). Mas complexity.json já pontuou scope 5/5 e risk 5/5 em parte porque 'o index.html não é um módulo do produto — ele É o produto', e a fase 1 vai ACRESCENTAR views a esse arquivo. Sem limite explícito, o arquivo vira intratável antes da fase 2. Contenções de custo zero e compatíveis com 'sem build step': separar em múltiplos arquivos .js/.css carregados por <script> e <link> (o navegador faz o 'build'), manter o design system (kpi-grid, funil2, badge, mono, t-name) num CSS próprio conforme NFR-5, e isolar a camada de acesso a dados numa função única — que é o embrião da mitigação M1 quando a autorização chegar. Nenhuma dessas exige ferramenta.",
+      "priority": "P1",
+      "traceTo": ["NFR-5", "CON-6", "FR-6"],
+      "sources": []
+    }
+  ],
+
+  "impactOnPriorFindings": {
+    "unchanged": [
+      "attributionModelProposal do research.json: INALTERADO. Os seis sinais S1-S6 e os cinco invariantes I1-I5 são avaliados na INGESTÃO (n8n → Neon) e não têm nenhuma dependência da camada de apresentação nem de autenticação. Trocar Next.js por vanilla JS não toca nada disso.",
+      "Desenho de resolução de identidade (EC-7): INALTERADO. Tier 1 determinístico e Tier 2 com pg_trgm/fuzzystrmatch continuam rodando no Neon, do lado do banco.",
+      "Neon Free como banco, com todos os limites e riscos registrados no amendment 1 (0,5 GB de storage, 100 CU-hours, OQ-9 como restrição de infraestrutura).",
+      "n8n como única camada de ingestão, inclusive ads; FR-9 permanece com 4 famílias de fonte.",
+      "NFR-1/AC-8.1 (sinal de incompletude origem vs destino) permanece elevado a requisito de primeira classe, e fica ainda mais importante: agora o n8n é ponto único de falha da ingestão E da leitura."
+    ],
+    "changed": [
+      "NFR-3 muda de escopo de fase, não de existência (ver newRecommendations sobre reescrever a métrica).",
+      "O risco técnico principal do amendment 1 (10 ms de CPU por invocação do Workers Free para SSR do App Router) SAI do caminho crítico da fase 1, junto com o spike de meio dia que ele exigia. O risco entra na fase 2, se e quando Next.js voltar.",
+      "A disputa OpenNext vs vinext deixa de ser decisão pendente da fase 1.",
+      "OQ-4 (hospedagem/infra) fica mais fechado que no amendment 1 no eixo de aplicação (GitHub Pages, já em uso) e ganha um item novo: qual zona DNS usar e se ela está na Cloudflare. A pendência de REGIÃO DE DADOS do Neon continua aberta e continua bloqueante para OQ-8.",
+      "Aparece uma dependência de fase 1 que não existia em nenhum artefato anterior: conta Cloudflare com zona ativa. Não é custo, é pré-requisito operacional com dono e janela."
+    ]
+  },
+
+  "summary": "O gate escolhido pelo usuário é viável e gratuito. Confirmado em doc oficial: Cloudflare Access permite política Allow / Include / 'Emails ending in' @loupen.com.br com login por one-time PIN, sem identity provider pago; o Free cobre até 50 seats (número de 2026 não lido em página oficial de pricing — UC-1, irrelevante pelo tamanho do time). O conflito de HTTPS com GitHub Pages é real — proxy ligado impede o GitHub de emitir certificado, sintoma 526 — e se resolve pelo modo SSL/TLS 'Full', que por definição documentada não valida o certificado do origin. A brecha do ponto 4 EXISTE e é grave: o Access protege hostnames, então o webhook do n8n continuaria público, e a URL dele já está em texto claro no repositório. Fechamento recomendado, sem custo: servir os dados como /api/* do MESMO hostname protegido via Origin Rule (disponível no Free, aceita origin em outra zona da mesma conta), mais Header auth no n8n com o segredo injetado na borda — duas camadas, porque uma das premissas segue não validada. Três alertas: o gate não protege o repositório público, onde 365 telefones de leads estão commitados HOJE (index.html:4373); o gate é binário, sem perfis; e seis validações de menos de duas horas separam este desenho de 'verificado'.",
+
+  "nextPhase": {
+    "phase": "spec",
+    "agent": "@pm",
+    "command": "*write-spec",
+    "note": "Leia os TRÊS artefatos juntos (research.json → amendment 1 → amendment 2), nesta ordem, com precedência para o mais recente. Sete pontos de atenção para o @pm. (1) A fase 1 do spec NÃO tem Next.js, Workers como hospedagem, Better Auth nem RBAC — está tudo DEFERRED, não REJECTED, com gatilho nomeado de volta (NFR-3 completo). (2) NFR-3 precisa ser reescrito em duas partes (fase 1 = gate de identidade corporativa + zero PII no artefato e no histórico; fase 2 = permissão por perfil), senão o spec não rastreia e trava no Critique. (3) A exposição de PII no repositório público é FATO VERIFICADO no codebase (index.html:4373, 391 nomes / 365 telefones, commits 511e383 / 64165b0 / d86260a) e deve entrar no spec como pré-requisito bloqueante da fase 1, com force push sob autoridade de @devops — não como observação. (4) A brecha do endpoint público é o requisito de segurança mais concreto desta fase: o critério de aceite é 'chamada anônima a /api/* devolve autenticação, não JSON'. (5) O gate é BINÁRIO: escreva explicitamente que quem entra vê tudo, e decida com o usuário se algum dado deve ficar fora da fase 1 por causa disso. (6) FR-6/AC-6.1 e FR-1/AC-1.2 (detalhe endereçável, filtro preservado) passam a depender de History API nativa no index.html — é requisito de implementação a escrever, porque hoje a navegação por showView() não reflete estado na URL. (7) A sequência de seis validações (UC-6, UC-3, UC-2, UC-9+UC-4, UC-5, UC-1) é pré-requisito do Plan, somando menos de duas horas, e o spike nº 0 do amendment 1 (CREATE EXTENSION pg_trgm/fuzzystrmatch no Neon Free) continua sendo o primeiro de todos. O attributionModelProposal segue INALTERADO e continua entrando no spec como PROPOSTA sujeita a validação do usuário."
+  }
+}
