@@ -1236,3 +1236,79 @@ Não ativei `3l8hobRXtjbzodZc`. Ativá-lo para rodar um webhook ativaria também
 Trigger`, deixado inativo aguardando revisão. Recebeu só duas melhorias corretas de qualquer
 forma: a query de contatos ampliada (antes exigia vínculo com Salesforce e devolvia zero linhas) e
 batching no nó HTTP (não havia — 500 chamadas de uma vez tomariam 429).
+
+---
+
+## 2026-09-10 — Etapa 8: ficha completa do lead
+
+### 🔴 A jornada do lead não mostrava nenhuma conversão
+
+`view_jornada_unificada` (migration 037) une 4 fontes: `conversion_event`
+(direto e via identidade), `lead_touchpoint` e criação de oportunidade. Foi escrita **antes** de
+`lead_conversion_event` (045) e `lead_funnel_stage_event` (039) terem dado.
+
+Resultado: a ficha do lead exibia tudo **menos** as conversões — **767 eventos** e **475** mudanças
+de estágio invisíveis, com o banco tendo a história inteira. O lead aparecia com jornada vazia.
+
+Migration 068 acrescentou as duas fontes. Estado agora:
+
+| tipo | granularidade | eventos |
+|---|---|---|
+| `conversao` | timestamp | **767** |
+| `mudanca_estagio` | dia | **475** |
+| `workflow_entrada`/`saida` | dia | 2 |
+
+### Firmografia por evento, visível na tela
+
+As colunas novas da view (`cargo_no_evento`, `tamanho_no_evento`, `campanha_midia`, `plataforma`,
+`primeiro_toque`, `ultimo_toque`, `atribuicao_status`) existem porque a firmografia é gravada por
+evento — e a ficha agora **destaca em âmbar quando o valor mudou** em relação à conversão anterior.
+
+Exemplo real na base: o mesmo lead aparece como `Diretor` em 22/06 e `CEO, Founder, Sócio` em
+30/06. Mostrar só o valor atual do cadastro esconderia a evolução, que é o que conta a história.
+
+Nos ramos que não têm o dado as colunas vêm **NULL de propósito**: um touchpoint de workflow não
+tem cargo, e preencher com o valor do cadastro atribuiria ao evento uma informação que ele não
+carrega.
+
+### Granularidade respeitada na interface
+
+Evento de granularidade `dia` passa a exibir **só a data**, com o marcador `(dia)`, e o resumo da
+jornada avisa que a ordem intradiária entre eles não é significativa (CON-3/EC-10). Exibir hora
+neles daria falsa precisão: a API do RD só expõe o estado atual, então a data real é "quando o
+pull rodou".
+
+### 🔴 Regressão que eu introduzi e os specs pegaram
+
+A ficha ganhou os campos novos e passou a fazer `ov.origens_conversao.length`. No modo real esses
+campos vêm do adaptador; no modo mock o fixture era devolvido **cru**, sem eles — e
+`undefined.length` derrubou a ficha inteira, deixando os três blocos em branco. **Três specs
+Playwright** acusaram.
+
+Corrigido com `_garantirFormaDetalhe()`, aplicada nos **dois** ramos. A lição é sobre
+responsabilidade: `data-api.js` é a costura única (ADR-021), então garantir a FORMA é trabalho
+dele. Uma view que precisa checar se cada campo existe já perdeu a garantia.
+
+Detalhe de implementação que também é armadilha: os defaults têm de vir **depois** do spread de
+`ov`. Antes, seriam código morto — e um `null` vindo do fixture reintroduziria o bug.
+
+### Endpoint `/api/leads/:id`
+
+Ganhou um terceiro ramo (`fn_perfil` → `view_lead_perfil`), separado de `view_lead_360` de
+propósito: aquela é o eixo Salesforce/receita, esta é o eixo firmografia/atribuição do RD. Fundi-las
+exigiria um JOIN que duplica linha por oportunidade.
+
+Também corrigido: o endpoint tratava ausência em `view_lead_360` como **`lead_nao_encontrado`**.
+Isso esconderia os 475 leads nativos do RD, que não têm registro no Salesforce. Agora a ficha é
+válida quando existe em **qualquer** dos dois eixos.
+
+### Os dois eixos, separados na tela
+
+A ficha mostra eixo A (origem de conversão) e eixo B (mídia paga) em blocos distintos, cada um com
+o rótulo do que pode receber investimento. Quando o eixo B está vazio, o texto explica que **não é
+falha da ferramenta** — é conversão sem tagueamento de UTM, o que acontece na maioria dos leads.
+
+### Verificado
+
+19/19 SQL · 11/11 node --test · 8/8 Playwright. Queries do endpoint executadas contra um lead real
+(3 conversões em 2 origens + 1 mudança de estágio).

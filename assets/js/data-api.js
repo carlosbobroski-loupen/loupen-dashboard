@@ -222,6 +222,42 @@ function _adaptarDetalheReal(real) {
       // (owner) do lead — view_lead_360 não inclui esse campo hoje.
       responsavel: null,
       estagio_funil: ov.estagio_funil,
+      fonte_dados: ov.fonte_dados ?? null,
+
+      // Perfil que entrou por MEDIÇÃO de cobertura (data-contract.md §1.1),
+      // não por suposição.
+      cargo: ov.cargo ?? null,
+      cargo_grupo: ov.cargo_grupo ?? null,
+      tamanho_empresa: ov.tamanho_empresa ?? null,
+      tamanho_empresa_bruto: ov.tamanho_empresa_bruto ?? null,
+      atendido_por: ov.atendido_por ?? null,
+      tags: Array.isArray(ov.tags) ? ov.tags : [],
+
+      // Eixo A (§1.2) — origem de conversão. NUNCA portadora de investimento.
+      qtd_conversoes: Number(ov.qtd_conversoes ?? 0),
+      qtd_origens: Number(ov.qtd_origens ?? 0),
+      origens_conversao: Array.isArray(ov.origens_conversao) ? ov.origens_conversao : [],
+      origem_primeira_conversao: ov.origem_primeira_conversao ?? null,
+      origem_ultima_conversao: ov.origem_ultima_conversao ?? null,
+
+      // Eixo B (§1.2) — único eixo que pode receber investimento e ROI.
+      // O bruto vem ao lado do normalizado porque normalizar sem guardar o
+      // original transforma a normalização num ato de fé.
+      campanha_midia: ov.campanha_midia ?? null,
+      plataforma: ov.plataforma ?? null,
+      campanha_midia_bruta: ov.campanha_midia_bruta ?? null,
+      plataforma_bruta: ov.plataforma_bruta ?? null,
+      tem_gclid: ov.tem_gclid === true,
+
+      primeiro_toque: ov.primeiro_toque ?? null,
+      ultimo_toque: ov.ultimo_toque ?? null,
+
+      data_criacao: ov.data_criacao ?? null,
+      data_conversao: ov.data_conversao ?? null,
+      trimestre: ov.trimestre ?? null,
+
+      is_teste: ov.is_teste === true,
+      teste_regra: ov.teste_regra ?? null,
       atribuicao: ov.atribuicao ? {
         segmento: ov.atribuicao.segmento,
         categoria: ov.atribuicao.categoria,
@@ -246,6 +282,28 @@ function _adaptarDetalheReal(real) {
       fonte: a.source_system,
       titulo: ROTULO_TIPO_EVENTO[a.tipo] ?? a.tipo,
       descricao: a.detalhe ?? '',
+
+      // Granularidade DECLARADA por evento (CON-3/EC-10). A interface é
+      // obrigada a respeitar: dois eventos de granularidade 'dia' no mesmo
+      // dia NÃO têm ordem intradiária significativa, porque a fonte só
+      // atualiza uma vez ao dia.
+      granularidade: a.granularidade ?? null,
+
+      // Contexto do evento (migration 068). Presente só em conversão — nos
+      // outros ramos vem null de propósito: um touchpoint de workflow não
+      // tem cargo, e preencher com o valor do cadastro atribuiria ao evento
+      // uma informação que ele não carrega.
+      origem_conversao: a.origem_conversao ?? null,
+      campanha_midia: a.campanha_midia ?? null,
+      plataforma: a.plataforma ?? null,
+      // Firmografia DO INSTANTE. Muda entre conversões do mesmo lead —
+      // verificado em dado real (`Diretor` num evento, `CEO, Founder, Sócio`
+      // noutro). É o que conta a evolução do lead.
+      cargo_no_evento: a.cargo_no_evento ?? null,
+      tamanho_no_evento: a.tamanho_no_evento ?? null,
+      primeiro_toque: a.primeiro_toque ?? null,
+      ultimo_toque: a.ultimo_toque ?? null,
+      atribuicao_status: a.atribuicao_status ?? null,
       // TODO conhecido: o backend real ainda só grava um booleano
       // (date_traceable), não uma idade textual do último dado válido
       // (EC-8) — a Etapa A tinha essa string pronta a partir do fixture
@@ -367,11 +425,47 @@ export async function buscarLead(id) {
   if (_modoReal()) {
     const res = await _fetchReal(`api/leads/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error(`data-api (real): falha ao buscar lead ${id} (HTTP ${res.status})`);
-    return _adaptarDetalheReal(await res.json());
+    return _garantirFormaDetalhe(_adaptarDetalheReal(await res.json()));
   }
 
   const detalhes = await _loadDetail();
-  return detalhes[id] ?? null;
+  return _garantirFormaDetalhe(detalhes[id] ?? null);
+}
+
+// Garante que a ficha SEMPRE recebe a mesma forma, venha do backend real ou
+// do fixture.
+//
+// Existe por causa de uma regressão real: a ficha ganhou os campos novos
+// (tags, origens_conversao, qtd_conversoes…) e passou a fazer
+// `ov.origens_conversao.length`. No modo real esses campos vêm do
+// `_adaptarDetalheReal`; no modo mock o fixture era devolvido CRU, sem eles —
+// e `undefined.length` derrubou a ficha inteira, deixando os três blocos em
+// branco. Três specs Playwright pegaram.
+//
+// A lição é sobre a responsabilidade deste arquivo: ele é a costura única
+// (ADR-021), então garantir a FORMA é trabalho dele, não de cada view. Uma
+// view que precisa checar se cada campo existe já perdeu a garantia.
+function _garantirFormaDetalhe(d) {
+  if (!d) return null;
+  const ov = d.overview ?? {};
+  return {
+    ...d,
+    overview: {
+      ...ov,
+      // DEPOIS do spread de propósito: os campos que a ficha lê como array ou
+      // número precisam vencer o valor da origem, porque um `null` vindo do
+      // fixture reintroduziria o `undefined.length` que causou a regressão.
+      // Colocá-los antes do spread seria código morto.
+      tags: Array.isArray(ov.tags) ? ov.tags : [],
+      origens_conversao: Array.isArray(ov.origens_conversao) ? ov.origens_conversao : [],
+      qtd_conversoes: Number(ov.qtd_conversoes ?? 0),
+      qtd_origens: Number(ov.qtd_origens ?? 0),
+      is_teste: ov.is_teste === true,
+      tem_gclid: ov.tem_gclid === true,
+    },
+    activity: Array.isArray(d.activity) ? d.activity : [],
+    related: d.related ?? { conta: null, oportunidade: null, cadeia_campanha: null },
+  };
 }
 
 /**
