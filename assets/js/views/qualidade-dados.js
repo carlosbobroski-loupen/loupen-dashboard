@@ -150,8 +150,9 @@ function _renderSemRegra(q) {
   if (!q) return _semBackend('A lista de valores sem regra');
   const cargos = q.cargos_sem_regra ?? [];
   const tamanhos = q.tamanhos_nao_lidos ?? [];
+  const plataformas = q.plataformas_sem_regra ?? [];
 
-  if (cargos.length === 0 && tamanhos.length === 0) {
+  if (cargos.length === 0 && tamanhos.length === 0 && plataformas.length === 0) {
     return '<div class="empty-state"><div class="es-title">Todos os valores preenchidos estão classificados</div><div>Nenhum cargo caiu em "sem regra" e nenhum tamanho de empresa ficou ilegível.</div></div>';
   }
 
@@ -171,7 +172,9 @@ function _renderSemRegra(q) {
     ${bloco('Cargos sem regra de agrupamento', cargos, 'cargo',
       'Cada um destes vai para o grupo "Sem regra" no filtro de cargo. A cauda com 1 lead cada fica assim de propósito: escrever regra a partir de um único caso seria inventar taxonomia. Valor que aparecer com volume merece regra nova.')}
     ${bloco('Tamanhos de empresa preenchidos e ilegíveis', tamanhos, 'valor',
-      'O lead informou algo que a normalização não consegue mapear nas 3 faixas. Distinto de "não informou" — aqui o dado existe e a falha de leitura é nossa.')}`;
+      'O lead informou algo que a normalização não consegue mapear nas 3 faixas. Distinto de "não informou" — aqui o dado existe e a falha de leitura é nossa.')}
+    ${bloco('Plataformas sem regra de grafia', plataformas, 'valor',
+      'Valor de plataforma que não casou com nenhuma regra. Na falta de regra a função devolve o valor decodificado como está — foi esta lista, no caso dos cargos, que revelou que a regra "Outro" (match exato) não pegava "Outros": 27 leads.')}`;
 }
 
 // Rótulos dos estados de atribuição que conhecemos. A LISTA DE ESTADOS vem do

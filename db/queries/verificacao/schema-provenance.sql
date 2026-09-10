@@ -51,9 +51,10 @@ DECLARE
   --   infra de ingestão (é o próprio registro de proveniência) ...........
   --                           ingest_run, sync_state, schema_migrations
   --   REGRA DE NEGÓCIO escrita por nós, não ingerida de fonte nenhuma
-  --   (migrations 045/046/050/056) ......................................
-  --                           cargo_grupo_regra, lead_teste_regra
-  --     Estas duas não têm proveniência porque não vêm de fonte externa: são
+  --   (migrations 045/046/050/056/064) ..................................
+  --                           cargo_grupo_regra, lead_teste_regra,
+  --                           plataforma_regra
+  --     Estas três não têm proveniência porque não vêm de fonte externa: são
   --     decisões nossas, versionadas em migration e auditáveis pela coluna
   --     `observado`/`motivo`. Dar-lhes um `source_system` fictício seria
   --     inventar origem para satisfazer o formato da checagem.
@@ -61,7 +62,7 @@ DECLARE
     'attribution_ruleset', 'channel_source', 'funnel_stage', 'leadsource_crosswalk',
     'identity_candidate', 'identity_edge', 'person', 'lead_origin_classification',
     'ingest_run', 'sync_state', 'schema_migrations',
-    'cargo_grupo_regra', 'lead_teste_regra'
+    'cargo_grupo_regra', 'lead_teste_regra', 'plataforma_regra'
   ];
   v_sem_proveniencia text;
   v_sem_coleta       text;
