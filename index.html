@@ -344,7 +344,7 @@
 
     <div id="crm-active-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 14px"></div>
 
-    <div style="display:grid;grid-template-columns:1fr 448px;gap:16px;align-items:start" id="crm-work-grid">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:16px;align-items:start" id="crm-work-grid">
       <div class="card">
         <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Leads</div><div class="section-badge" id="crm-row-count">—</div></div>
         <div style="overflow-x:auto">
@@ -374,15 +374,16 @@
             <div class="crm-panel-url" id="crm-p-url">/leads</div>
           </div>
         </div>
-        <div class="crm-panel-tabs" id="crm-panel-tabs">
-          <button class="meta-tab active" data-tab="overview">Visão geral</button>
-          <button class="meta-tab" data-tab="jornada">Jornada</button>
-          <button class="meta-tab" data-tab="related">Relacionados</button>
-        </div>
+        <!-- Sem abas desde 2026-09-15. As três abas empurravam a JORNADA para a
+             segunda e o DESFECHO COMERCIAL para a terceira — exatamente as duas
+             metades do que o usuário descreveu como "a análise do lead". Agora
+             tudo empilha numa coluna, na ordem em que a pergunta é feita:
+             quem é → onde parou no comercial → como chegou aqui. -->
         <div class="crm-panel-body">
-          <div class="crm-p-view active" data-view="overview" id="crm-view-overview"></div>
-          <div class="crm-p-view" data-view="jornada" id="crm-view-jornada"></div>
-          <div class="crm-p-view" data-view="related" id="crm-view-related"></div>
+          <div class="crm-p-view active" id="crm-view-desfecho" style="margin-bottom:14px"></div>
+          <div class="crm-p-view active" id="crm-view-overview" style="margin-bottom:14px"></div>
+          <div class="crm-p-view active" id="crm-view-jornada" style="margin-bottom:14px"></div>
+          <div class="crm-p-view active" id="crm-view-related"></div>
         </div>
       </div>
     </div>

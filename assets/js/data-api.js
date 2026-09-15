@@ -296,6 +296,12 @@ function _adaptarDetalheReal(real) {
       origem_conversao: a.origem_conversao ?? null,
       campanha_midia: a.campanha_midia ?? null,
       plataforma: a.plataforma ?? null,
+      // O anúncio que pagou por este evento (migration 086). Estava em
+      // lead_conversion_event desde o conserto do webhook e não era projetado
+      // pela view da jornada — o dado entrava no banco e não chegava na tela.
+      id_anuncio: a.id_anuncio ?? null,
+      criativo: a.criativo ?? null,
+      publico: a.publico ?? null,
       // Firmografia DO INSTANTE. Muda entre conversões do mesmo lead —
       // verificado em dado real (`Diretor` num evento, `CEO, Founder, Sócio`
       // noutro). É o que conta a evolução do lead.
@@ -323,8 +329,25 @@ function _adaptarDetalheReal(real) {
         id: oportunidades[0].id,
         mrr: oportunidades[0].mrr,
         estagio: oportunidades[0].stage_name,
-        valor_contrato: oportunidades[0].contrato_valor,
+        valor_contrato: oportunidades[0].contrato_valor_por_amount,
       } : null,
+      // TODAS as oportunidades, não só a primeira. Uma pessoa com 7
+      // oportunidades tinha 6 invisíveis na ficha — o bloco de desfecho
+      // (migration 079/080) precisa de todas para dizer a fase mais avançada.
+      //
+      // `amount` e `mrr` vão CRUS, com os nomes dos campos de origem. Qual
+      // sustenta receita é decisão de negócio em aberto (migrations 073/080),
+      // e a tela rotula em vez de escolher.
+      oportunidades: oportunidades.map((o) => ({
+        id: o.id,
+        stage_name: o.stage_name,
+        fase_comercial: o.fase_comercial ?? null,
+        record_type_name: o.record_type_name ?? null,
+        amount: o.amount ?? null,
+        mrr: o.mrr ?? null,
+        contrato_por_amount: o.contrato_valor_por_amount ?? null,
+        contrato_por_mrr: o.contrato_valor_por_mrr ?? null,
+      })),
       // TODO conhecido: ad_campaign/cadeia de campanha ainda não está
       // ligada à API real.
       cadeia_campanha: null,
@@ -581,11 +604,39 @@ export async function obterPessoas(filtros = {}) {
   const filtradas = busca
     ? lista.filter((l) => `${l.nome ?? ''} ${l.empresa ?? ''}`.toLowerCase().includes(busca))
     : lista;
-  const pessoas = filtradas.map((l) => ({
+
+  // Pivô campanha→leads (AC-4.1) no modo mock. No modo real isso é o filtro
+  // `campanha` de `fn_search_pessoas` (migration 087), que casa contra
+  // `origens_conversao` OU `utm_campaign`. O fixture de LISTA não carrega
+  // nenhum dos dois: no mock o nome de campanha só existe no bloco
+  // `atribuicao` do DETALHE (`campanha_bruta` / `cadeia_campanha`, §2). Casar
+  // contra ele aqui é o que mantém o pivô vivo sem backend — e a suíte e2e
+  // roda exatamente assim. É a MESMA regra do SQL expressa nos campos que o
+  // fixture tem; não é um segundo conceito de campanha.
+  const campanha = String(filtros.campanha ?? '');
+  let porCampanha = filtradas;
+  if (campanha) {
+    const detalhes = await _loadDetail();
+    porCampanha = filtradas.filter((l) => {
+      const d = detalhes[l.id];
+      if (!d) return false;
+      const bruta = d.overview?.atribuicao?.campanha_bruta;
+      const cadeia = d.related?.cadeia_campanha ?? [];
+      return bruta === campanha || cadeia.includes(campanha);
+    });
+  }
+
+  const pessoas = porCampanha.map((l) => ({
     pessoa_chave: `mock:${l.id}`,
     nome: l.nome, empresa: l.empresa,
     fontes: [l.fonte_dados === 'salesforce' ? 'salesforce' : 'rd_station'],
     rd_lead_id: l.id, sf_lead_id: null,
+    // A lista abre a ficha por `source_id_ficha` (/api/leads/{id}), NAO pelo
+    // id interno. O ramo real recebe a coluna da view; aqui ela tem que ser
+    // emitida na mao, senao `data-lead-row` sai "undefined" e clicar na linha
+    // nao abre ficha nenhuma no modo mock -- que e o modo em que a suite e2e
+    // roda. No fixture, `l.id` JA E o source_id (ver _adaptarItemLista).
+    source_id_ficha: l.id,
     segmento: l.segmento, categoria: l.categoria, detalhe: null,
     de_lista_importada: false,
     qtd_conversoes: l.qtd_conversoes ?? 0,
@@ -603,12 +654,17 @@ export async function obterPessoas(filtros = {}) {
     fase_mais_avancada: null, fase_ordem: null, estagio_mais_avancado: null,
     mrr_ganho: null, amount_ganho: null,
   }));
-  const total = Number(lista.total ?? pessoas.length);
+  // Quando o mock estreita a página no cliente (busca ou campanha), o total
+  // TEM que ser o da página estreitada. Devolver o total de antes faria o
+  // rodapé "N de M" mentir — o mesmo defeito que `total_filtrado` existe para
+  // não ter no lado real (ver migration 084).
+  const estreitouNoCliente = Boolean(busca) || Boolean(campanha);
+  const total = estreitouNoCliente ? pessoas.length : Number(lista.total ?? pessoas.length);
   return {
-    pessoas, total: busca ? pessoas.length : total,
+    pessoas, total,
     ocultos_lista_importada: 0,
     offset: Number(filtros.offset) || 0, limite: Number(filtros.limit) || 50,
-    tem_mais: pessoas.length < (busca ? pessoas.length : total),
+    tem_mais: pessoas.length < total,
   };
 }
 

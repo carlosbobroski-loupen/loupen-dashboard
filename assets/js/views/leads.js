@@ -39,7 +39,7 @@ import { listarLeads, obterPessoas, obterOpcoesFiltro } from '../data-api.js';
 import { renderBadge } from '../attribution.js';
 import { lerEstadoAtual, atualizarEstado, comoArray } from '../url-state.js';
 import { renderPainelLead, limparPainel } from './lead-detalhe.js';
-import { aplicarFiltroCampanha, renderBreadcrumbCampanha } from './relacionamentos.js';
+import { renderBreadcrumbCampanha } from './relacionamentos.js';
 
 // Dimensões de filtro. `rotulo` é o que aparece na tela; `chave` é o nome no
 // contrato, na URL e na query. A ordem aqui é a ordem na barra de filtros:
@@ -257,7 +257,11 @@ function _filtrosDoEstado(estado) {
     const v = um(estadoChave);
     if (v) f[apiChave] = v;
   }
-  if (estado.campanha) f.busca = estado.campanha;
+  // Pivo campanha->leads (AC-4.1). `campanha` e parametro de primeira classe
+  // em fn_search_pessoas desde a migration 087. Mandar no `busca` -- como esta
+  // linha fazia -- devolvia ZERO para qualquer campanha, porque `busca` so casa
+  // contra nome, empresa e e-mail.
+  if (estado.campanha) f.campanha = estado.campanha;
   if (estado.busca) f.busca = estado.busca;
   if (estado.incluir_lista) f.incluir_lista = true;
   if (estado.so_com_oportunidade) f.so_com_oportunidade = true;
@@ -379,7 +383,8 @@ async function _renderLista(estado, { acumular = false } = {}) {
   emptyEl.style.display = 'none';
 
   tbody.innerHTML = _carregadas.map((p) => {
-    const alvo = p.rd_lead_id ?? p.sf_lead_id;
+    // A ficha abre por source_id (/api/leads/{id}), NAO pelo id interno.
+    const alvo = p.source_id_ficha;
     const fontes = (p.fontes || []).map((f) => `<span class="mono-sm" style="background:var(--surface2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-right:3px">${f === 'rd_station' ? 'RD' : 'SF'}</span>`).join('');
     const lista = p.de_lista_importada
       ? '<span class="mono-sm" style="background:var(--amber-dim);color:var(--amber);padding:1px 5px;border-radius:4px" title="Lead de lista importada — conta como lead, mas sai do denominador das taxas.">lista</span>'

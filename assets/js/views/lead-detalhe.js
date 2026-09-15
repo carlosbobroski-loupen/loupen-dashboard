@@ -78,7 +78,7 @@ function _renderOverview(detalhe) {
          (§1.2). Só o eixo B pode receber investimento e ROI; misturá-los
          produziria ROI sobre campanha sem custo. -->
     <div style="margin-top:16px;padding:12px;border:1px solid var(--border2);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;background:var(--surface2)">
-      <div style="font-size:12px;font-weight:600;margin-bottom:8px">Eixo A · Origem de conversão <span class="mono-sm" style="font-weight:400;color:var(--dim)">nunca recebe investimento</span></div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">O que trouxe este lead <span class="mono-sm" style="font-weight:400;color:var(--dim)">nunca recebe investimento</span></div>
       <div class="field-grid">
         <div class="field"><div class="field-label">Conversões</div><div class="field-val" style="font-variant-numeric:tabular-nums">${ov.qtd_conversoes}${ov.qtd_origens > 1 ? ` <span class="mono-sm" style="color:var(--muted)">em ${ov.qtd_origens} origens</span>` : ''}</div></div>
         <div class="field"><div class="field-label">Primeira origem</div><div class="field-val">${ov.origem_primeira_conversao ? escapeHtml(ov.origem_primeira_conversao) : '—'}</div></div>
@@ -88,7 +88,7 @@ function _renderOverview(detalhe) {
     </div>
 
     <div style="margin-top:10px;padding:12px;border:1px solid var(--border2);border-left:3px solid ${temEixoB ? 'var(--green)' : 'var(--border2)'};border-radius:0 8px 8px 0;background:var(--surface2)">
-      <div style="font-size:12px;font-weight:600;margin-bottom:8px">Eixo B · Mídia paga <span class="mono-sm" style="font-weight:400;color:var(--dim)">único eixo com ROI</span></div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">Anúncio que pagou por este lead <span class="mono-sm" style="font-weight:400;color:var(--dim)">único eixo com ROI</span></div>
       ${temEixoB ? `
       <div class="field-grid">
         <div class="field"><div class="field-label">Campanha</div><div class="field-val">${ov.campanha_midia ? escapeHtml(ov.campanha_midia) : '—'}</div></div>
@@ -139,8 +139,14 @@ function _renderJornada(detalhe) {
 
       // Contexto só existe em conversão; nos outros ramos vem null.
       const ctx = [];
-      if (a.campanha_midia) ctx.push(`<span title="Eixo B — campanha de mídia paga"><i class="ti ti-currency-dollar" style="font-size:11px"></i> ${escapeHtml(a.campanha_midia)}</span>`);
+      if (a.campanha_midia) ctx.push(`<span title="Campanha de mídia paga"><i class="ti ti-currency-dollar" style="font-size:11px"></i> ${escapeHtml(a.campanha_midia)}</span>`);
       if (a.plataforma) ctx.push(`<span title="Plataforma de origem"><i class="ti ti-speakerphone" style="font-size:11px"></i> ${escapeHtml(a.plataforma)}</span>`);
+      // O anúncio que pagou por esta conversão (migration 086). É o que liga a
+      // pessoa ao criativo na aba de Criativos — sem ele, "veio do Facebook" é
+      // tudo o que se sabe.
+      if (a.criativo) ctx.push(`<span title="Criativo do anúncio"><i class="ti ti-photo" style="font-size:11px"></i> ${escapeHtml(a.criativo)}</span>`);
+      if (a.publico) ctx.push(`<span title="Público/segmentação do anúncio"><i class="ti ti-users" style="font-size:11px"></i> ${escapeHtml(a.publico)}</span>`);
+      if (a.id_anuncio) ctx.push(`<span title="ID do anúncio na plataforma — clique para copiar" data-copiar="${escapeHtml(a.id_anuncio)}" style="cursor:pointer;border-bottom:1px dotted var(--dim)"><i class="ti ti-hash" style="font-size:11px"></i> ${escapeHtml(a.id_anuncio)}</span>`);
       if (a.cargo_no_evento) {
         const mudou = cargoAnterior !== null && cargoAnterior !== a.cargo_no_evento;
         ctx.push(`<span${mudou ? ' style="color:var(--amber);font-weight:600" title="O cargo informado MUDOU em relação à conversão anterior — a firmografia é gravada por evento justamente para mostrar isso"' : ' title="Cargo informado nesta conversão"'}><i class="ti ti-briefcase" style="font-size:11px"></i> ${escapeHtml(a.cargo_no_evento)}${mudou ? ' ⟵ mudou' : ''}</span>`);
@@ -174,6 +180,84 @@ function _renderJornada(detalhe) {
   </div>`;
 
   return resumo + `<div class="crm-timeline">${itens}</div>`;
+}
+
+// Desfecho comercial no TOPO da ficha. Antes vivia dentro da terceira aba, e
+// mostrava apenas `oportunidades[0]` com o stage_name cru — um dos 29 valores
+// literais do Salesforce. Metade do modelo mental do usuário estava a dois
+// cliques de distância.
+const FASE_ROTULO_F = {
+  contato: 'Contato', qualificacao: 'Qualificação', reuniao: 'Reunião',
+  negociacao: 'Negociação', ganho: 'Ganho', perdido: 'Perdido',
+};
+const FASE_COR_F = {
+  contato: 'var(--dim)', qualificacao: 'var(--blue)', reuniao: 'var(--purple)',
+  negociacao: 'var(--amber)', ganho: 'var(--green)', perdido: 'var(--red)',
+};
+const FASE_ORDEM_F = { contato: 1, qualificacao: 2, reuniao: 3, negociacao: 4, ganho: 5, perdido: 5 };
+
+function _renderDesfecho(detalhe) {
+  const opps = detalhe.related?.oportunidades ?? [];
+  const conta = detalhe.related?.conta;
+
+  if (!opps.length) {
+    return `<div style="background:var(--surface2);border-radius:9px;padding:12px 14px">
+      <div class="mono-sm" style="color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:10.5px;margin-bottom:5px">Desfecho comercial</div>
+      <div style="font-size:13px;color:var(--muted)">${conta
+        ? `Virou a conta <strong style="color:var(--text)">${escapeHtml(conta.nome ?? '—')}</strong>, ainda sem oportunidade registrada.`
+        : 'Ainda não virou conta nem oportunidade no Salesforce.'}</div>
+    </div>`;
+  }
+
+  // TODAS as oportunidades, não `oportunidades[0]`. Uma pessoa com 7
+  // oportunidades tinha 6 invisíveis.
+  const comFase = opps.map((o) => ({ ...o, fase: o.fase_comercial ?? null }));
+  const maisAvancada = comFase.reduce((melhor, o) => {
+    const ord = FASE_ORDEM_F[o.fase] ?? 0;
+    const ganhou = o.fase === 'ganho';
+    if (!melhor) return { ...o, _ord: ord, _ganhou: ganhou };
+    if (ganhou && !melhor._ganhou) return { ...o, _ord: ord, _ganhou: ganhou };
+    if (!melhor._ganhou && ord > melhor._ord) return { ...o, _ord: ord, _ganhou: ganhou };
+    return melhor;
+  }, null);
+
+  const cor = FASE_COR_F[maisAvancada?.fase] ?? 'var(--muted)';
+  const ord = FASE_ORDEM_F[maisAvancada?.fase] ?? 0;
+  const barra = [1, 2, 3, 4, 5]
+    .map((i) => `<span style="flex:1;height:6px;border-radius:2px;background:${i <= ord ? cor : 'var(--surface)'}"></span>`)
+    .join('');
+
+  const ganhas = comFase.filter((o) => o.fase === 'ganho').length;
+  const perdidas = comFase.filter((o) => o.fase === 'perdido').length;
+
+  const linhas = comFase.map((o) => {
+    const c = FASE_COR_F[o.fase] ?? 'var(--muted)';
+    // Valor de contrato: as DUAS bases, rotuladas. Qual sustenta receita é
+    // decisão de negócio em aberto (migrations 073/080) — a tela não escolhe.
+    const vals = [];
+    if (o.mrr != null) vals.push(`MRR ${Number(o.mrr).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+    if (o.amount != null) vals.push(`Amount ${Number(o.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+    return `<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--border)">
+      <span style="width:6px;height:6px;border-radius:50%;background:${c};flex:none"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px">${escapeHtml(o.stage_name ?? '—')}
+          ${o.record_type_name ? `<span class="mono-sm" style="color:var(--dim)"> · ${escapeHtml(o.record_type_name)}</span>` : ''}</div>
+        ${vals.length ? `<div class="mono-sm" style="color:var(--muted)">${vals.join(' · ')}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="background:var(--surface2);border-radius:9px;padding:12px 14px">
+    <div class="mono-sm" style="color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:10.5px;margin-bottom:7px">Desfecho comercial</div>
+    <div style="display:flex;gap:3px;margin-bottom:6px">${barra}</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+      <strong style="color:${cor};font-size:14px">${FASE_ROTULO_F[maisAvancada?.fase] ?? 'sem fase mapeada'}</strong>
+      <span class="mono-sm" style="color:var(--muted)">${opps.length} oportunidade(s)${
+        ganhas ? ` · ${ganhas} ganha(s)` : ''}${perdidas ? ` · ${perdidas} perdida(s)` : ''}</span>
+    </div>
+    ${conta ? `<div class="mono-sm" style="color:var(--muted);margin-bottom:4px"><i class="ti ti-building" style="font-size:11px"></i> ${escapeHtml(conta.nome ?? '')}</div>` : ''}
+    ${linhas}
+  </div>`;
 }
 
 function _renderRelated(detalhe, estado) {
@@ -224,13 +308,25 @@ function _renderRelated(detalhe, estado) {
   return blocos.join('');
 }
 
-function _ativarAba(tabId) {
-  document.querySelectorAll('#crm-panel-tabs .meta-tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tabId));
-  document.querySelectorAll('.crm-panel-body .crm-p-view').forEach((el) => el.classList.toggle('active', el.dataset.view === tabId));
-}
-
+// As abas do painel foram removidas em 2026-09-15 (ver index.html). O seletor
+// abaixo não encontra nada e o forEach não itera — mantido explicitamente, com
+// esta nota, porque apagar sem explicar faria a próxima pessoa procurar por
+// onde as abas sumiram.
 document.querySelectorAll('#crm-panel-tabs .meta-tab').forEach((btn) => {
-  btn.onclick = () => _ativarAba(btn.dataset.tab);
+  btn.onclick = () => {};
+});
+
+// Copiar o ID do anúncio com um clique: é o valor que se cola na plataforma de
+// mídia para achar o criativo. Sem isso, o caminho é selecionar 18 dígitos com
+// o mouse.
+document.addEventListener('click', (ev) => {
+  const alvo = ev.target.closest('[data-copiar]');
+  if (!alvo) return;
+  navigator.clipboard?.writeText(alvo.dataset.copiar).then(() => {
+    const antes = alvo.innerHTML;
+    alvo.innerHTML = '<i class="ti ti-check" style="font-size:11px"></i> copiado';
+    setTimeout(() => { alvo.innerHTML = antes; }, 1200);
+  }).catch(() => {});
 });
 
 /**
@@ -244,6 +340,7 @@ export async function renderPainelLead(leadId, estado) {
     document.getElementById('crm-p-nome').textContent = 'Lead não encontrado';
     document.getElementById('crm-p-url').textContent = `/leads/${leadId}`;
     document.getElementById('crm-view-overview').innerHTML = `<div class="empty-state"><div class="es-title">Não encontrado</div><div>Nenhum lead com id "${escapeHtml(leadId)}" no fixture atual.</div></div>`;
+    document.getElementById('crm-view-desfecho').innerHTML = '';
     document.getElementById('crm-view-jornada').innerHTML = '';
     document.getElementById('crm-view-related').innerHTML = '';
     return;
@@ -251,6 +348,7 @@ export async function renderPainelLead(leadId, estado) {
 
   document.getElementById('crm-p-nome').innerHTML = `${escapeHtml(detalhe.overview.nome)} ${renderBadge(detalhe.overview.atribuicao)}`;
   document.getElementById('crm-p-url').textContent = `/leads/${leadId}`;
+  document.getElementById('crm-view-desfecho').innerHTML = _renderDesfecho(detalhe);
   document.getElementById('crm-view-overview').innerHTML = _renderOverview(detalhe);
   document.getElementById('crm-view-jornada').innerHTML = _renderJornada(detalhe);
   document.getElementById('crm-view-related').innerHTML = _renderRelated(detalhe, estado);
@@ -270,8 +368,9 @@ export async function renderPainelLead(leadId, estado) {
 export function limparPainel() {
   document.getElementById('crm-p-nome').textContent = 'Selecione um lead';
   document.getElementById('crm-p-url').textContent = '/leads';
+  const d = document.getElementById('crm-view-desfecho');
+  if (d) d.innerHTML = '';
   document.getElementById('crm-view-overview').innerHTML = '';
   document.getElementById('crm-view-jornada').innerHTML = '';
   document.getElementById('crm-view-related').innerHTML = '';
-  _ativarAba('overview');
 }

@@ -1,37 +1,54 @@
--- db/migrations/084_fn_search_pessoas.sql
+-- db/migrations/087_busca_pessoas_pivo_campanha.sql
 --
--- A busca por PESSOA -- o que a aba Leads passa a consumir.
+-- O PIVÔ CAMPANHA→LEADS ESTAVA MORTO. Esta migration é o que o ressuscita.
 --
--- Substitui, para a lista, o papel de `fn_search_leads`, que é por REGISTRO de
--- origem. Mantém a mesma convenção de assinatura (p_filtros jsonb, p_limit,
--- p_offset) para não inventar um segundo padrão de chamada.
+-- Quando a aba Leads passou a consumir `fn_search_pessoas` (migration 084), o
+-- filtro `campanha` não veio junto. O cliente contornou mandando a campanha no
+-- parâmetro `busca` -- e `busca` casa contra NOME, EMPRESA e E-MAIL, nunca
+-- contra campanha. Resultado medido: clicar em "ver leads desta campanha"
+-- devolvia ZERO linhas para qualquer campanha da base. O pivô não estava
+-- degradado, estava morto, e a tela dizia "nenhum lead encontrado" como se
+-- fosse resposta legítima.
 --
--- TRÊS COISAS QUE A BUSCA ATUAL NÃO TEM, e que são a razão desta migration:
+-- POR QUE DOIS CAMPOS COM OR, E NÃO UM SÓ
 --
--- 1. BUSCA TEXTUAL. Não existe um único campo de busca no produto inteiro
---    (`grep -c 'type="search"' index.html` = 0). Foi por isso que o usuário
---    teve que filtrar por marketing e varrer a tabela com o olho para achar um
---    lead específico -- e saiu com a impressão de que a ficha não mostrava
---    nada, quando na verdade ele não chegou a abrir a ficha certa.
+-- A migration 054 já registrou este erro uma vez: `campanha`,
+-- `origem_conversao` e `campanha_midia` são TRÊS coisas distintas, e tratar
+-- uma como apelido da outra fez o pivô devolver vazio. Aqui o pivô precisa
+-- achar a pessoa por qualquer um dos dois sinais que carregam nome de
+-- campanha, porque eles cobrem populações diferentes -- medido em
+-- 2026-09-15 sobre view_pessoa_jornada_desfecho (6.844 pessoas):
 --
--- 2. TOTAL SEPARADO DA PÁGINA. `fn_search_leads` devolve as linhas e a tela
---    imprime "200 de 490" a partir de um total que vem de outro lugar. Aqui o
---    total vem na mesma chamada, sobre o MESMO filtro -- senão a paginação
---    mente quando o filtro muda.
+--   origens_conversao IS NOT NULL ......... 491 pessoas
+--   utm_campaign      IS NOT NULL ......... 107 pessoas
+--   utm_campaign também presente em origens_conversao ..... 65 pessoas
 --
--- 3. OFFSET DE VERDADE. Hoje a lista trava em 200 e não tem "carregar mais":
---    290 dos 490 leads são inalcançáveis pela interface.
+-- Ou seja: 42 pessoas só são alcançáveis pelo lado utm_campaign, e a maior
+-- parte das 491 só pelo lado origens_conversao. Por campanha a divergência
+-- fica explícita:
 --
--- FILTRO DE LISTA IMPORTADA: por padrão `incluir_lista` é FALSE. Os 318 leads
--- do sorteio contam como lead mas saem do denominador de qualquer taxa (regra
--- da migration 071). A tela DEVE dizer quantos ocultou -- por isso a função
--- devolve `total_ocultos_lista` junto, e não só o total filtrado. Exclusão
--- silenciosa é proibida neste projeto desde o contrato de dados §1.6.
-
--- DROP antes: mudar o RETURNS TABLE muda o tipo de retorno, e CREATE OR REPLACE
--- recusa. A funcao ainda nao tem consumidor em producao (o workflow chama por
--- nome, nao por assinatura), entao e seguro.
-DROP FUNCTION IF EXISTS fn_search_pessoas(jsonb, integer, integer);
+--   [SB]+CAMPANHA_WEBINAR ....... 0 por origens_conversao, 13 por utm_campaign
+--   GOTO_GERAL_LEADS_2601 ....... 6 por origens_conversao,  5 por utm_campaign
+--   Webinar-GoTo-07-26 .......... 86 por origens_conversao, 0 por utm_campaign
+--
+-- Escolher um lado só perde leads reais em silêncio, nos dois sentidos. Por
+-- isso o predicado é OR entre os dois campos, e os dois CONTINUAM existindo
+-- como filtros independentes: `origem_conversao` (eixo A) e `plataforma`
+-- (eixo B) não foram tocados. `campanha` é um filtro de PIVÔ, que atravessa
+-- os dois eixos de propósito -- não é apelido de nenhum deles.
+--
+-- GRÃO: no grão de PESSOA a origem de conversão é um ARRAY
+-- (`origens_conversao`), não o escalar `valor_bruto` de `fn_search_leads` v3.
+-- Uma pessoa tem N conversões; casar contra o array é o equivalente exato do
+-- match escalar que o pivô tinha no grão de registro.
+--
+-- OS TRÊS LUGARES: o predicado entra no CTE `filtrado` (que produz
+-- `total_filtrado`), no bloco de ocultos por lista importada e no RETURN QUERY.
+-- Aplicar em dois e esquecer o terceiro faria o rodapé "N de M" mentir -- que é
+-- exatamente o defeito que esta função existe para não ter (ver 084).
+--
+-- Sem mudança de assinatura nem de RETURNS TABLE: CREATE OR REPLACE basta, e
+-- preserva GRANT e COMMENT existentes (reemitidos abaixo por idempotência).
 
 CREATE OR REPLACE FUNCTION fn_search_pessoas(
   p_filtros jsonb   DEFAULT '{}'::jsonb,
@@ -98,6 +115,9 @@ DECLARE
   v_tag        text    := nullif(p_filtros->>'tag', '');
   v_tamanho    text    := nullif(p_filtros->>'tamanho_empresa', '');
   v_origem     text    := nullif(p_filtros->>'origem_conversao', '');
+  -- Filtro de PIVO (migration 087). Distinto de v_origem e de v_plataforma:
+  -- atravessa os dois eixos porque o nome de campanha aparece nos dois.
+  v_campanha   text    := nullif(p_filtros->>'campanha', '');
   v_total      bigint;
   v_ocultos    bigint;
 BEGIN
@@ -122,6 +142,9 @@ BEGIN
       AND (v_tamanho    IS NULL OR v.tamanho_empresa = v_tamanho)
       AND (v_tag        IS NULL OR v.tags @> ARRAY[v_tag])
       AND (v_origem     IS NULL OR v.origens_conversao @> ARRAY[v_origem])
+      AND (v_campanha   IS NULL
+           OR v.origens_conversao @> ARRAY[v_campanha]
+           OR v.utm_campaign = v_campanha)
       AND (v_incluir_lista OR NOT v.de_lista_importada)
   )
   SELECT count(*) INTO v_total FROM filtrado;
@@ -137,7 +160,10 @@ BEGIN
            OR v.nome ILIKE '%' || v_busca || '%'
            OR v.empresa ILIKE '%' || v_busca || '%')
       AND (v_segmento  IS NULL OR v.segmento  = v_segmento)
-      AND (v_categoria IS NULL OR v.categoria = v_categoria);
+      AND (v_categoria IS NULL OR v.categoria = v_categoria)
+      AND (v_campanha  IS NULL
+           OR v.origens_conversao @> ARRAY[v_campanha]
+           OR v.utm_campaign = v_campanha);
   END IF;
 
   RETURN QUERY
@@ -172,6 +198,9 @@ BEGIN
     AND (v_tamanho    IS NULL OR v.tamanho_empresa = v_tamanho)
     AND (v_tag        IS NULL OR v.tags @> ARRAY[v_tag])
     AND (v_origem     IS NULL OR v.origens_conversao @> ARRAY[v_origem])
+    AND (v_campanha   IS NULL
+         OR v.origens_conversao @> ARRAY[v_campanha]
+         OR v.utm_campaign = v_campanha)
     AND (v_incluir_lista OR NOT v.de_lista_importada)
   -- Ordem: quem foi mais longe no funil primeiro, depois quem tem jornada mais
   -- rica, depois o mais recente. O lead que virou negócio é o que se procura.
@@ -184,6 +213,6 @@ BEGIN
 END $$;
 
 COMMENT ON FUNCTION fn_search_pessoas(jsonb, integer, integer) IS
-  'Busca por PESSOA (view_pessoa_jornada_desfecho) com busca textual em nome/empresa/e-mail, filtros e paginacao real. Devolve `total_filtrado` na MESMA chamada, sobre o mesmo predicado -- total calculado a parte foi como o dashboard antigo produzia numero que nao batia com a lista. `total_ocultos_lista` diz quantos a regra de lista importada tirou de cena, porque exclusao silenciosa e proibida (contrato §1.6). Ver migration 084.';
+  'Busca por PESSOA (view_pessoa_jornada_desfecho) com busca textual em nome/empresa/e-mail, filtros e paginacao real. Devolve `total_filtrado` na MESMA chamada, sobre o mesmo predicado -- total calculado a parte foi como o dashboard antigo produzia numero que nao batia com a lista. `total_ocultos_lista` diz quantos a regra de lista importada tirou de cena, porque exclusao silenciosa e proibida (contrato §1.6). v2 (migration 087): filtro `campanha` de primeira classe, que casa contra origens_conversao OU utm_campaign -- e o que sustenta o pivo campanha->leads (AC-4.1). NAO e apelido de `origem_conversao` nem de `plataforma`, que seguem independentes (mesmo erro que a migration 054 corrigiu). Ver migrations 084 e 087.';
 
 GRANT EXECUTE ON FUNCTION fn_search_pessoas(jsonb, integer, integer) TO crm_ingest;

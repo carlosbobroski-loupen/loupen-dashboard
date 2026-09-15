@@ -13,7 +13,10 @@ test.describe('Filtragem combinável', () => {
     expect(totalMarketing).toBeGreaterThan(0);
 
     await page.click('tr[data-lead-row="real-mkt-03"]');
-    await page.click('.meta-tab[data-tab="related"]');
+    // 2026-09-15: o painel do lead deixou de ter abas — #crm-panel-tabs saiu de
+    // index.html e #crm-view-related já vem renderizado. Só o clique na aba
+    // saiu; o clique em [data-ir-campanha] (que é o filtro B deste cenário)
+    // e todas as asserções de interseção abaixo continuam iguais.
     await page.click('#crm-view-related [data-ir-campanha]'); // filtro B: campanha
 
     await expect(page).toHaveURL(/segmento=marketing/);
@@ -48,7 +51,7 @@ test.describe('Filtragem combinável', () => {
 
   test('Navegar de uma campanha para seus leads, com caminho de volta preservado', async ({ page }) => {
     await page.goto('/?view=leads-crm&lead=real-mkt-05&dados=mock'); // mesma campanha de real-mkt-03
-    await page.click('.meta-tab[data-tab="related"]');
+    // 2026-09-15: painel sem abas — #crm-view-related já está visível.
     await page.click('#crm-view-related [data-ir-campanha]');
 
     const linhas = await page.locator('#crm-lead-rows tr').allTextContents();

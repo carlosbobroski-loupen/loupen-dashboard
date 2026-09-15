@@ -164,7 +164,12 @@ SELECT
   coalesce(prd.atendido_por,   psf.atendido_por)   AS atendido_por,
   coalesce(prd.estagio_funil,  psf.estagio_funil)  AS estagio_funil,
   coalesce(prd.tags,           psf.tags)           AS tags,
-  coalesce(prd.fonte_dados,    psf.fonte_dados)    AS fonte_dados
+  coalesce(prd.fonte_dados,    psf.fonte_dados)    AS fonte_dados,
+  -- O id que a FICHA usa para abrir (/api/leads/{id} busca por source_id, nao
+  -- pelo id interno). Preferencia pelo registro do RD, que tem a jornada de
+  -- conversao; Salesforce como reserva. Sem esta coluna a lista passaria o id
+  -- interno e a ficha abriria vazia -- defeito que so aparece no clique.
+  coalesce(lrd.source_id, lsf.source_id)              AS source_id_ficha
 FROM view_pessoa p
 LEFT JOIN lead lrd      ON lrd.id = p.rd_lead_id
 LEFT JOIN lead lsf      ON lsf.id = p.sf_lead_id

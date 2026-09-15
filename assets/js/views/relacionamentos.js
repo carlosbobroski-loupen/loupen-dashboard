@@ -12,28 +12,14 @@
 // em algum lead da lista. Reportado ao usuário como gap real da Etapa A,
 // não escondido nem simulado com dado inventado (Constitution Artigo IV).
 
-import { buscarLead } from '../data-api.js';
-
-/**
- * Filtra `lista` (list items de listarLeads) para os que pertencem à
- * `campanhaId` informada. Exige buscar o detalhe de cada item da lista
- * porque `campanha_bruta`/`cadeia_campanha` só existem no bloco
- * `atribuicao` do detalhe (§2), não no list item (§1) — ver a mesma nota
- * em data-api.js sobre o limite de filtro por campanha na Etapa A.
- * @param {Array<object>} lista
- * @param {string|undefined} campanhaId
- */
-export async function aplicarFiltroCampanha(lista, campanhaId) {
-  if (!campanhaId) return lista;
-  const detalhes = await Promise.all(lista.map((l) => buscarLead(l.id)));
-  return lista.filter((l, i) => {
-    const d = detalhes[i];
-    if (!d) return false;
-    const bruta = d.overview.atribuicao?.campanha_bruta;
-    const cadeia = d.related?.cadeia_campanha ?? [];
-    return bruta === campanhaId || cadeia.includes(campanhaId);
-  });
-}
+// O FILTRO EM SI NAO MORA MAIS AQUI. Ate 2026-09-15 este arquivo exportava
+// `aplicarFiltroCampanha`, que a aba Leads deixou de chamar quando a lista
+// passou a ser por pessoa (migration 084) -- ficou import orfao. A regra do
+// pivo agora tem UMA fonte de verdade por modo: `fn_search_pessoas` (filtro
+// `campanha`, migration 087) no modo real, e o ramo mock de `obterPessoas`
+// em data-api.js no modo fixture. Manter aqui uma terceira copia exportada e
+// sem chamador e como as implementacoes divergem: a proxima pessoa liga a
+// errada e o pivo volta a mentir.
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
