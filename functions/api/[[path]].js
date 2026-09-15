@@ -85,6 +85,14 @@ function resolverRota(segments, search) {
     return `${N8N_BASE}/api/leads${search || ''}`;
   }
 
+  // GET /api/pessoas?busca=&segmento=&limit=&offset=
+  // A lista por PESSOA (migration 084). Query string repassada crua para o n8n,
+  // que filtra o que conhece — o Code node ignora parâmetro desconhecido em vez
+  // de repassar, senão a superfície da API passa a ser definida pelo cliente.
+  if (segments.length === 1 && segments[0] === 'pessoas') {
+    return `${N8N_BASE}/api/pessoas${search || ''}`;
+  }
+
   // GET /api/marketing-funil
   // Leads de marketing do RD Station cruzados com o desfecho deles no
   // Salesforce (migration 077). Sem query string: o recorte é a própria

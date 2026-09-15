@@ -536,6 +536,82 @@ export async function obterOpcoesFiltro() {
  * cliente foi como o dashboard antigo produzia total que não batia com a
  * lista exibida embaixo dele.
  */
+/**
+ * Lista por PESSOA (migrations 082-084). Uma linha por ser humano, com o array
+ * de conversões do RD e o desfecho comercial do Salesforce.
+ *
+ * Substitui `listarLeads` NA LISTA. A outra continua servindo onde o grão de
+ * REGISTRO é o certo (a ficha, que abre um registro específico).
+ *
+ * O envelope traz `total` e `ocultos_lista_importada` calculados no MESMO
+ * predicado da página — total vindo de outro lugar foi como o dashboard antigo
+ * produzia número que não batia com a lista embaixo dele.
+ */
+export async function obterPessoas(filtros = {}) {
+  if (_modoReal()) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(filtros)) {
+      if (v !== undefined && v !== null && v !== '' && v !== false) params.set(k, String(v));
+    }
+    const res = await _fetchReal(`api/pessoas?${params.toString()}`);
+    if (!res.ok) throw new Error(`data-api (real): falha ao listar pessoas (HTTP ${res.status})`);
+    const body = await res.json();
+    return Array.isArray(body) ? body[0] : body;
+  }
+  // Modo mock: o fixture da Etapa A é por REGISTRO e não tem o lado Salesforce.
+  // Deriva a forma de pessoa a partir dele, com o desfecho comercial VAZIO e
+  // `existe_no_salesforce: false` — que é a verdade no fixture, não um
+  // preenchimento. Devolver vazio aqui quebraria a suíte e2e, que existe para
+  // rodar sem backend; e inventar oportunidades no mock seria pior ainda.
+  // `filtros` chega na forma da API (segmento 'Marketing', valores escalares).
+  // `listarLeads` fala a forma da URL (segmento 'marketing', arrays). Traduzir
+  // aqui — e não no chamador — mantém a view com um contrato só.
+  const paraFixture = { limit: Number(filtros.limit) || 50 };
+  const SEG_INVERSO = { Marketing: 'marketing', Comercial: 'comercial', Parceiro: 'parceiro', NaoAtribuido: 'nao_atribuido' };
+  if (filtros.segmento) paraFixture.segmento = [SEG_INVERSO[filtros.segmento] ?? String(filtros.segmento).toLowerCase()];
+  for (const [api, urlChave] of [
+    ['trimestre', 'trimestre'], ['cargo_grupo', 'cargo_grupo'], ['atendido_por', 'atendido_por'],
+    ['estagio_funil', 'estagio_funil'], ['tamanho_empresa', 'tamanho_empresa'],
+    ['plataforma', 'plataforma'], ['origem_conversao', 'origem_conversao'], ['tag', 'tags'],
+  ]) {
+    if (filtros[api]) paraFixture[urlChave] = [filtros[api]];
+  }
+  const lista = await listarLeads(paraFixture);
+  const busca = String(filtros.busca ?? '').toLowerCase();
+  const filtradas = busca
+    ? lista.filter((l) => `${l.nome ?? ''} ${l.empresa ?? ''}`.toLowerCase().includes(busca))
+    : lista;
+  const pessoas = filtradas.map((l) => ({
+    pessoa_chave: `mock:${l.id}`,
+    nome: l.nome, empresa: l.empresa,
+    fontes: [l.fonte_dados === 'salesforce' ? 'salesforce' : 'rd_station'],
+    rd_lead_id: l.id, sf_lead_id: null,
+    segmento: l.segmento, categoria: l.categoria, detalhe: null,
+    de_lista_importada: false,
+    qtd_conversoes: l.qtd_conversoes ?? 0,
+    origens_conversao: l.origem_conversao ? [l.origem_conversao] : [],
+    qtd_conversoes_pagas: l.campanha_midia ? 1 : 0,
+    plataforma: l.plataforma ?? null, utm_campaign: l.campanha_midia ?? null,
+    id_anuncio: null, criativo: null,
+    cargo: l.cargo ?? null, cargo_grupo: l.cargo_grupo ?? null,
+    tamanho_empresa: l.tamanho_empresa ?? null, tags: l.tags ?? [],
+    trimestre: l.trimestre ?? null, atendido_por: l.atendido_por ?? null,
+    estagio_funil: l.estagio_funil ?? null,
+    existe_no_salesforce: false, status_no_salesforce: null,
+    qtd_oportunidades: 0, teve_reuniao: false, chegou_a_negociar: false,
+    qtd_ganhas: 0, qtd_perdidas: 0,
+    fase_mais_avancada: null, fase_ordem: null, estagio_mais_avancado: null,
+    mrr_ganho: null, amount_ganho: null,
+  }));
+  const total = Number(lista.total ?? pessoas.length);
+  return {
+    pessoas, total: busca ? pessoas.length : total,
+    ocultos_lista_importada: 0,
+    offset: Number(filtros.offset) || 0, limite: Number(filtros.limit) || 50,
+    tem_mais: pessoas.length < (busca ? pessoas.length : total),
+  };
+}
+
 export async function obterMarketingFunil() {
   if (_modoReal()) {
     const res = await _fetchReal('api/marketing-funil');

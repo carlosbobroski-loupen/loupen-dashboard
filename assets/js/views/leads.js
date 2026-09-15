@@ -23,8 +23,19 @@
 // 4. Onde o grão é multiplicado (um lead em várias origens/tags), a
 //    interface ROTULA. É obrigação do contrato §1.7: sem o rótulo alguém
 //    soma a coluna e conclui que o número está errado.
+//
+// 5. (2026-09-15) A LISTA PASSOU A SER POR PESSOA, não por registro de origem.
+//    Antes, quem existia no RD e no Salesforce aparecia DUAS vezes — uma linha
+//    completa e uma vazia — e nada na tela dizia qual era qual. Eram 430 casos.
+//    A lista agora lê `/api/pessoas` (fn_search_pessoas, migration 084), que
+//    entrega uma linha por pessoa com o ARRAY de conversões do RD e o DESFECHO
+//    comercial do Salesforce. `listarLeads` continua servindo a ficha, onde o
+//    grão de registro é o certo — é lá que se abre um registro específico.
+//
+// 6. Existe BUSCA. O produto inteiro não tinha nenhum campo de busca, e por
+//    isso achar um lead específico exigia filtrar e varrer a tabela com o olho.
 
-import { listarLeads, obterOpcoesFiltro } from '../data-api.js';
+import { listarLeads, obterPessoas, obterOpcoesFiltro } from '../data-api.js';
 import { renderBadge } from '../attribution.js';
 import { lerEstadoAtual, atualizarEstado, comoArray } from '../url-state.js';
 import { renderPainelLead, limparPainel } from './lead-detalhe.js';
@@ -64,37 +75,37 @@ let _opcoesErro = null;
 // ---------------------------------------------------------------------------
 // KPIs — calculados sobre a lista já retornada, sem chamada extra
 // ---------------------------------------------------------------------------
-function _renderKpis(lista, totalFiltrado, totalGeral) {
+function _renderKpis(env) {
   const txt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const n = (v) => Number(v ?? 0).toLocaleString('pt-BR');
+  const pessoas = env.pessoas || [];
+  const total = Number(env.total ?? 0);
 
-  txt('crm-kpi-total', totalFiltrado.toLocaleString('pt-BR'));
-  txt('crm-kpi-total-foot', totalFiltrado === totalGeral
-    ? 'sem filtro aplicado'
-    : `de ${totalGeral.toLocaleString('pt-BR')} no total`);
+  txt('crm-kpi-total', n(total));
+  txt('crm-kpi-total-foot', env.ocultos_lista_importada
+    ? `${n(env.ocultos_lista_importada)} de lista importada fora da conta`
+    : 'pessoas, não registros de origem');
 
-  // Somas sobre a PÁGINA carregada. Quando há mais linhas que a página, o
-  // rodapé diz isso — um número parcial rotulado é honesto; um número
-  // parcial apresentado como total, não.
-  const conv = lista.reduce((s, l) => s + (l.qtd_conversoes || 0), 0);
-  const multi = lista.filter((l) => (l.qtd_conversoes || 0) > 1).length;
-  const paga = lista.filter((l) => l.campanha_midia || l.plataforma).length;
-  const parcial = lista.length < totalFiltrado;
-  const nota = parcial ? `nos ${lista.length} carregados` : `nos ${lista.length} leads`;
+  // As três somas abaixo são sobre a PÁGINA carregada, e o rodapé diz isso.
+  // Número parcial rotulado é honesto; número parcial apresentado como total,
+  // não — foi assim que o dashboard antigo divergiu da lista embaixo dele.
+  const carregados = pessoas.length;
+  const parcial = carregados < total;
+  const nota = parcial ? `nos ${n(carregados)} carregados` : `nas ${n(carregados)} pessoas`;
 
-  txt('crm-kpi-conv', conv.toLocaleString('pt-BR'));
-  txt('crm-kpi-conv-foot', lista.length
-    ? `${(conv / lista.length).toFixed(1)} por lead · ${nota}`
-    : '—');
+  const conv = pessoas.reduce((s, p) => s + Number(p.qtd_conversoes || 0), 0);
+  txt('crm-kpi-conv', n(conv));
+  txt('crm-kpi-conv-foot', carregados ? `${(conv / carregados).toFixed(1)} por pessoa · ${nota}` : '—');
 
-  txt('crm-kpi-multi', multi.toLocaleString('pt-BR'));
-  txt('crm-kpi-multi-foot', lista.length
-    ? `${Math.round((multi / lista.length) * 100)}% ${nota}`
-    : '—');
+  const comOpp = pessoas.filter((p) => Number(p.qtd_oportunidades || 0) > 0).length;
+  txt('crm-kpi-multi', n(comOpp));
+  txt('crm-kpi-multi-foot', carregados
+    ? `${Math.round((comOpp / carregados) * 100)}% ${nota}` : '—');
 
-  txt('crm-kpi-paga', paga.toLocaleString('pt-BR'));
-  txt('crm-kpi-paga-foot', lista.length
-    ? `${Math.round((paga / lista.length) * 100)}% ${nota} · único eixo com ROI`
-    : '—');
+  const paga = pessoas.filter((p) => p.utm_campaign || p.plataforma).length;
+  txt('crm-kpi-paga', n(paga));
+  txt('crm-kpi-paga-foot', carregados
+    ? `${Math.round((paga / carregados) * 100)}% ${nota} · único eixo com ROI` : '—');
 }
 
 // ---------------------------------------------------------------------------
@@ -228,19 +239,28 @@ function _renderChipsAtivos(estado) {
 // Lista
 // ---------------------------------------------------------------------------
 function _filtrosDoEstado(estado) {
+  // O estado da URL guarda arrays (multi-seleção). `fn_search_pessoas` aceita
+  // um valor por dimensão — mandamos o primeiro e a barra de chips continua
+  // mostrando o que está ativo. Multi-seleção por dimensão volta quando a
+  // função aceitar array; mandar só o primeiro em silêncio seria pior, então
+  // a tela avisa (ver _renderChipsAtivos).
+  const um = (chave) => comoArray(estado[chave])[0];
   const f = {};
-  for (const chave of ['segmento', ...DIMENSOES.map((d) => d.chave)]) {
-    const v = comoArray(estado[chave]);
-    if (v.length) f[chave] = v;
+  const seg = um('segmento');
+  if (seg) f.segmento = ROTULO_VALOR[seg] ?? seg;
+  for (const [estadoChave, apiChave] of [
+    ['trimestre', 'trimestre'], ['cargo_grupo', 'cargo_grupo'],
+    ['atendido_por', 'atendido_por'], ['estagio_funil', 'estagio_funil'],
+    ['tamanho_empresa', 'tamanho_empresa'], ['plataforma', 'plataforma'],
+    ['origem_conversao', 'origem_conversao'], ['tags', 'tag'],
+  ]) {
+    const v = um(estadoChave);
+    if (v) f[apiChave] = v;
   }
-  if (estado.periodo_inicio) f.periodo_inicio = estado.periodo_inicio;
-  if (estado.periodo_fim) f.periodo_fim = estado.periodo_fim;
-  if (estado.incluir_teste) f.incluir_teste = true;
-  // `campanha` é o pivô campanha→leads (AC-4.1): casa contra valor_bruto da
-  // atribuição. NÃO é `campanha_midia` (eixo B) — confundir os dois foi um
-  // erro real desta reescrita, pego pelos specs.
-  if (estado.campanha) f.campanha = estado.campanha;
-  f.limit = 200;
+  if (estado.campanha) f.busca = estado.campanha;
+  if (estado.busca) f.busca = estado.busca;
+  if (estado.incluir_lista) f.incluir_lista = true;
+  if (estado.so_com_oportunidade) f.so_com_oportunidade = true;
   return f;
 }
 
@@ -255,82 +275,130 @@ function _renderEmptyState(resumo) {
     </div>`;
 }
 
-async function _renderLista(estado) {
+// Quantas pessoas já foram carregadas nesta combinação de filtro. Zera quando
+// o filtro muda — "carregar mais" acumula, trocar de filtro recomeça.
+let _carregadas = [];
+let _chaveFiltro = null;
+
+const FASE_ROTULO = {
+  contato: 'Contato', qualificacao: 'Qualificação', reuniao: 'Reunião',
+  negociacao: 'Negociação', ganho: 'Ganho', perdido: 'Perdido',
+};
+const FASE_COR = {
+  contato: 'var(--dim)', qualificacao: 'var(--blue)', reuniao: 'var(--purple)',
+  negociacao: 'var(--amber)', ganho: 'var(--green)', perdido: 'var(--red)',
+};
+
+// A jornada como pontos: um por conversão, na ordem. Com 367 pessoas de uma
+// conversão só a coluna fica calma, e quem tem várias SALTA — que é o sinal
+// que interessa. O texto embaixo nomeia as origens.
+function _jornada(p) {
+  const n = Number(p.qtd_conversoes || 0);
+  if (!n) return '<span class="t-sub">sem conversão no RD</span>';
+  const pagas = Number(p.qtd_conversoes_pagas || 0);
+  const pontos = Array.from({ length: Math.min(n, 10) }, (_, i) =>
+    `<span style="width:6px;height:6px;border-radius:50%;display:inline-block;background:${
+      i < pagas ? 'var(--green)' : 'var(--muted)'}"></span>`).join('');
+  const origens = (p.origens_conversao || []);
+  const txt = origens.slice(0, 2).join(' · ') + (origens.length > 2 ? ` +${origens.length - 2}` : '');
+  return `<div style="display:flex;gap:3px;align-items:center;margin-bottom:3px">${pontos}${
+    n > 10 ? `<span class="mono-sm" style="color:var(--dim);margin-left:4px">+${n - 10}</span>` : ''}</div>
+    <div class="t-sub" title="${origens.join(' · ')}" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${txt}</div>`;
+}
+
+// O desfecho comercial como barra de 5 segmentos. Comunica "onde parou" num
+// relance, sem obrigar a ler um dos 29 nomes de estágio do Salesforce.
+function _desfecho(p) {
+  if (!Number(p.qtd_oportunidades || 0)) {
+    return p.existe_no_salesforce
+      ? '<span class="t-sub">no CRM, sem oportunidade</span>'
+      : '<span class="t-sub" style="color:var(--dim)">só no RD Station</span>';
+  }
+  const ordem = Number(p.fase_ordem || 0);
+  const fase = p.fase_mais_avancada;
+  const cor = FASE_COR[fase] || 'var(--muted)';
+  const segs = [1, 2, 3, 4, 5].map((i) =>
+    `<span style="flex:1;height:5px;border-radius:2px;background:${i <= ordem ? cor : 'var(--surface2)'}"></span>`).join('');
+  const extra = [];
+  if (Number(p.qtd_ganhas || 0))   extra.push(`${p.qtd_ganhas} ganha(s)`);
+  if (Number(p.qtd_perdidas || 0)) extra.push(`${p.qtd_perdidas} perdida(s)`);
+  return `<div style="display:flex;gap:2px;margin-bottom:4px;min-width:90px">${segs}</div>
+    <div style="font-size:11.5px;color:${cor};font-weight:500">${FASE_ROTULO[fase] ?? p.estagio_mais_avancado ?? 'sem fase'}</div>
+    ${extra.length ? `<div class="t-sub">${extra.join(' · ')}</div>` : ''}`;
+}
+
+async function _renderLista(estado, { acumular = false } = {}) {
   const tbody = document.getElementById('crm-lead-rows');
   const emptyEl = document.getElementById('crm-empty-state');
   const filtros = _filtrosDoEstado(estado);
+  const chave = JSON.stringify(filtros);
 
-  let lista;
+  if (!acumular || chave !== _chaveFiltro) { _carregadas = []; _chaveFiltro = chave; }
+
+  let env;
   try {
-    lista = await listarLeads(filtros);
-    // Pivô campanha→leads no modo MOCK: o fixture não tem `valor_bruto` na
-    // lista (só no detalhe), então o recorte por campanha continua sendo
-    // feito no cliente, como na Etapa A. No modo real o servidor já filtrou
-    // (fn_search_leads v3), e esta chamada é um no-op — ela devolve a lista
-    // inteira quando não encontra o que recortar.
-    if (estado.campanha) {
-      const recortada = await aplicarFiltroCampanha(lista, estado.campanha);
-      if (recortada.length !== lista.length) {
-        const total = lista.total;
-        lista = recortada;
-        lista.total = Math.min(Number(total ?? recortada.length), recortada.length);
-      }
-    }
+    env = await obterPessoas({ ...filtros, limit: 50, offset: _carregadas.length });
   } catch (e) {
     tbody.innerHTML = '';
     // INT-1: erro NÃO apaga o filtro aplicado.
     _renderEmptyState(`Falha ao carregar: ${e.message}. Os filtros continuam aplicados — tente novamente.`);
+    document.getElementById('crm-mais').style.display = 'none';
     return;
   }
 
-  const totalFiltrado = Number(lista.total ?? lista.length);
-  const totalGeral = _opcoes?.totais?.leads ?? totalFiltrado;
+  _carregadas = acumular ? [..._carregadas, ...(env.pessoas || [])] : (env.pessoas || []);
+  const total = Number(env.total ?? 0);
 
   document.getElementById('crm-row-count').textContent =
-    lista.length < totalFiltrado
-      ? `${lista.length} de ${totalFiltrado.toLocaleString('pt-BR')}`
-      : `${totalFiltrado.toLocaleString('pt-BR')}`;
+    _carregadas.length < total
+      ? `${_carregadas.length} de ${total.toLocaleString('pt-BR')}`
+      : total.toLocaleString('pt-BR');
 
-  if (lista.length === 0) {
+  if (!_carregadas.length) {
     tbody.innerHTML = '';
-    // INT-1: nunca "0" sem contexto — o resumo diz QUAL combinação vazia.
+    // INT-1: o estado vazio NOMEIA cada filtro ativo. Nunca "0" sem contexto --
+    // e nunca um filtro omitido da explicação, senão o usuário não sabe o que
+    // soltar para voltar a ver linha.
     const ativos = [];
-    for (const chave of ['segmento', ...DIMENSOES.map((d) => d.chave)]) {
-      const v = comoArray(estado[chave]);
+    if (estado.busca) ativos.push(`Busca: "${estado.busca}"`);
+    if (estado.campanha) ativos.push(`Campanha: ${estado.campanha}`);
+    for (const chaveDim of ['segmento', ...DIMENSOES.map((d) => d.chave)]) {
+      const v = comoArray(estado[chaveDim]);
       if (v.length) {
-        const dim = DIMENSOES.find((d) => d.chave === chave);
+        const dim = DIMENSOES.find((d) => d.chave === chaveDim);
         ativos.push(`${dim?.rotulo ?? 'Segmento'}: ${v.map(rot).join(' ou ')}`);
       }
     }
-    if (estado.campanha) ativos.push(`Campanha: ${estado.campanha}`);
     _renderEmptyState(ativos.length
-      ? `Nenhum lead satisfaz <strong>todos</strong> estes critérios ao mesmo tempo:<br>${ativos.join('<br>')}`
-      : 'A base não tem leads para mostrar.');
-    _renderKpis([], 0, totalGeral);
+      ? `Nenhuma pessoa satisfaz <strong>todos</strong> estes critérios ao mesmo tempo:<br>${ativos.join('<br>')}`
+      : 'A base não tem pessoas para mostrar.');
+    document.getElementById('crm-mais').style.display = 'none';
+    _renderKpis({ pessoas: [], total: 0, ocultos_lista_importada: env.ocultos_lista_importada });
     return;
   }
   emptyEl.style.display = 'none';
 
-  tbody.innerHTML = lista.map((l) => {
-    const tags = (l.tags || []).slice(0, 2)
-      .map((t) => `<span class="mono-sm" style="background:var(--surface2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-right:3px">${t}</span>`).join('');
-    const maisTags = (l.tags || []).length > 2 ? `<span class="mono-sm" style="color:var(--dim)">+${l.tags.length - 2}</span>` : '';
-    const origem = l.origem_conversao ?? '—';
+  tbody.innerHTML = _carregadas.map((p) => {
+    const alvo = p.rd_lead_id ?? p.sf_lead_id;
+    const fontes = (p.fontes || []).map((f) => `<span class="mono-sm" style="background:var(--surface2);color:var(--muted);padding:1px 5px;border-radius:4px;margin-right:3px">${f === 'rd_station' ? 'RD' : 'SF'}</span>`).join('');
+    const lista = p.de_lista_importada
+      ? '<span class="mono-sm" style="background:var(--amber-dim);color:var(--amber);padding:1px 5px;border-radius:4px" title="Lead de lista importada — conta como lead, mas sai do denominador das taxas.">lista</span>'
+      : '';
+    const paga = p.utm_campaign
+      ? `<div style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.utm_campaign}">${p.plataforma ? `<strong>${p.plataforma}</strong> · ` : ''}${p.utm_campaign}</div>
+         ${p.criativo ? `<div class="t-sub">${p.criativo}</div>` : ''}`
+      : '<span class="t-sub" style="color:var(--dim)">sem tagueamento</span>';
     return `
-    <tr data-lead-row="${l.id}" style="cursor:pointer" class="${estado.lead === l.id ? 'sel' : ''}">
+    <tr data-lead-row="${alvo}" style="cursor:pointer" class="${estado.lead == alvo ? 'sel' : ''}">
       <td>
-        <div style="font-weight:600">${l.nome ?? '—'}${l.is_teste ? ' <span class="mono-sm" style="color:var(--amber,var(--dim))" title="Marcado como dado de teste — visível porque você pediu explicitamente.">(teste)</span>' : ''}</div>
-        <div class="t-sub">${l.empresa ?? '—'}</div>
-        <div style="margin-top:3px">${tags}${maisTags}</div>
+        <div style="font-weight:600">${p.nome ?? '—'}</div>
+        <div class="t-sub">${p.empresa ?? '—'}</div>
+        <div style="margin-top:3px">${fontes}${lista}</div>
       </td>
-      <td>
-        <div style="max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${origem}">${origem}</div>
-        <div class="t-sub">${renderBadge({ segmento: l.segmento })}</div>
-      </td>
-      <td><div>${rot(l.cargo_grupo)}</div><div class="t-sub" title="${l.cargo ?? ''}">${l.cargo ?? '—'}</div></td>
-      <td>${rot(l.tamanho_empresa)}</td>
-      <td class="mono-sm" style="text-align:right;font-variant-numeric:tabular-nums">${l.qtd_conversoes ?? 0}</td>
-      <td class="mono-sm">${(l.data_conversao ?? l.data_criacao ?? '').slice(0, 10) || '—'}</td>
+      <td>${_jornada(p)}</td>
+      <td>${paga}</td>
+      <td>${_desfecho(p)}</td>
+      <td class="mono-sm" style="text-align:right;font-variant-numeric:tabular-nums">${p.qtd_conversoes ?? 0}</td>
     </tr>`;
   }).join('');
 
@@ -338,7 +406,14 @@ async function _renderLista(estado) {
     tr.onclick = () => _aplicarFiltro({ lead: tr.dataset.leadRow });
   });
 
-  _renderKpis(lista, totalFiltrado, totalGeral);
+  // "Carregar mais": os 290 leads que a interface não alcançava antes.
+  const maisEl = document.getElementById('crm-mais');
+  const temMais = _carregadas.length < total;
+  maisEl.style.display = temMais ? 'block' : 'none';
+  document.getElementById('crm-mais-info').textContent =
+    `${_carregadas.length} de ${total.toLocaleString('pt-BR')}`;
+
+  _renderKpis({ ...env, pessoas: _carregadas });
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +446,43 @@ if (btnLimpar) {
   };
 }
 
+// A busca vai para a URL (FR-6: endereçável e retomável), com debounce para
+// não disparar uma consulta por tecla. O valor do campo é restaurado do estado
+// a cada render, senão ele se apaga ao voltar da ficha.
+let _debounceBusca = null;
+function _ligarBusca(estado) {
+  const el = document.getElementById('crm-busca');
+  if (!el) return;
+  if (document.activeElement !== el) el.value = estado.busca ?? '';
+  if (el.dataset.ligado) return;
+  el.dataset.ligado = '1';
+  el.addEventListener('input', () => {
+    clearTimeout(_debounceBusca);
+    const termo = el.value.trim();
+    _debounceBusca = setTimeout(() => {
+      _aplicarFiltro({ busca: termo || undefined, lead: undefined });
+      const campo = document.getElementById('crm-busca');
+      if (campo) { campo.focus(); campo.setSelectionRange(campo.value.length, campo.value.length); }
+    }, 350);
+  });
+}
+
+function _ligarCarregarMais(estado) {
+  const btn = document.getElementById('crm-btn-mais');
+  if (!btn || btn.dataset.ligado) return;
+  btn.dataset.ligado = '1';
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Carregando…';
+    try {
+      await _renderLista(lerEstadoAtual(), { acumular: true });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Carregar mais';
+    }
+  });
+}
+
 /** Ponto de entrada — chamado quando a view é exibida (ver app.js). */
 export async function renderViewLeadsCrm() {
   const estado = lerEstadoAtual();
@@ -390,6 +502,8 @@ export async function renderViewLeadsCrm() {
   _dropdowns(estado);
   _renderChipsAtivos(estado);
   renderBreadcrumbCampanha(estado.campanha, () => _aplicarFiltro({ campanha: undefined }));
+  _ligarBusca(estado);
+  _ligarCarregarMais(estado);
   await _renderLista(estado);
 
   if (estado.lead) {

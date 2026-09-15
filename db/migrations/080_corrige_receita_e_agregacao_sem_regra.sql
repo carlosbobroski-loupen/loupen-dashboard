@@ -175,7 +175,7 @@ opp AS (
     bool_or(f.fase = 'reuniao')                                 AS teve_reuniao,
     bool_or(f.fase = 'negociacao')                              AS chegou_a_negociar,
     max(f.ordem)                                                AS fase_ordem_max,
-    (array_agg(f.fase ORDER BY f.ordem DESC NULLS LAST))[1]     AS fase_mais_avancada,
+    (array_agg(f.fase ORDER BY (f.fase='ganho') DESC, f.ordem DESC NULLS LAST))[1] AS fase_mais_avancada,
     count(DISTINCT o.id) FILTER (WHERE f.fase IS NULL)          AS qtd_estagio_sem_fase,
     sum(o.amount) FILTER (WHERE f.fase = 'ganho')               AS amount_ganho,
     sum(o.mrr)    FILTER (WHERE f.fase = 'ganho')               AS mrr_ganho,

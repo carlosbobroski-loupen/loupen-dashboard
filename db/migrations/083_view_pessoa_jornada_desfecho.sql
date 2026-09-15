@@ -78,9 +78,10 @@ desfecho AS (
     count(DISTINCT o.id) FILTER (WHERE f.fase = 'ganho')              AS qtd_ganhas,
     count(DISTINCT o.id) FILTER (WHERE f.fase = 'perdido')            AS qtd_perdidas,
     count(DISTINCT o.id) FILTER (WHERE f.fase IS NULL)                AS qtd_estagio_sem_fase,
-    (array_agg(f.fase ORDER BY f.ordem DESC NULLS LAST))[1]           AS fase_mais_avancada,
+    -- Desempate explicito: ganho vence perdido (migration 085).
+    (array_agg(f.fase ORDER BY (f.fase='ganho') DESC, f.ordem DESC NULLS LAST))[1] AS fase_mais_avancada,
     max(f.ordem)                                                      AS fase_ordem,
-    (array_agg(o.stage_name ORDER BY f.ordem DESC NULLS LAST))[1]     AS estagio_mais_avancado,
+    (array_agg(o.stage_name ORDER BY (f.fase='ganho') DESC, f.ordem DESC NULLS LAST))[1] AS estagio_mais_avancado,
     max(o.record_type_name)                                           AS record_type,
     max(o.closed_at_source)                                           AS ultima_movimentacao_em,
     sum(o.amount) FILTER (WHERE f.fase = 'ganho')                     AS amount_ganho,
@@ -156,10 +157,24 @@ SELECT
   d.amount_ganho,
   d.mrr_ganho,
   d.contrato_por_amount,
-  d.contrato_por_mrr
+  d.contrato_por_mrr,
+  -- ── dimensoes de filtro (ver JOIN com view_lead_perfil abaixo) ──
+  coalesce(prd.trimestre,      psf.trimestre)      AS trimestre,
+  coalesce(prd.cargo_grupo,    psf.cargo_grupo)    AS cargo_grupo,
+  coalesce(prd.atendido_por,   psf.atendido_por)   AS atendido_por,
+  coalesce(prd.estagio_funil,  psf.estagio_funil)  AS estagio_funil,
+  coalesce(prd.tags,           psf.tags)           AS tags,
+  coalesce(prd.fonte_dados,    psf.fonte_dados)    AS fonte_dados
 FROM view_pessoa p
 LEFT JOIN lead lrd      ON lrd.id = p.rd_lead_id
 LEFT JOIN lead lsf      ON lsf.id = p.sf_lead_id
+-- Dimensoes que a barra de filtros da aba Leads ja usa. Vem de view_lead_perfil
+-- para NAO reimplementar as regras de normalizacao (cargo_grupo, tamanho,
+-- trimestre) numa segunda view -- duas implementacoes da mesma regra divergem,
+-- e foi assim que o ramo do webhook divergiu do ramo do pull por 33 migrations.
+-- Preferencia pelo registro do RD (tem a firmografia); Salesforce como reserva.
+LEFT JOIN view_lead_perfil prd ON prd.lead_id = p.rd_lead_id
+LEFT JOIN view_lead_perfil psf ON psf.lead_id = p.sf_lead_id
 LEFT JOIN conv cv       ON cv.pessoa_chave = p.pessoa_chave
 LEFT JOIN desfecho d    ON d.pessoa_chave  = p.pessoa_chave
 LEFT JOIN classif cl    ON cl.pessoa_chave = p.pessoa_chave;

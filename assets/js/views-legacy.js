@@ -168,7 +168,7 @@ const MDF_PLANOS = {
   }
 };
 
-const VIEWS={overview:'Visão geral','marketing-funil':'Marketing → Salesforce',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',oportunidades_v2:'Oportunidades v2 (Salesforce)',srd_ia:'SRD IA',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
+const VIEWS={overview:'Visão geral','leads-crm':'Leads','qualidade-dados':'Qualidade de dados','marketing-funil':'Marketing → Salesforce',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',oportunidades_v2:'Oportunidades v2 (Salesforce)',srd_ia:'SRD IA',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
 let CC={};
 
 // ── v2: SEGURANÇA, METAS/BENCHMARKS E HELPERS DE RENDER ──────

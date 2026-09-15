@@ -303,17 +303,17 @@
   <div class="view" id="view-leads-crm">
     <div class="kpi-grid-4" id="crm-kpis">
       <div class="kpi blue">
-        <div class="kpi-label"><i class="ti ti-users"></i>Leads</div>
+        <div class="kpi-label" title="Pessoas, não registros de origem: quem existe no RD e no Salesforce conta uma vez só."><i class="ti ti-users"></i>Pessoas</div>
         <div class="kpi-value" id="crm-kpi-total">—</div>
         <div class="kpi-footer" id="crm-kpi-total-foot">—</div>
       </div>
       <div class="kpi green">
-        <div class="kpi-label"><i class="ti ti-click"></i>Conversões</div>
+        <div class="kpi-label" title="Conversões registradas no RD Station, somadas na página carregada."><i class="ti ti-click"></i>Conversões (RD)</div>
         <div class="kpi-value" id="crm-kpi-conv">—</div>
         <div class="kpi-footer" id="crm-kpi-conv-foot">—</div>
       </div>
       <div class="kpi amber">
-        <div class="kpi-label" title="Leads que converteram mais de uma vez — separa curioso de engajado."><i class="ti ti-repeat"></i>Multi-conversão</div>
+        <div class="kpi-label" title="Pessoas que geraram pelo menos uma oportunidade no Salesforce."><i class="ti ti-briefcase"></i>Com oportunidade</div>
         <div class="kpi-value" id="crm-kpi-multi">—</div>
         <div class="kpi-footer" id="crm-kpi-multi-foot">—</div>
       </div>
@@ -328,6 +328,13 @@
          nunca de enum embutido. Cada opção mostra a contagem de leads, para
          que ninguém escolha um filtro que devolve zero. -->
     <div class="filter-bar" id="crm-filter-bar" style="flex-wrap:wrap;gap:8px">
+      <div style="position:relative;flex:0 0 260px">
+        <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:14px;pointer-events:none"></i>
+        <input type="search" id="crm-busca" placeholder="Buscar por nome, empresa ou e-mail"
+               autocomplete="off" spellcheck="false"
+               style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                      border-radius:7px;padding:7px 10px 7px 28px;font-size:12.5px;font-family:var(--font)">
+      </div>
       <span class="filter-glabel">Segmento</span>
       <span id="crm-pills-segmento" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span>
       <button class="filter-clear" id="crm-filter-clear" style="margin-left:auto;background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer"><i class="ti ti-x"></i> Limpar</button>
@@ -341,15 +348,23 @@
       <div class="card">
         <div class="section-row"><div class="section-title"><i class="ti ti-list"></i>Leads</div><div class="section-badge" id="crm-row-count">—</div></div>
         <div style="overflow-x:auto">
-        <table class="tbl">
+        <table class="tbl" style="table-layout:fixed;min-width:640px">
+          <colgroup>
+            <col style="width:30%"><col style="width:24%"><col style="width:22%">
+            <col style="width:18%"><col style="width:6%">
+          </colgroup>
           <thead><tr>
-            <th>Lead</th><th>Origem de conversão</th><th>Cargo</th>
-            <th>Tamanho</th><th>Conv.</th><th>Data</th>
+            <th>Pessoa</th><th>Jornada</th><th>Origem paga</th><th>Desfecho</th><th>Conv.</th>
           </tr></thead>
           <tbody id="crm-lead-rows"></tbody>
         </table>
         </div>
         <div id="crm-empty-state" style="display:none"></div>
+        <div id="crm-mais" style="display:none;padding:12px;text-align:center;border-top:1px solid var(--border)">
+          <button id="crm-btn-mais" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                  padding:7px 16px;border-radius:7px;font-size:12.5px;cursor:pointer">Carregar mais</button>
+          <div id="crm-mais-info" class="mono-sm" style="color:var(--dim);margin-top:6px"></div>
+        </div>
       </div>
 
       <div class="crm-panel" id="crm-panel">
