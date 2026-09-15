@@ -85,6 +85,14 @@ function resolverRota(segments, search) {
     return `${N8N_BASE}/api/leads${search || ''}`;
   }
 
+  // GET /api/marketing-funil
+  // Leads de marketing do RD Station cruzados com o desfecho deles no
+  // Salesforce (migration 077). Sem query string: o recorte é a própria
+  // definição da view, não um filtro do cliente.
+  if (segments.length === 1 && segments[0] === 'marketing-funil') {
+    return `${N8N_BASE}/api/marketing-funil`;
+  }
+
   // GET /api/leads/{id}
   if (segments.length === 2 && segments[0] === 'leads') {
     const id = segments[1];

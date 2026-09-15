@@ -20,6 +20,7 @@
     <div class="nav-label">Geral</div>
     <button class="nav-item active" onclick="showView('overview')"><i class="ti ti-layout-dashboard"></i>Visão geral</button>
     <button class="nav-item" onclick="showView('leads-crm')"><i class="ti ti-id-badge-2"></i>Leads<span style="margin-left:auto;font-size:9px;font-weight:700;background:var(--green-dim);color:var(--green);padding:1px 6px;border-radius:5px">novo</span></button>
+    <button class="nav-item" onclick="showView('marketing-funil')"><i class="ti ti-arrows-right-left"></i>Marketing &rarr; Salesforce<span style="margin-left:auto;font-size:9px;font-weight:700;background:var(--green-dim);color:var(--green);padding:1px 6px;border-radius:5px">novo</span></button>
     <button class="nav-item" onclick="showView('qualidade-dados')"><i class="ti ti-heartbeat"></i>Qualidade de dados<span style="margin-left:auto;font-size:9px;font-weight:700;background:var(--green-dim);color:var(--green);padding:1px 6px;border-radius:5px">novo</span></button>
     <div class="nav-label">Fontes</div>
     <button class="nav-item" onclick="showView('leads')"><i class="ti ti-users"></i>Leads RD Station</button>
@@ -51,7 +52,7 @@
   <div class="topbar">
     <div class="page-title" id="page-title">Visão geral</div>
     <div class="topbar-right">
-      <div class="date-range-wrap">
+      <div class="date-range-wrap" id="date-range-wrap">
         <i class="ti ti-calendar" style="color:var(--muted);font-size:15px"></i>
         <input type="date" class="date-input" id="date-start" onchange="carregarTudo()">
         <span style="color:var(--muted);font-size:12px">até</span>
@@ -373,6 +374,43 @@
   </div>
 
   <!-- QUALIDADE DE DADOS — subtask 5.15, Etapa A -->
+  <div class="view" id="view-marketing-funil">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:12.5px;color:var(--muted);max-width:74ch">
+        Leads que entraram pelo RD Station e que o motor de atribuição classificou como
+        <strong style="color:var(--text)">gerados por marketing</strong> &mdash; e o que
+        aconteceu com cada um deles dentro do Salesforce.
+      </div>
+      <div class="mono" style="font-size:11px;color:var(--dim);white-space:nowrap" id="mf-gerado"></div>
+    </div>
+
+    <div class="kpi-grid" id="mf-kpis"></div>
+
+    <div class="card">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-filter"></i>Do lead à oportunidade</div>
+        <div class="section-badge">ligação por e-mail (Tier 1)</div>
+      </div>
+      <div id="mf-funil" style="padding:4px 6px 10px"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-speakerphone"></i>De onde vem o resultado</div>
+        <div class="section-badge" id="mf-cat-badge">&mdash;</div>
+      </div>
+      <div id="mf-categorias" style="padding:0 2px"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-list-details"></i>Leads, um a um</div>
+        <div class="section-badge" id="mf-leads-badge">&mdash;</div>
+      </div>
+      <div id="mf-leads" style="padding:0 2px;max-height:620px;overflow-y:auto"></div>
+    </div>
+  </div>
+
   <div class="view" id="view-qualidade-dados">
     <div class="card">
       <div class="section-row"><div class="section-title"><i class="ti ti-database"></i>Fontes de dados</div><div class="section-badge" id="qd-fontes-count">—</div></div>

@@ -168,7 +168,7 @@ const MDF_PLANOS = {
   }
 };
 
-const VIEWS={overview:'Visão geral',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',oportunidades_v2:'Oportunidades v2 (Salesforce)',srd_ia:'SRD IA',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
+const VIEWS={overview:'Visão geral','marketing-funil':'Marketing → Salesforce',leads:'Leads RD Station',rdstation:'RD Station CRM',ga4:'Google Analytics',utm:'Campanhas UTM',lp:'Landing Pages',oportunidades:'Oportunidades',oportunidades_v2:'Oportunidades v2 (Salesforce)',srd_ia:'SRD IA',campanhas:'Campanhas',criativos:'Criativos',meta:'Meta ADS',linkedin:'LinkedIn ADS',gads:'Google ADS',mdfs:'MDFs'};
 let CC={};
 
 // ── v2: SEGURANÇA, METAS/BENCHMARKS E HELPERS DE RENDER ──────
@@ -298,6 +298,12 @@ function showView(id, fromDrill){
   if (cpf) cpf.classList.toggle('visible', id==='campanhas');
   if (mdff) mdff.classList.toggle('visible', id==='mdfs');
   if (srdf) srdf.classList.toggle('visible', id==='srd_ia');
+  // Views que NAO sao recortadas por periodo: esconder o seletor de data em vez
+  // de deixa-lo visivel e inerte. Um controle que nao faz nada mente sobre o
+  // numero que esta na tela -- o usuario mexe na data, nada muda, e ele passa a
+  // duvidar do dado em vez de duvidar do controle.
+  const drw = document.getElementById('date-range-wrap');
+  if (drw) drw.style.display = ['marketing-funil','qualidade-dados'].includes(id) ? 'none' : '';
   // Breadcrumb de navegação vinda de um drill-down (clique em KPI/gráfico/tabela)
   const bc = document.getElementById('drill-breadcrumb');
   if (bc) bc.classList.toggle('visible', !!fromDrill && id !== 'overview');

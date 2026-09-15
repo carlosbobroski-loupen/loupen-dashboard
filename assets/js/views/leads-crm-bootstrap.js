@@ -9,6 +9,7 @@
 
 import { renderViewLeadsCrm } from './leads.js';
 import { renderViewQualidadeDados } from './qualidade-dados.js';
+import { renderViewMarketingFunil } from './marketing-funil.js';
 import { lerEstadoAtual } from '../url-state.js';
 
 if (typeof window.showView === 'function') {
@@ -17,10 +18,11 @@ if (typeof window.showView === 'function') {
     showViewAntesDoCrm(id, fromDrill);
     if (id === 'leads-crm') renderViewLeadsCrm();
     if (id === 'qualidade-dados') renderViewQualidadeDados();
+    if (id === 'marketing-funil') renderViewMarketingFunil();
   };
 }
 
 const estadoInicial = lerEstadoAtual();
-if (['leads-crm', 'qualidade-dados'].includes(estadoInicial.view) && typeof window.showView === 'function') {
+if (['leads-crm', 'qualidade-dados', 'marketing-funil'].includes(estadoInicial.view) && typeof window.showView === 'function') {
   window.showView(estadoInicial.view);
 }

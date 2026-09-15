@@ -1312,3 +1312,473 @@ falha da ferramenta** — é conversão sem tagueamento de UTM, o que acontece n
 
 19/19 SQL · 11/11 node --test · 8/8 Playwright. Queries do endpoint executadas contra um lead real
 (3 conversões em 2 origens + 1 mudança de estágio).
+
+---
+
+## 2026-09-14 — Passo 1: fechamento real do 2.21 (auditoria + ADR-022)
+
+### A regra existia só dentro deste log, e o `edge-routing.md` dizia o contrário
+
+A decisão de governança do 2.21 (aceitar o escopo de escrita, proibir por convenção o uso
+em nó de escrita) foi tomada em 08/09 e registrada **só aqui**, num arquivo narrativo de
+100 KB. Enquanto isso, `docs/architecture/edge-routing.md` seguia com a seção
+"Credenciais de fonte — **PENDENTES**", escrita em 07/09, afirmando que não existia
+credencial de pull do RD Station (existiam três workflows `CRM Ingest` desde 09/09) e
+mandando obter "um token com escopo de leitura apenas" — exatamente o que ficou provado
+ser impossível.
+
+Uma decisão que vive só no log é uma decisão que a próxima pessoa não encontra. Virou
+**ADR-022**, e a seção do `edge-routing.md` foi substituída pelo estado medido.
+
+### 🔴 A regra não era verdade na instância — e o pior caso não era o que eu imaginava
+
+Auditoria nó a nó dos **28 workflows** (JSON real, não pelo nome do workflow — três deles
+têm nome enganoso: "Leads RD Station", "RD Station Marketing → Leads Dashboard" e "Ponte
+SF - RD Station" **não chamam a API do RD**).
+
+**Nos workflows ativos a regra vale:** os 8 nós que usam `vOAhOy0T4xmEAOvq` em workflow
+ativo são todos `GET`. Isso era o que eu esperava confirmar.
+
+**Dois nós de escrita latentes usam a credencial:**
+
+| Workflow | Estado | Chamada |
+|---|---|---|
+| `4xTglLdVWuPTBNII` LinkedIn Lead Gen Forms (OFICIAL) | inativo, **não arquivado** | `POST /platform/conversions` |
+| `s39i4zl6U6Oos7CW` LinkedIn Lead Sync | arquivado, Schedule de 15 min | `POST /platform/conversions` |
+
+O primeiro é o caso ruim de verdade: o nome dele diz "aguardando aprovação do LinkedIn",
+ou seja, **existe intenção declarada de ligá-lo**. No dia em que a aprovação sair, alguém
+aperta o botão e viola a regra sem saber que ela existe.
+
+### O achado que eu classifiquei errado, e a correção
+
+Quatro nós fazem `POST /platform/conversions?api_key=c5c0947…` com a chave **em texto
+puro na URL**, sem nenhum objeto `credentials` — dois deles ativos (`automação leads`,
+`Diagnóstico de Maturidade`). Eu reportei isso como "segredo exposto, rotacione".
+
+**Estava errado, e o usuário corrigiu:** `c5c0947…` é a **API Key / token público** do RD
+Station. Confirmado na documentação da plataforma: ela serve *exclusivamente* para enviar
+evento de conversão, é o único endpoint que o RD aceita receber do front-end, e é feita
+para ficar visível em código de cliente — está nos formulários do próprio site. **Não lê
+contato, não lê segmentação, não altera cadastro.**
+
+Consequências da correção:
+1. **Rotação não reduz risco nenhum** — a chave voltaria a ser pública no site no mesmo
+   dia. Eu teria feito o usuário derrubar 4 workflows (2 ativos, que cadastram lead de
+   verdade) para não ganhar nada.
+2. O risco residual real é **injeção de conversão falsa**, inerente ao mecanismo.
+3. O desenho, na verdade, **já estava certo**: quem escreve conversão usa a chave que não
+   lê; quem lê usa a credencial OAuth2. A separação existe.
+
+**A lição, e ela é a mesma de sempre nesta epic:** eu vi "chave em texto puro na URL",
+reconheci o padrão de "segredo vazado" e classifiquei sem perguntar o que aquela chave
+podia fazer. Severidade não se deduz do formato — se deduz do **poder**. Foi o mesmo erro
+do `ilegivel`: acusar a fonte antes de entender o que ela estava dizendo.
+
+### O que continua valendo do achado
+
+A regra de 08/09 — "nenhum workflow conecta a credencial a nó de escrita" — segue mal
+enunciada, mas por outro motivo: ela fala do *lugar onde a chave mora* em vez do *poder
+que ela tem*. Enunciado que vale:
+
+> A credencial OAuth2 da ingestão analítica (`vOAhOy0T4xmEAOvq`), que lê contato,
+> segmentação e evento, nunca pode ser anexada a uma chamada de escrita. Escrita de
+> conversão é feita com a API Key pública — que pode ser pública justamente porque não lê
+> nada.
+
+Enunciado corrigido, que é o que vale a partir de agora:
+
+> Nenhum workflow pode executar chamada de **escrita** à API do RD Station usando
+> credencial ou chave da ingestão analítica — esteja ela no gerenciador de credenciais,
+> embutida na URL ou em header manual.
+
+**A lição é a mesma família dos filtros inventados e do `ilegivel`:** eu descrevi o
+controle pelo *mecanismo que conhecia* (a credencial) em vez de pelo *efeito que importa*
+(a chamada de escrita). Regra que nomeia o mecanismo só protege contra o mecanismo.
+
+### Achado colateral, não pedido, registrado porque existe
+
+`1D2ltiXyGkbbfXcD` (Dashboard LinkedIn Ads) tem `client_secret` e `refresh_token` do
+Google OAuth em texto puro nos parâmetros de um nó; `keQYCzL5KzLDyWid` (arquivado) tem um
+access token do Facebook completo na URL. Nada foi tocado.
+
+### O que ficou pendente de ação humana
+
+1. ~~Rotacionar a api_key `c5c0947…`~~ — **cancelado**, é token público por projeto.
+2. **Apontar os 2 nós latentes para a API Key pública** em vez da credencial OAuth2 —
+   corrige a violação sem quebrar os workflows, que é melhor que simplesmente desconectar.
+   Modificação em workflow de produção, aguardando OK do usuário.
+
+### Incertezas declaradas em vez de preenchidas
+
+- ~~Não sei se a `c5c0947…` é a mesma app da credencial OAuth2~~ — **resolvido**: é a API
+  Key pública, mecanismo separado do OAuth2, só escreve conversão.
+- Se existirem workflows em outros projetos n8n fora do alcance desta API key, eles não
+  estão na auditoria.
+- `vOAhOy0T4xmEAOvq` é do tipo genérico `oAuth2Api`, não de um tipo específico do RD.
+  **Não há barreira técnica** impedindo anexá-la a qualquer URL: a regra é convencional
+  por natureza, e por isso precisa de auditoria repetida, não de confiança.
+
+---
+
+## 2026-09-14 — Spike 1.9 e o desbloqueio do 2.16: o handshake humano nunca foi necessário
+
+### 🔴 O bloqueio nº 1 do épico era um erro de premissa
+
+Desde 08/09 o plano registrava que 2.16 dependia de "um consent flow real, exige
+login+aprovação humana; nenhuma ferramenta de agente pode completar isso". Isso é verdade
+para o fluxo **authorization_code**, que foi o único tentado.
+
+O usuário forneceu client id/secret de um Connected App em 14/09 e o
+**`grant_type=client_credentials`** respondeu `200` com `scope=api` na primeira tentativa.
+Sem navegador, sem clique, sem sessão humana.
+
+O bloqueio que segurou o caminho crítico do épico por seis dias era **uma premissa não
+testada sobre qual fluxo OAuth usar**, não um limite de ferramenta. A lição é a mesma do
+`ilegivel`: eu classifiquei como "impossível para um agente" o que era "o único caminho
+que eu tinha tentado".
+
+### ✅ Bulk API 2.0 provado com execução (fecha 1.9)
+
+Job de query real contra a org, não leitura de documentação:
+
+| | |
+|---|---|
+| Registros | **4.585** oportunidades criadas em 2026 |
+| Tempo de processamento | **772 ms** |
+| CSV devolvido | 787.866 bytes |
+| Estado final | `JobComplete`, `retries: 0` |
+
+Job deletado ao fim (`204`). Confirma **R20**: o caminho é HTTP Request contra
+`/services/data/v67.0/jobs/query`; o node nativo do Salesforce no n8n não expõe Bulk 2.0.
+
+**Limites da org inventariados:** 105.200 requisições/dia (85.295 restantes no momento do
+teste), 15.000 batches Bulk v1, 10.000 jobs Bulk V2 query/dia. Folga confortável para
+delta por `SystemModstamp`.
+
+### Volumes reais — e por que 2.22 fica mais importante, não menos
+
+| Objeto | Registros |
+|---|---|
+| Lead | 82.940 |
+| Account | 29.545 |
+| Opportunity | 92.582 |
+| RecordType | 55 |
+| User | 276 |
+
+A janela de 6-12 meses de OQ-9 deixa de ser conservadorismo e passa a ser necessidade: são
+duas ordens de grandeza acima do que o épico vinha manipulando (500 leads do RD).
+
+### Inventário de campo ANTES de qualquer filtro — o método que o usuário cobrou
+
+| Campo (Lead) | Preenchidos | Observação |
+|---|---|---|
+| `Identificador_RD__c` | **423** | chave canônica RD ↔ Salesforce, melhor que casar por e-mail |
+| `UTM_Campaign__c` | 6.123 | eixo B direto do Salesforce |
+| `UTM_Source__c` | 6.695 | idem |
+| `Campanha_LinkedIn__c` | 59 | guarda o Ad ID do Meta |
+| `IsConverted = true` | 4.671 | junção com Opportunity via `ConvertedAccountId` |
+
+**`Identificador_RD__c` só passou a ser preenchido em 06/2026** — 83 (jun), 169 (jul), 20
+(ago), 33 (set), mais 7 resíduos de 2022. Qualquer junção RD↔SF por essa chave é **cega
+antes de junho**. É propriedade da fonte, não defeito a corrigir no código — e teria
+virado um filtro inventado se eu tivesse proposto antes de medir.
+
+| Campo (Opportunity) | Preenchidos |
+|---|---|
+| `Valor_Previsto_de_Contrato__c` | 92.582 (100%) |
+| `Termo_do_Contrato__c` | 26.194 |
+| `MRR__c` | 9.321 (10%) |
+
+### 🔴 `Amount` não é o MRR — a nota antiga não sobrevive ao contato com a org
+
+Linha real do CSV: `Amount = 708,00` com `MRR__c = 2367,05`, RecordType `New Freshworks`.
+A anotação anterior do projeto ("Amount é MRR, não valor de contrato") vale no máximo para
+alguns RecordTypes. **Nenhuma métrica de receita deve usar nenhum dos dois antes de medir
+a relação por RecordType.**
+
+### O 44 do dashboard tem ordem de grandeza explicada
+
+423 leads com `Identificador_RD__c` → **29** já convertidos → **68** oportunidades nas
+contas deles, sendo **43** criadas em 2026. O "44" congelado na aba Oportunidades(SF) é
+dessa ordem. Não é prova de que 44 = 43, mas mostra que a reconciliação do EC-6 (44 vs
+236) finalmente pode ser feita por query em vez de suposição.
+
+### 🔴 Mesmo problema do RD Station, com um conserto que lá não existia
+
+O app roda como **TI Loupen (`suporte.ti@loupen.com.br`), perfil "Administrador do
+sistema"**. O describe reporta `createable`, `updateable` e **`deletable` = true** em
+Lead, Account e Opportunity: a credencial de ingestão pode **apagar** registro de CRM em
+produção.
+
+**Nenhuma escrita foi testada.** A permissão foi lida da metadata do describe justamente
+para não repetir o episódio de 08/09, em que o teste de escrita no RD Station criou um
+contato real. Provar por metadata quando a metadata é conclusiva é melhor do que provar
+por dano reversível.
+
+Diferente do RD Station, aqui existe caminho técnico: trocar o usuário "Run As" do
+Connected App por um usuário de integração com perfil somente-leitura. **Ação de Setup,
+pendente no usuário.**
+
+### Estado da camada de banco (o que 2.16 ainda precisa)
+
+`stg_salesforce` (migration 011) e os ramos `Owner`, `Account`, `Lead` e `Opportunity` de
+`fn_run_ingest_batch` (migration 012), com reconciliação em `sync_state`, **já existem e
+nunca foram exercitados com dado real** — foram escritos e testados contra seed. Falta
+apenas o workflow n8n que traz o dado. A ordem "banco antes de tudo" foi respeitada desde
+o começo; o que faltava era a fonte.
+
+---
+
+## 2026-09-14 (noite) — 2.16 e 2.22: o Salesforce entrou
+
+### App dedicado, e por que o primeiro caminho estava errado
+
+As credenciais fornecidas no inicio da sessao eram do app **do time de servicos**
+("lake de servicos margem e inicio de servico" — identificado por
+`LoginHistory.Application`, ja que `ConnectedApplication` nao expoe a consumer key).
+
+Eu tinha passado ao usuario um passo a passo para trocar o "Executar como" **daquele
+app**. Ele perguntou se isso afetaria o time de servicos — e afetaria. O "Executar como"
+e do app inteiro, e o permission set que eu montei e estreito de proposito. Provado
+depois: com a identidade nova, `SELECT COUNT() FROM Case` devolve *"sObject type 'Case'
+is not supported"*. Tudo fora de Lead/Account/Opportunity **desaparece**. O dashboard
+deles teria quebrado.
+
+**A pergunta do usuario evitou um incidente.** A licao e minha: eu tratei "o app que
+responde pela credencial" como "o app do epico" sem verificar de quem ele era. O nome
+estava na minha frente (`lake de servicos...`) e eu li como identificador opaco.
+
+Caminho correto: **External Client App `dashboard_crm_ingestao_marketing`**, criado pelo
+usuario, rodando como `Integracao Dashboard`.
+
+### Somente leitura, provado por tentativa de escrita
+
+Nao por metadata — por tentar de verdade, que foi exatamente o que faltou no RD Station:
+
+| Tentativa | Resultado |
+|---|---|
+| `POST /sobjects/Lead` | `400 CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY` — *entity type cannot be inserted: Lead* |
+| `PATCH /sobjects/Opportunity/{id}` | `400` — *entity type cannot be updated: Oportunidade* |
+| `SELECT COUNT() FROM Case` | *sObject type 'Case' is not supported* |
+| Leitura de Lead/Account/Opportunity | funciona, org inteira |
+
+Estrutura: usuario `Integracao Dashboard` (`marketing@loupen.com.br`), perfil
+**Salesforce API Only System Integrations** (licenca gratuita, 1 de 5 assentos), com
+permission set proprio dando Read + ViewAllRecords nos 3 objetos e **zero** permissao de
+escrita. O perfil sozinho concede **nada** — a query de ObjectPermissions devolve 3
+linhas, todas do permission set. Nao existe segunda porta.
+
+### 🔴 Campo inventado, achado antes de carregar (migration 069)
+
+`fn_run_ingest_batch` lia `DuracaoMesesContrato__c`. **Esse campo nao existe na org** —
+confirmado no describe de Opportunity, 357 campos, nenhum com esse nome. O real e
+`Termo_do_Contrato__c` (double, 26.194 preenchidos).
+
+Provado em transacao com ROLLBACK **antes** de corrigir: payload com
+`"Termo_do_Contrato__c":"12.0"` gravava `duracao_meses_contrato = NULL` — e a
+reconciliacao reportava **`status: ok`**, porque ela conta LINHAS, nao campos
+preenchidos. Depois da 069: grava 12; sem o campo, grava NULL (nao arbitra prazo).
+
+O cast passa por `numeric` e `round()`: `'12.0'::integer` falha em Postgres, e um cast
+direto so quebraria em producao, no primeiro registro real.
+
+### 🔴 "Amount e MRR" tambem era suposicao (migration 073)
+
+O comentario da migration 012 afirmava: *"Amount e MRR bruto, NUNCA valor de contrato"*.
+Linha real da org: `Amount = 708,00` com `MRR__c = 2367,05`, RecordType `New Freshworks`.
+Sao campos diferentes com valores diferentes.
+
+Decisao: guardar **os dois**, crus, cada um com o nome do campo de origem. `amount` =
+Amount, `mrr` = MRR__c. Nenhum rebatizado, nenhum derivado do outro. Qual sustenta receita
+por RecordType e decisao de negocio que agora **pode** ser tomada com os dois numeros na
+mesa. Cobertura de `MRR__c`: 9.321 de 92.582 (10%) — fato da fonte, nao motivo para
+substituir por Amount.
+
+### Mecanismo: REST com paginacao, nao Bulk 2.0 — e por que
+
+O Bulk 2.0 esta provado (spike 1.9: 4.585 linhas em 772 ms) e fica como saida se o volume
+crescer. Para 35,7 mil registros ele custa um laco de polling e devolve **CSV achatado**,
+que quebraria o `RecordType.Name` **aninhado** que `fn_run_ingest_batch` espera
+(`payload#>>'{RecordType,Name}'`). O REST devolve a forma certa nativamente em 21 paginas
+contra um limite de 105 mil requisicoes/dia. Desvio do plano registrado aqui com o motivo,
+nao escondido.
+
+### A carga (2.22)
+
+| Objeto | Registros | Paginas | Tempo |
+|---|---|---|---|
+| Owner | 40 | 1 | 0,3s |
+| Account | 20.619 | 11 | 4,6s |
+| Lead | 7.076 | 4 | 2,2s |
+| Opportunity | 8.049 | 5 | 3,0s |
+
+**Reconciliacao: 5 de 5 objetos `ok`, origem = destino em todos** (Owner 40/40, Account
+20.619/20.619, Lead 7.076/7.076, Lead_Atribuicao 7.076/7.076, Opportunity 8.049/8.049).
+
+**Janela de 12 meses, decidida com numero:** 6 meses davam 33.319 registros, 12 meses dao
+35.743 (+7%), 24 meses saltariam +24 mil oportunidades. Uma linha pesa 466 bytes.
+
+**Tamanho medido apos a carga: 50 MB — 9,8% do limite de 0,5 GB do Neon.** 2.22 exigia
+medir em vez de presumir; medido.
+
+**EC-6 fechado por construcao:** a aba Oportunidades(SF) exibia **44**. O banco tem
+**8.049** oportunidades reais, 7.968 com RecordType, 4.964 com duracao de contrato.
+
+### ⚠️ Limitacao conhecida da watermark
+
+`sync_state.last_run_at` guarda a hora da EXECUCAO, nao o `max(SystemModstamp)` dos
+registros trazidos. Registro alterado **durante** a execucao cai numa janela cega entre a
+consulta e a gravacao da marca. A janela e de segundos, mas e real. Correcao adequada:
+usar o maior SystemModstamp do lote, ou recuar a marca por uma margem de seguranca.
+Registrado como divida, nao como resolvido.
+
+---
+
+## 2026-09-14 (noite) — 3.15: a matriz de transicao, com numero
+
+Regra legada reproduzida fielmente de `views-legacy.js:1726-1734`:
+`isMarketing = (e-mail bate na Central de Leads) OR (LeadSource casa com CAMPANHA_RULES:
+rescue|logmein, webinar, goto|linkedin)`, e `Comercial = NOT isMarketing` — o bucket
+residual do EC-1.
+
+**Aproximacao declarada:** `info` no frontend consulta a Central de Leads (planilha da
+automacao). Aqui foi aproximado por "existe lead do RD Station com o mesmo e-mail". As
+populacoes se sobrepoem mas nao sao identicas, entao o "Marketing" pela regra legada aqui
+e um **piso**, nao um numero exato. Dito em vez de escondido.
+
+### Matriz (7.076 leads do Salesforce, sem os de teste)
+
+| regra legada | motor SQL | leads | % |
+|---|---|---|---|
+| Comercial | Comercial | 3.846 | 54,4 |
+| Comercial | **NaoAtribuido** | 1.337 | 18,9 |
+| Marketing | Marketing | 705 | 10,0 |
+| Marketing | **NaoAtribuido** | 633 | 8,9 |
+| **Comercial** | **Marketing** | **471** | **6,7** |
+| Comercial | Parceiro | 83 | 1,2 |
+| Marketing | Parceiro | 1 | 0,0 |
+
+**2.525 leads mudam de classificacao — 35,7% da base.**
+
+### O que os numeros dizem
+
+**Os 471 sao o EC-1 em estado puro:** leads que o dashboard publicado chama de
+"Comercial" e que nasceram de campanha de marketing. Cada um deles e receita atribuida ao
+time errado.
+
+**1.970 vao para "Nao atribuido"** (1.337 de Comercial, 633 de Marketing). Hoje eles estao
+escondidos dentro de baldes que **afirmam** saber a origem. O motor nao esta perdendo
+informacao — esta parando de inventar.
+
+**84 viram Parceiro**, categoria que a regra legada nao tinha. Colapsa-los em
+Marketing/Comercial destruiria informacao de negocio.
+
+| segmento | regra legada | motor SQL |
+|---|---|---|
+| Comercial | 5.737 | 3.846 |
+| Marketing | 1.339 | 1.176 |
+| NaoAtribuido | — | 1.970 |
+| Parceiro | — | 84 |
+
+Marketing cai de 1.339 para 1.176, mas a composicao e outra: 705 permanecem, 633 saem
+para Nao atribuido e 471 entram vindos de Comercial. **Nao e o mesmo numero menor — e um
+numero diferente.**
+
+### Gate 3.16 esta pronto para o usuario
+
+A lista nominal dos **1.337 leads que saem de Comercial para Nao atribuido** e o que
+CON-8 exige aprovar antes de qualquer exibicao. A query esta em
+`db/queries/verificacao/v1-matriz-transicao.sql`; falta o aceite.
+
+---
+
+## 2026-09-15 — Correção de uma leitura errada minha, antes que virasse gate aprovado
+
+### O que eu escrevi ontem, e por que estava errado
+
+Sobre os 633 leads que saem de Marketing para Não atribuído na matriz de 3.15, eu escrevi:
+
+> "O motor não está perdendo informação — está parando de inventar."
+
+**Está errado.** Fui olhar *quais* leads são, em vez de aceitar o agregado, e a lista
+desmonta a frase:
+
+| LeadSource que perdeu Marketing | Leads |
+|---|---|
+| `GoTo` | 323 |
+| `LOGMEIN_RESCUE-LICENCA-ECO_07-26` | 72 |
+| `GOTO_INSTITUCIONAL_07-26` | 36 |
+| `[CP07][LOGMEIN][FUNDO][LEAD]` | 29 |
+| `Rescue-licenca-eco-fb -planilha` | 24 |
+| `Rescue-licenca-eco-meta` | 15 |
+
+Isso não é lead sem atribuição. São **códigos de campanha de mídia paga**. Nesse grupo,
+quem estava certo era a **regra legada** — por acidente: o match por substring
+(`rescue|logmein|goto|...`) pegava o código da campanha que o crosswalk não tinha.
+
+### A causa, medida
+
+`leadsource_crosswalk` foi decidido em **2026-09-07**, a partir de uma amostra SOQL, quando
+a base tinha 500 leads do RD Station e **zero do Salesforce**. A carga de 12 meses trouxe
+7.076 leads do Salesforce com valores de LeadSource que o crosswalk nunca viu.
+
+| | |
+|---|---|
+| Valores distintos de LeadSource na base | **94** |
+| Conhecidos pelo crosswalk | **44** |
+| **Sem regra** | **50 (53%)** |
+
+Os 50 caem em `NaoAtribuido` não porque a origem seja desconhecida, mas porque **ninguém
+ensinou a regra**.
+
+### Por que isto não podia esperar o gate
+
+Aprovar o 3.16 antes de corrigir exibiria como "não atribuído" um conjunto de leads de
+mídia paga — **o mesmo erro que o épico existe para corrigir, na direção oposta**. O gate
+teria sido aprovado sobre um número que eu mesmo apresentei como confiável.
+
+### A lição, e ela é sobre mim
+
+Eu li um agregado (633 leads mudam de segmento), encaixei numa narrativa que já estava
+pronta ("o motor é mais honesto que a regra legada") e **escrevi a conclusão sem abrir a
+lista**. A narrativa era verdadeira para 1.337 dos casos e falsa para uma parte relevante
+dos outros 633. Agregado confirma narrativa com muita facilidade; é a lista que
+desmente. É a mesma família de `inventariar a fonte antes de especificar` — só que desta
+vez a fonte a inventariar era a minha própria conclusão.
+
+### Proposta escrita, não aplicada: migration 075
+
+`db/migrations/075_crosswalk_leadsource_pos_carga.sql` classifica **44 dos 50** valores
+pelo que o próprio valor diz, com contagem e janela de datas registradas. Classificar
+origem de lead é decisão de negócio (CON-8), então a migration existe e **não foi
+aplicada**.
+
+**Efeito simulado, sem escrever nada:**
+
+| Hoje | Depois da 075 | Leads |
+|---|---|---|
+| NaoAtribuido | NaoAtribuido | 1.014 |
+| NaoAtribuido | **(segue sem regra)** | **546** |
+| NaoAtribuido | **Marketing** | **332** |
+| NaoAtribuido | Comercial | 77 |
+| NaoAtribuido | Parceiro | 1 |
+
+**332 leads recuperam atribuição de mídia paga.**
+
+### Os 6 que eu NÃO classifiquei, de propósito
+
+`GoTo` (325) · `Evento` (12) · `Inbound` (12) · `WhatsApp` (4) · `LastPass` (2) ·
+`Tráfego Direto` (1).
+
+O caso decisivo é **`GoTo`, com 325 leads e histórico de 2021 a 2026**. "GoTo" é o nome do
+**produto**, não de uma campanha — o lead pode ter vindo de campanha do GoTo ou de
+prospecção ativa naquela linha. Cinco anos com o mesmo rótulo sugere que virou padrão de
+digitação, não origem. Chutar aqui seria recriar o bucket residual com outro nome.
+
+### Sequência correta a partir daqui
+
+1. Usuário decide os 6 pendentes (o `GoTo` sozinho move 60% do resto)
+2. Aplicar a 075 com os 6 incluídos
+3. **Reexecutar a matriz de 3.15** — os números de ontem estão desatualizados
+4. Só então levar o gate 3.16 para aprovação

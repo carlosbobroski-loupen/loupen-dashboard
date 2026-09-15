@@ -141,21 +141,82 @@ senão a URL `github.io` continua pública).
 **Interruptor do corte:** `MODO_DADOS` em `assets/js/data-api.js` (`'mock'` → `'real'`).
 Não virar antes do gate estar ativo e verificado.
 
-## Credenciais de fonte (Salesforce, RD Station) — PENDENTES
+## Credenciais de fonte — estado real (2026-09-14)
 
-**Achado real (2026-09-07):** nenhuma credencial de API de PULL existe hoje para
-Salesforce ou RD Station neste n8n:
-- O workflow "Ponte SF - RD Station (snapshot manual)" (id `XCVAyBqxGT8uRQAf`) não tem
-  nenhum nó de chamada à API do Salesforce — é um Code node com dado colado manualmente,
-  seguido de escrita em Google Sheets. Confirma R20 (nó nativo do Salesforce no n8n não
-  expõe Bulk API 2.0) e a origem do gap 44/236 (EC-6): nunca houve ingestão automática.
-- O workflow "Leads RD Station" (id `O0CV1vx7N5Mc6Nig`) só *recebe* webhook do RD Station
-  (RD Station empurra pra dentro) — não há credencial de API do RD Station para *puxar*
-  estágio de funil/workflows (P-ING-5 exige isso via pull agendado).
+O que estava escrito aqui até 2026-09-09 ("PENDENTES", "nenhuma credencial de pull
+existe", "obter um token do RD Station com escopo de leitura apenas") **ficou falso nos
+dois casos**. Substituído pelo estado medido.
 
-**Bloqueio real para 2.16/2.17:** construir a ingestão Salesforce (Bulk API 2.0) e o pull
-agendado do RD Station exige credenciais que só o usuário pode fornecer — um Connected
-App do Salesforce (client id/secret ou usuário+senha+security token) e um token de API do
-RD Station com escopo de leitura apenas (INV-1/EC-9: nunca escopo de escrita). Não é algo
-resolvível com o acesso MCP do Claude a essas plataformas (sessões OAuth do Claude não são
-credenciais de aplicação de terceiro reutilizáveis em outro sistema).
+### RD Station — credencial única, com escopo de escrita irredutível
+
+**Credencial:** "RD Station Marketing OAuth2 - Loupen", id `vOAhOy0T4xmEAOvq`, tipo
+genérico `oAuth2Api`.
+
+Ela **tem escopo de escrita real** e não existe forma de reduzi-lo: as permissões do app
+são um pacote fixo na plataforma, sem toggle individual. Comprovado por escrita
+deliberada (criou um contato de verdade, deletado em seguida) e por print da tela de
+permissões. Decisão, alternativas rejeitadas e limites aceitos em **ADR-022**.
+
+> **Regra de arquitetura permanente:** nenhum workflow pode executar chamada de
+> **escrita** à API do RD Station usando credencial ou chave da ingestão analítica —
+> esteja ela no gerenciador de credenciais, embutida na URL ou em header manual.
+> Somente `GET`.
+
+**Quem usa a credencial hoje** (auditoria nó a nó dos 28 workflows, 2026-09-14):
+
+| Workflow | Estado | Nós | Veredito |
+|---|---|---|---|
+| `x1md8DzjX6psKXNR` CRM Ingest - RD Station Leads | ativo | 3 × GET (segmentação, contato, eventos) | conforme |
+| `By8hqnYjf6CSWZQY` Loupen Dashboard - Ads Data API | ativo | 5 × GET (segmentações) | conforme |
+| `3l8hobRXtjbzodZc` CRM Ingest - Funil/Workflow | inativo | 3 × GET | conforme |
+| `i9lwcRFRddo3cAec` CRM Ingest - Estágio de Funil | inativo | 1 × GET | conforme |
+| `aqXxZ5EpyyyZFnOk` [BACKFILL] retroativos LinkedIn | inativo | 1 × GET | conforme |
+| `4xTglLdVWuPTBNII` LinkedIn Lead Gen Forms (OFICIAL) | inativo, **não arquivado** | `POST /platform/conversions` | ⚠️ **latente** |
+| `s39i4zl6U6Oos7CW` LinkedIn Lead Sync | arquivado, Schedule 15 min | `POST /platform/conversions` | ⚠️ **latente** |
+
+**Escrita de conversão usa a API Key pública, e isso está correto.** Quatro nós fazem
+`POST /platform/conversions?api_key=c5c0947…` com a chave na URL —
+`1PF5oDDICnODOMH8` "automação leads" e `uYQP2xMSouJyMgot` "Diagnóstico de Maturidade"
+(ativos), mais `3iGqn4kYNh5kKEbe` e `aqXxZ5EpyyyZFnOk` (inativos).
+
+Essa chave é o **token público** do RD Station: escreve conversão e **não lê nada** — é o
+único endpoint que a plataforma aceita receber do front-end, e por isso é feita para ficar
+exposta (está nos formulários do site). Não é segredo vazado, e rotacioná-la não reduz
+risco nenhum. O risco residual é injeção de conversão falsa, inerente ao mecanismo.
+
+**É exatamente essa separação que a regra protege:** quem escreve conversão usa a chave que
+não lê; quem lê contato usa a credencial OAuth2, que nunca deve escrever.
+
+Uma quinta credencial existe e está isolada: `cMCb7MTOzM7DrG1c` "RD Station Conversions
+API" (`httpHeaderAuth`), usada só no workflow arquivado `ymDbU9lMkinHYn9Q`.
+
+### Salesforce — client_credentials, sem handshake humano
+
+**O bloqueio registrado no plano (consentimento OAuth interativo, subtask 2.16) não
+existe.** O Connected App aceita `grant_type=client_credentials`:
+
+```
+POST https://loupen.my.salesforce.com/services/oauth2/token
+grant_type=client_credentials & client_id=... & client_secret=...
+→ 200, scope=api
+```
+
+Sem navegador, sem clique, sem sessão humana. Roda desatendido de um nó HTTP Request.
+
+| | |
+|---|---|
+| Org | `00D15000000FnTfEAK`, API até v67.0 |
+| Segredos | `SALESFORCE_LOGIN_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` no `.env` (ignorado pelo git, não rastreado) |
+| Bulk API 2.0 | verificado: job de query devolveu 4.585 oportunidades de 2026 em 772 ms (~788 KB CSV). Confirma R20 — tem de ser HTTP Request, o node nativo do n8n não expõe Bulk 2.0 |
+| Limites | 105.200 requisições/dia · 10.000 jobs Bulk V2/dia |
+
+**⚠️ Mesmo problema do RD Station, mas aqui com conserto.** O app roda como **TI Loupen
+(`suporte.ti@loupen.com.br`), perfil "Administrador do sistema"**: o describe reporta
+`createable`, `updateable` e **`deletable` = true** em Lead, Account e Opportunity — a
+credencial de ingestão pode **apagar** registro de CRM em produção. Nenhuma escrita foi
+testada; a permissão foi lida da metadata, justamente para não repetir o episódio do RD
+Station.
+
+Diferente do RD Station, o Salesforce **permite** corrigir: basta trocar o usuário "Run
+As" do Connected App por um usuário de integração com perfil somente-leitura. Ação de
+Setup, pendente no dono da org. Até lá, o risco é o mesmo de INV-1 — só que evitável.

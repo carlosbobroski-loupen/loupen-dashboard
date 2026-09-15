@@ -1,0 +1,281 @@
+{
+  "name": "CRM Ingest - Salesforce (delta por SystemModstamp)",
+  "nodes": [
+    {
+      "id": "hook",
+      "name": "Hook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "b7c41e52-9a3d-4f18-8e6a-1d2c3b4a5f60",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "crm-sf-ingest",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1zOWmZMVPMyV3J0e",
+          "name": "CRM API Header Auth (X-CRM-Api-Key)"
+        }
+      }
+    },
+    {
+      "id": "wm",
+      "name": "Watermark",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        300
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT object, to_char(last_run_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS wm FROM sync_state WHERE source = 'salesforce'",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HxzsjsD5aq9xddR2",
+          "name": "Neon CRM Ingest (crm_ingest, least-privilege)"
+        }
+      }
+    },
+    {
+      "id": "consultas",
+      "name": "Montar consultas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Uma consulta por objeto, na ordem em que fn_run_ingest_batch resolve as FKs.\n// O piso de 12 meses e a decisao de janela registrada no validation-log: 6 meses\n// custavam quase o mesmo que 12, e 12 compra comparacao ano contra ano.\nconst PISO = '2025-09-14T00:00:00Z';\nconst INST = 'https://loupen.my.salesforce.com';\nconst V = 'v67.0';\n\n// Watermark por objeto, vinda de sync_state. Ausente = primeira carga daquele objeto.\nconst wm = {};\nfor (const it of $input.all()) {\n  if (it.json && it.json.object && it.json.wm) wm[it.json.object] = it.json.wm;\n}\n\nconst desde = (obj) => wm[obj] || PISO;\n\nconst OBJETOS = [\n  { tipo: 'Owner', soql: `SELECT Id, Name, Email FROM User WHERE IsActive = true` },\n  { tipo: 'Account', soql: `SELECT Id, Name FROM Account WHERE SystemModstamp >= ${desde('Account')}` },\n  { tipo: 'Lead', soql: `SELECT Id, Name, Company, Email, Phone, Status, LeadSource, Identificador_RD__c, UTM_Source__c, UTM_Campaign__c, Campanha_LinkedIn__c, ConvertedAccountId, OwnerId, CreatedDate FROM Lead WHERE SystemModstamp >= ${desde('Lead')}` },\n  { tipo: 'Opportunity', soql: `SELECT Id, RecordType.Name, StageName, Amount, MRR__c, Termo_do_Contrato__c, AccountId, OwnerId, CreatedDate, CloseDate FROM Opportunity WHERE SystemModstamp >= ${desde('Opportunity')}` }\n];\n\n// Um batch_id para a execucao inteira: fn_run_ingest_batch e chamada UMA vez no fim,\n// e resolve Owner -> Account -> Lead -> Opportunity na ordem interna dela.\nconst batchId = 'sf-' + new Date().toISOString().replace(/[-:.]/g,'').slice(0,15) + 'Z';\nconst coletadoEm = new Date().toISOString();\n\nreturn OBJETOS.map(o => ({ json: {\n  batch_id: batchId,\n  object_type: o.tipo,\n  collected_at: coletadoEm,\n  url: `${INST}/services/data/${V}/query?q=${encodeURIComponent(o.soql)}`\n}}));"
+      }
+    },
+    {
+      "id": "sf",
+      "name": "Salesforce Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ 'https://loupen.my.salesforce.com' + $response.body.nextRecordsUrl }}",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.done === true }}",
+              "limitPagesFetched": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "fy93rAXAr6vJ3J7C",
+          "name": "Salesforce Ingestao Dashboard (client_credentials, somente leitura)"
+        }
+      }
+    },
+    {
+      "id": "normaliza",
+      "name": "Normalizar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Achata as paginas em linhas de staging. Cada item de entrada e UMA pagina da\n// resposta do Salesforce.\nconst meta = $('Montar consultas').all().map(i => i.json);\nconst saida = [];\nconst entrada = $input.all();\n\nfor (let i = 0; i < entrada.length; i++) {\n  const pagina = entrada[i].json;\n  const m = meta[entrada[i].pairedItem?.item ?? 0] || meta[0];\n  for (const r of (pagina.records || [])) {\n    delete r.attributes;\n    if (r.RecordType && typeof r.RecordType === 'object') delete r.RecordType.attributes;\n    saida.push({ json: { batch_id: m.batch_id, object_type: m.object_type, collected_at: m.collected_at, payload: r } });\n  }\n  // Guarda de truncamento: se a paginacao nao completou, a execucao FALHA em voz\n  // alta em vez de gravar um lote parcial que a reconciliacao chamaria de 'ok'.\n  if (pagina.done === false) {\n    throw new Error(`Paginacao incompleta em ${m.object_type}: done=false na ultima pagina recebida. Lote abortado de proposito -- carga parcial silenciosa e o defeito que esta ingestao existe para nao ter.`);\n  }\n}\n\nif (saida.length === 0) throw new Error('Nenhum registro retornado pelo Salesforce. Verifique a watermark em sync_state.');\nreturn saida;"
+      }
+    },
+    {
+      "id": "stg",
+      "name": "Insert stg_salesforce",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO stg_salesforce (batch_id, source_system, object_type, payload, collected_at) VALUES ($1, 'salesforce', $2, $3::jsonb, $4::timestamptz)",
+        "options": {
+          "queryReplacement": "={{ $json.batch_id }},{{ $json.object_type }},{{ JSON.stringify($json.payload) }},{{ $json.collected_at }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HxzsjsD5aq9xddR2",
+          "name": "Neon CRM Ingest (crm_ingest, least-privilege)"
+        }
+      }
+    },
+    {
+      "id": "collapse",
+      "name": "Collapse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const p = $('Normalizar').first().json;\nreturn [{ json: { batch_id: p.batch_id } }];"
+      }
+    },
+    {
+      "id": "run",
+      "name": "Run Ingest Batch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1500,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM fn_run_ingest_batch($1)",
+        "options": {
+          "queryReplacement": "={{ $json.batch_id }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HxzsjsD5aq9xddR2",
+          "name": "Neon CRM Ingest (crm_ingest, least-privilege)"
+        }
+      }
+    },
+    {
+      "id": "cron",
+      "name": "A cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        480
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "7 * * * *"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hook": {
+      "main": [
+        [
+          {
+            "node": "Watermark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Watermark": {
+      "main": [
+        [
+          {
+            "node": "Montar consultas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar consultas": {
+      "main": [
+        [
+          {
+            "node": "Salesforce Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salesforce Query": {
+      "main": [
+        [
+          {
+            "node": "Normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar": {
+      "main": [
+        [
+          {
+            "node": "Insert stg_salesforce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert stg_salesforce": {
+      "main": [
+        [
+          {
+            "node": "Collapse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collapse": {
+      "main": [
+        [
+          {
+            "node": "Run Ingest Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada hora": {
+      "main": [
+        [
+          {
+            "node": "Watermark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

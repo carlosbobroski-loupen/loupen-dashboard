@@ -527,6 +527,27 @@ export async function obterOpcoesFiltro() {
 /**
  * Deriva a qualidade de dados por fonte (subtask 5.15, EC-8/AC-9.2).
  */
+/**
+ * Funil de marketing RD Station -> Salesforce (migration 077).
+ *
+ * Um objeto com `kpis` (UMA linha, calculada no banco), `categorias` e
+ * `leads` (uma linha por lead de marketing do RD, NUNCA multiplicada por
+ * oportunidade). O agregado vem pronto do banco de propósito: somar no
+ * cliente foi como o dashboard antigo produzia total que não batia com a
+ * lista exibida embaixo dele.
+ */
+export async function obterMarketingFunil() {
+  if (_modoReal()) {
+    const res = await _fetchReal('api/marketing-funil');
+    if (!res.ok) throw new Error(`data-api (real): falha ao obter funil de marketing (HTTP ${res.status})`);
+    const body = await res.json();
+    return Array.isArray(body) ? body[0] : body;
+  }
+  // Modo mock: a aba não faz parte do fixture curado da Etapa A. Devolver
+  // forma vazia é honesto — a view mostra zeros, não inventa número.
+  return { gerado_em: null, kpis: null, categorias: [], leads: [], total: 0 };
+}
+
 export async function obterQualidadeDados() {
   if (_modoReal()) {
     const res = await _fetchReal(`api/meta`);

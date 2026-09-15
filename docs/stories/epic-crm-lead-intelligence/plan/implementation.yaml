@@ -524,7 +524,7 @@ phases:
         retornados para um objeto com volume conhecido (Opportunity), o job/batch da Bulk
         API 2.0 usado, e a saída de Setup → System Overview com os limites de chamada de
         API da org.
-    status: pending
+    status: completed
     notes: >-
       Spike exigido por complexity.json + R20. O nó Salesforce nativo do n8n NÃO expõe as
       operações da Bulk API 2.0 — montar as chamadas via HTTP Request é TAREFA EXPLÍCITA,
@@ -532,6 +532,9 @@ phases:
       sincronização e se a Bulk API é obrigatória; sem esse número, 2.13 é dimensionada no
       escuro. CON-1: o MCP do Claude é read/write via chat e não pode ser backend vivo.
     stage: B
+    notas_2026_09_14: >-
+      FECHADA 2026-09-14. Bulk API 2.0 provado por EXECUCAO: job de query devolveu 4.585 oportunidades de 2026 em 772 ms (787.866 bytes de CSV), estado JobComplete, retries 0, job deletado ao fim (204). Confirma R20. Limites da org inventariados: 105.200 requisicoes/dia, 10.000 jobs Bulk V2/dia. O handshake OAuth interativo que bloqueava 2.16 nunca foi necessario -- client_credentials responde 200 sem navegador.
+
   - id: '1.10'
     description: >-
       Spike RD Station — comparar a saída do MCP em uso com os endpoints REST públicos para
@@ -1207,6 +1210,9 @@ phases:
       A frequência de execução é limitada pelos limites de API levantados em 1.9.
       A asserção reconciliacao-ac81.sql já existe (criada em 2.9) — executar após a carga.
     dependencies: ['2.13', '2.15', '1.9']
+    notas_2026_09_14: >-
+      DADO CARREGADO 2026-09-14, workflow recorrente PENDENTE. A ingestao foi executada por script (extracao REST paginada -> stg_salesforce -> fn_run_ingest_batch) com reconciliacao 5/5 ok e watermark gravada em sync_state. O criterio de saida nomeado (236 e nao 44) foi superado: 8.049 oportunidades reais. FALTA: criar o workflow na instancia n8n -- a definicao pronta esta versionada em n8n/crm-ingest-salesforce.json; a criacao foi BLOQUEADA por politica de permissao (escrita em producao sem supervisao) e aguarda autorizacao. Desvio de mecanismo registrado: REST paginado em vez de Bulk 2.0, porque o CSV do Bulk achata o RecordType.Name aninhado que a funcao espera.
+
   - id: '2.17'
     description: >-
       Implementar a ingestão do RD Station: webhook para eventos de conversão mais pull
@@ -1451,7 +1457,7 @@ phases:
     verification:
       type: command
       command: 'psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 -f db/queries/verificacao/tamanho-base-r8.sql'
-    status: pending
+    status: completed
     notes: >-
       ÚNICA SUBTASK DE phase-2 QUE DEPENDE DE 1.13 (OQ-8), porque é a primeira que
       materializa PII na base própria — ver a decisão registrada em 1.13.
@@ -1474,6 +1480,9 @@ phases:
     decisão do usuário. R11 é CRÍTICO: implementar sem validar produz números de ROI
     errados sem sinal visível.
   subtasks:
+    notas_2026_09_14: >-
+      FECHADA 2026-09-14. Janela decidida com numero: 6 meses = 33.319 registros, 12 meses = 35.743 (+7%), 24 meses saltariam +24 mil oportunidades; uma linha pesa 466 bytes. Escolhida 12 meses. Carga executada: Owner 40, Account 20.619, Lead 7.076, Opportunity 8.049. TAMANHO MEDIDO APOS A CARGA: 50 MB = 9,8% do limite de 0,5 GB do Neon. Medido, nao presumido.
+
   - id: '3.1'
     description: >-
       V3 — levantar os valores reais e distintos de LeadSource no Salesforce e submeter o
@@ -1889,7 +1898,7 @@ phases:
     verification:
       type: command
       command: 'psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 -f db/queries/verificacao/v1-matriz-transicao.sql'
-    status: blocked
+    status: completed
     notes: >-
       BLOQUEADA (2026-09-07) — TODO EXPLÍCITO PARA O USUÁRIO, mesma raiz de 2.16. Depende
       de 2.22 (carga histórica real), que depende de 2.16 (credencial Salesforce, ainda não
@@ -1905,6 +1914,9 @@ phases:
       A matriz compara a classificação legada com a nova, lead a lead, e é reproduzível
       porque attribution_ruleset registra a versão da regra (2.10).
     dependencies: ['3.9', '2.22']
+    notas_2026_09_14: >-
+      FECHADA 2026-09-14, com a base historica real. Query em db/queries/verificacao/v1-matriz-transicao.sql. 2.525 de 7.076 leads (35,7%) mudam de classificacao. Comercial->NaoAtribuido 1.337; Marketing->NaoAtribuido 633; Comercial->Marketing 471 (o EC-1 em estado puro); Comercial->Parceiro 83; Marketing->Parceiro 1. Aproximacao declarada: `info` da regra legada foi aproximado por match de e-mail com lead do RD Station, entao o Marketing legado e um PISO.
+
   - id: '3.16'
     description: >-
       V2 e ponto de decisão do usuário (CON-8) — apresentar a lista de leads que migram de
