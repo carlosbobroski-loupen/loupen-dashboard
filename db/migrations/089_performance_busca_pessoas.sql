@@ -1,0 +1,179 @@
+-- db/migrations/089_performance_busca_pessoas.sql
+--
+-- A ABA LEADS PAROU. NÃO FOI O JOIN QUE EU ACRESCENTEI ONTEM.
+--
+-- SINTOMA: `/api/pessoas` devolvia "falha ao carregar os dados". Medido:
+-- `fn_search_pessoas('{}', 50, 0)` levava 1m52s a 3m27s pela conexão que o
+-- n8n usa. O webhook desiste antes. Quatro dias atrás a mesma chamada
+-- respondia em ~2s.
+--
+-- 🔴 AS DUAS HIPÓTESES ÓBVIAS ESTÃO ERRADAS, E MEDIR DERRUBOU AS DUAS.
+--
+-- HIPÓTESE 1 — "é o LEFT JOIN duplo com view_lead_perfil da migration 083".
+-- Derrubada: `SELECT * FROM view_pessoa_jornada_desfecho` (as 6.844 pessoas,
+-- TODAS as colunas, os dois joins com view_lead_perfil inclusive) responde em
+-- **75 ms**. A view não é lenta. A cadeia inteira -- view_pessoa 39 ms,
+-- view_lead_perfil 39 ms, view_pessoa_jornada_desfecho 76 ms -- é barata.
+--
+-- HIPÓTESE 2 — "é a role: crm_ingest é lenta, o owner é rápido". O número
+-- puxava para lá (owner 302 ms, crm_ingest 115.534 ms na MESMA chamada), mas
+-- é coincidência de estado, não causa. Não há RLS (0 policies, 0 tabelas com
+-- relrowsecurity), não há `ALTER ROLE ... SET` (pg_db_role_setting vazio), os
+-- GUCs efetivos das duas roles são idênticos, e a MESMA consulta escrita com
+-- literais roda em 194 ms pelo owner e 164 ms pelo crm_ingest.
+--
+-- A CAUSA REAL: PLANO GENÉRICO DO plpgsql.
+--
+-- Provado na mesma sessão, mesma role, mesma chamada:
+--
+--   SET plan_cache_mode = force_custom_plan;   ->      259 ms
+--   SET plan_cache_mode = force_generic_plan;  ->  207.096 ms   (3m27s)
+--
+-- 800x. É isso, e nada além disso.
+--
+-- POR QUE O PLANO GENÉRICO É CATASTRÓFICO AQUI. Os 15 filtros entram como
+-- `($n IS NULL OR coluna = $n)`. Com o valor conhecido (plano custom), `$n IS
+-- NULL` vira TRUE em tempo de planejamento, a cláusula inteira some, e a
+-- estimativa fica nas 6.844 pessoas reais -> hash join. Sem o valor (plano
+-- genérico), o planejador aplica seletividade default a CADA um dos 15 e as
+-- multiplica: a estimativa desaba para `rows=1` nos dois lados de todo join.
+-- Com rows=1 dos dois lados, um nested loop parece de graça. EXPLAIN (ANALYZE,
+-- BUFFERS) do plano genérico, com os números:
+--
+--   Nested Loop Left Join (cost rows=1) .... actual 92.803 ms
+--     Join Filter: l_1.id = max(b.lead_id) FILTER (source_system='rd_station')
+--     Rows Removed by Join Filter: 49.649.635      <- o join com view_lead_perfil
+--
+--   Nested Loop Left Join (cost rows=1) .... actual 122.210 ms (acumulado)
+--     Join Filter: <CASE de pessoa_chave> = <CASE de pessoa_chave>
+--     Rows Removed by Join Filter: 44.657.418      <- o join com o CTE classif
+--
+--   Limit ... Execution Time: 122.235 ms      Buffers: shared hit=3.414.551
+--
+-- O nó que domina é o primeiro: **92,8 s dos 122 s**, 6.526 x 7.608 = 49,6
+-- milhões de comparações que o plano custom nem chega a considerar. 3,4
+-- milhões de buffers -- ~26 GB de tráfego de buffer num banco de 50 MB.
+--
+-- POR QUE COMEÇOU AGORA, SE O CÓDIGO É O MESMO. O plano genérico sempre
+-- existiu. O que mudou foi o tamanho: a carga de 12 meses do Salesforce levou
+-- `lead` de ~514 para 7.608 linhas. Um nested loop custa N*M -- 15x de dado
+-- em cada lado é 225x de trabalho. Os "~2 segundos de quatro dias atrás" e os
+-- "2 minutos de hoje" são o MESMO plano ruim, medido antes e depois da carga.
+-- Nenhuma migration de ontem causou isso; a 083 agrava (304 s contra 157 s no
+-- endpoint) porque acrescenta mais um nested loop ao mesmo plano, mas a
+-- doença é anterior a ela.
+--
+-- POR QUE A ROLE PARECIA IMPORTAR. A conexão é pelo endpoint `-pooler`
+-- (PgBouncer, transaction mode). Cada role tem o SEU pool de backends. Os
+-- backends do crm_ingest estão quentes -- o n8n chama a função o dia inteiro,
+-- e a partir da 5ª execução o plpgsql compara o custo do plano genérico
+-- (17.362, uma fantasia baseada no rows=1) com o custo real medido do custom e
+-- conclui que o genérico é mais barato. A partir daí ele NUNCA mais volta. Os
+-- backends do owner estavam frios, ainda em plano custom. A role não é causa:
+-- é o marcador de quais backends já caíram no plano genérico.
+--
+-- A CORREÇÃO: proibir o plano genérico DENTRO destas funções.
+--
+-- `plan_cache_mode` é lido em `choose_custom_plan()`, que roda no contexto de
+-- GUC da função -- então `ALTER FUNCTION ... SET` atinge exatamente os
+-- statements de dentro dela, sem afetar mais nada na sessão nem obrigar o n8n
+-- a mudar como conecta. O preço é replanejar a cada chamada: **6 ms**. Contra
+-- 122.235 ms. Não há trade-off a discutir.
+--
+-- O QUE EU CONSIDEREI E NÃO FIZ, E POR QUÊ:
+--
+--   Índices dirigidos -- seriam a primeira tentativa se o problema fosse
+--   varredura. Não é: `Seq Scan on lead` custa 1,5 ms e `identity_edge` 1,2 ms.
+--   O custo está no MÉTODO de join sobre relações derivadas (agregações de
+--   CTE), que índice nenhum alcança. Índice aqui seria placebo.
+--
+--   Ler as tabelas direto em vez dos dois joins com view_lead_perfil --
+--   tiraria o nó de 92,8 s, mas deixaria de pé o segundo nested loop (29,4 s)
+--   e a causa, que reapareceria no próximo filtro opcional que alguém
+--   acrescentar. E duplicaria as regras de normalização (cargo_grupo,
+--   tamanho, trimestre) numa segunda implementação -- o erro que o cabeçalho
+--   da 083 existe para não cometer.
+--
+--   Materializar view_pessoa -- resolveria por outro caminho (estatística real
+--   em coluna real), ao preço de uma peça nova a manter e refrescar na
+--   ingestão. Desnecessário: com plano custom a chamada já responde em 259 ms,
+--   10x abaixo da meta de 3 s.
+--
+--   Reduzir as três avaliações do predicado (CTE do total, bloco de ocultos,
+--   RETURN QUERY) a uma -- economizaria ~2/3 de 259 ms, e custaria reescrever
+--   a função que garante que `total_filtrado` e `total_ocultos_lista` batem com
+--   a lista. Trocar correção provada por 170 ms não se paga. Fica registrado
+--   como dívida consciente, não como esquecimento.
+--
+-- fn_search_leads entra junto: hoje ela NÃO está degradada (medido: genérico
+-- 1.363 ms, custom 1.640 ms -- o genérico é até melhor), mas é a mesma forma,
+-- 13 filtros opcionais como parâmetro sobre view_lead_perfil, e a mesma base
+-- que acabou de crescer 15x. Imunizá-la custa os mesmos ~30 ms de
+-- replanejamento. Registro o número medido para que ninguém leia isto no
+-- futuro achando que ela também estava quebrada -- não estava.
+--
+-- NÃO TOCA em view_receita nem em view_lead_360 (migration 088, outro agente).
+-- NÃO recria função nem view, então GRANT e COMMENT existentes permanecem
+-- intactos por construção -- ALTER FUNCTION ... SET não mexe em ACL. Os GRANTs
+-- são reemitidos abaixo por idempotência, não por necessidade.
+
+-- 🟡 O QUE ESTA MIGRATION *NÃO* RESOLVE, E ESTÁ BLOQUEADO EM OUTRO AGENTE.
+--
+-- Com a correção aplicada, 14 dos 16 casos de filtro medidos respondem entre
+-- 212 ms e 448 ms. Dois não:
+--
+--   fn_search_pessoas('{"fase":"perdido"}', 50, 0) .... 8.171 ms
+--   fn_search_pessoas('{"fase":"ganho"}',   50, 0) .... 3.750 ms
+--
+-- É o MESMO mecanismo por outra porta, e não é regressão -- sempre foi assim.
+-- `fase_mais_avancada` é saída de agregação do CTE `desfecho`, e o planejador
+-- não tem estatística sobre saída de agregação. Filtrar por ela estima
+-- `rows=1` (real: 164) e o nested loop volta. EXPLAIN (ANALYZE) de
+-- `fase=perdido`, com os números:
+--
+--   Nested Loop Left Join .. actual 2.675 ms .. Rows Removed 1.240.266  (prd)
+--   Nested Loop Left Join .. actual 5.283 ms .. Rows Removed 1.240.104  (psf)
+--   Nested Loop Left Join .. actual 6.271 ms .. Rows Removed 1.115.572  (classif)
+--   Execution Time: 6.273 ms
+--
+-- Os dois joins com view_lead_perfil respondem por ~5,2 s dos 6,3 s.
+--
+-- A correção seria trocar os DOIS `LEFT JOIN view_lead_perfil` (prd, psf) por
+-- UM só: despivotar os dois lead_id da pessoa com LATERAL (VALUES (rd,1),
+-- (sf,2)), juntar view_lead_perfil uma vez e reconstruir a preferência
+-- RD->SF com `(array_agg(col ORDER BY prio) FILTER (WHERE col IS NOT NULL))[1]`
+-- -- que é coalesce(prd.col, psf.col) escrito de outra forma, SEM
+-- reimplementar nenhuma regra de normalização (continua lendo view_lead_perfil).
+--
+-- NÃO FIZ, e o motivo é de processo, não técnico: a migration 088 (outro
+-- agente, em curso agora) faz DROP + CREATE de `view_pessoa_jornada_desfecho`
+-- -- já está em produção com `contrato_valor` no lugar de `contrato_por_amount`
+-- e `contrato_por_mrr`. Reescrever a mesma view em paralelo é garantir que uma
+-- das duas versões seja perdida. Fica para depois da 088, com a medição acima
+-- já pronta para quem pegar.
+--
+-- SOBRE O `/api/leads` A 157 s: não é a mesma doença. fn_search_leads foi
+-- medida em 1.363 ms (plano genérico) e 1.640 ms (plano custom) -- ela nunca
+-- esteve degradada por plano. O que a derruba é CONTENÇÃO: o compute tem
+-- 230 MB de shared_buffers e uma fração de vCPU, e as chamadas de
+-- `/api/pessoas` queimavam 2 a 3,5 MINUTOS de CPU cada, acumulando com os
+-- retries do navegador e do webhook. Reproduzido: com apenas DUAS conexões
+-- rodando a versão sem correção, fn_search_leads foi de 1.363 ms para 3.130 ms
+-- (2,3x). Não reproduzi os 115x -- para isso seriam precisas muito mais
+-- chamadas simultâneas, que é justamente o que uma tela em retry produz.
+-- Matar o consumo de /api/pessoas é o que devolve o compute para todo mundo.
+
+ALTER FUNCTION fn_search_pessoas(jsonb, integer, integer)
+  SET plan_cache_mode = 'force_custom_plan';
+
+ALTER FUNCTION fn_search_leads(jsonb, integer, integer)
+  SET plan_cache_mode = 'force_custom_plan';
+
+GRANT EXECUTE ON FUNCTION fn_search_pessoas(jsonb, integer, integer) TO crm_ingest;
+GRANT EXECUTE ON FUNCTION fn_search_leads(jsonb, integer, integer)   TO crm_ingest;
+
+-- ROLLBACK (se algum dia o plano custom passar a ser o problema):
+--   ALTER FUNCTION fn_search_pessoas(jsonb, integer, integer) RESET plan_cache_mode;
+--   ALTER FUNCTION fn_search_leads(jsonb, integer, integer)   RESET plan_cache_mode;
+-- Reverter devolve o comportamento antigo, inclusive a falha -- só faça isso
+-- com uma medição nova na mão.

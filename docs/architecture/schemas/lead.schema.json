@@ -110,7 +110,7 @@
             "estagio": { "type": "string" },
             "valor_contrato": {
               "type": ["number", "null"],
-              "description": "FR-10/EC-5: SÓ preenchido quando estagio='Ganho' e duração conhecida."
+              "description": "FR-10/EC-5: SÓ preenchido quando estagio='Ganho'. É o Amount da oportunidade, que já é o valor total — não se multiplica por duracao_meses_contrato (migration 088)."
             }
           },
           "allOf": [

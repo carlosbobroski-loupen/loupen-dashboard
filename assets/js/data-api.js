@@ -329,15 +329,18 @@ function _adaptarDetalheReal(real) {
         id: oportunidades[0].id,
         mrr: oportunidades[0].mrr,
         estagio: oportunidades[0].stage_name,
-        valor_contrato: oportunidades[0].contrato_valor_por_amount,
+        valor_contrato: oportunidades[0].contrato_valor,
       } : null,
       // TODAS as oportunidades, não só a primeira. Uma pessoa com 7
       // oportunidades tinha 6 invisíveis na ficha — o bloco de desfecho
       // (migration 079/080) precisa de todas para dizer a fase mais avançada.
       //
-      // `amount` e `mrr` vão CRUS, com os nomes dos campos de origem. Qual
-      // sustenta receita é decisão de negócio em aberto (migrations 073/080),
-      // e a tela rotula em vez de escolher.
+      // `amount` e `mrr` vão CRUS, com os nomes dos campos de origem — são o
+      // DADO. `contrato_valor` é a CONCLUSÃO: Amount quando a oportunidade está
+      // Ganha, sem multiplicar por prazo, porque Amount é o valor total da
+      // oportunidade (decisão de 2026-09-15, migration 088). As duas bases
+      // rivais (`contrato_por_amount`/`contrato_por_mrr`) sumiram junto com a
+      // indecisão que as criou.
       oportunidades: oportunidades.map((o) => ({
         id: o.id,
         stage_name: o.stage_name,
@@ -345,8 +348,7 @@ function _adaptarDetalheReal(real) {
         record_type_name: o.record_type_name ?? null,
         amount: o.amount ?? null,
         mrr: o.mrr ?? null,
-        contrato_por_amount: o.contrato_valor_por_amount ?? null,
-        contrato_por_mrr: o.contrato_valor_por_mrr ?? null,
+        contrato_valor: o.contrato_valor ?? null,
       })),
       // TODO conhecido: ad_campaign/cadeia de campanha ainda não está
       // ligada à API real.

@@ -232,11 +232,14 @@ function _renderDesfecho(detalhe) {
 
   const linhas = comFase.map((o) => {
     const c = FASE_COR_F[o.fase] ?? 'var(--muted)';
-    // Valor de contrato: as DUAS bases, rotuladas. Qual sustenta receita é
-    // decisão de negócio em aberto (migrations 073/080) — a tela não escolhe.
+    // A decisão foi tomada (migration 088): `Amount` É o valor total da
+    // oportunidade. Então ele vira O valor exibido, rotulado como tal, sem
+    // multiplicação por prazo. `MRR__c` continua visível porque é dado real da
+    // origem, mas deixou de ser candidato a "valor de contrato" — por isso vem
+    // depois, rotulado como MRR e nada além disso.
     const vals = [];
-    if (o.mrr != null) vals.push(`MRR ${Number(o.mrr).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
-    if (o.amount != null) vals.push(`Amount ${Number(o.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+    if (o.amount != null) vals.push(`<span style="color:var(--text)">Valor da oportunidade ${Number(o.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>`);
+    if (o.mrr != null) vals.push(`<span style="color:var(--dim)">MRR ${Number(o.mrr).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>`);
     return `<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--border)">
       <span style="width:6px;height:6px;border-radius:50%;background:${c};flex:none"></span>
       <div style="flex:1;min-width:0">

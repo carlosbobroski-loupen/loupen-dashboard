@@ -330,7 +330,7 @@ Ordenado cronologicamente (AC-3.1). Array vazio é estado válido (lead sem inte
       "id": "string",
       "mrr": "number",
       "estagio": "string",
-      "valor_contrato": "number | null — SÓ preenchido quando estagio = 'Ganho' e duração conhecida (FR-10, EC-5)"
+      "valor_contrato": "number | null — SÓ preenchido quando estagio = 'Ganho'. É o Amount da oportunidade, que JÁ É o valor total — não se multiplica por prazo (FR-10, EC-5, migration 088)"
     } || null,
     "cadeia_campanha": ["string campanha", "string conjunto", "string anuncio"] || null
   }
@@ -340,7 +340,8 @@ Ordenado cronologicamente (AC-3.1). Array vazio é estado válido (lead sem inte
 | Regra | Trace |
 |---|---|
 | `conta: null` | lead ainda não convertido — nunca inferir por `LeadSource` (AC-2.2, CON-4: join só por `ConvertedAccountId`) |
-| `valor_contrato: null` quando `estagio != 'Ganho'` | FR-10/EC-5 — **invariante**, nunca duração default |
+| `valor_contrato: null` quando `estagio != 'Ganho'` | FR-10/EC-5 — **invariante**, nunca um número presumido |
+| `valor_contrato = Amount`, sem multiplicar por `duracao_meses_contrato` | Amount é o valor TOTAL da oportunidade (decisão de 2026-09-15, migration 088). A fórmula antiga inflava 14x |
 
 ---
 
