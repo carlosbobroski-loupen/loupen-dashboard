@@ -31,6 +31,7 @@
 
 const LEADS_LIST_URL = 'assets/data/mock/leads.json';
 const LEADS_DETAIL_URL = 'assets/data/mock/leads-detalhe.json';
+const OPORTUNIDADES_URL = 'assets/data/mock/oportunidades.json';
 
 // MODO_DADOS é o ÚNICO interruptor do corte de produção (7.1/7.4). Enquanto
 // for 'mock', o site publicado se comporta exatamente como hoje. Virar para
@@ -126,6 +127,24 @@ const _MOCK_FORCADO_LOCAL = (() => {
   }
 })();
 
+// Seletor de CENÁRIO do fixture de oportunidades (`?cenario=soma_nao_fecha`).
+// Mesmo host-guard e mesma leitura única de `_MOCK_FORCADO_LOCAL`, pelos mesmos
+// dois motivos: é chave de sessão de teste (não muda durante a navegação) e não
+// pode existir em produção. Serve para abrir no navegador os caminhos
+// degradados que a base real quase nunca produz — sem isso, "a tela trata
+// soma_fecha:false" seria afirmação sem como ser conferida a olho.
+const _CENARIO_MOCK_LOCAL = (() => {
+  if (typeof window === 'undefined') return null;
+  const host = window.location.hostname;
+  const local = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1' || host === '';
+  if (!local) return null;
+  try {
+    return new URLSearchParams(window.location.search).get('cenario');
+  } catch (e) {
+    return null;
+  }
+})();
+
 function _modoReal() {
   if (_MOCK_FORCADO_LOCAL) return false;
   return MODO_DADOS === 'real' || _modoTesteLocal();
@@ -146,6 +165,7 @@ function _fetchReal(caminho) {
 
 let _listCache = null;
 let _detailCache = null;
+let _oportunidadesCache = null;
 
 async function _loadList() {
   if (_listCache) return _listCache;
@@ -161,6 +181,14 @@ async function _loadDetail() {
   if (!res.ok) throw new Error(`data-api: falha ao carregar detalhe de leads (HTTP ${res.status})`);
   _detailCache = await res.json();
   return _detailCache;
+}
+
+async function _loadOportunidades() {
+  if (_oportunidadesCache) return _oportunidadesCache;
+  const res = await fetch(OPORTUNIDADES_URL, { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`data-api: falha ao carregar fixture de oportunidades (HTTP ${res.status})`);
+  _oportunidadesCache = await res.json();
+  return _oportunidadesCache;
 }
 
 // Adapta um item de /api/leads (fn_search_leads) para a forma que o
@@ -204,6 +232,26 @@ const ROTULO_TIPO_EVENTO = {
   conversao: 'Conversão registrada',
   criacao_oportunidade: 'Oportunidade criada',
 };
+
+// AUSÊNCIA NA ORIGEM (null) e AUSÊNCIA DE TRANSPORTE (chave não veio) são
+// coisas diferentes, e colapsar as duas em `null` faz a ficha AFIRMAR algo
+// falso: "MRR não informado na origem" sobre um número que existe.
+//
+// ESTE BRANCH É DEFESA, NÃO DIAGNÓSTICO. Ele nasceu de um defeito real: ao
+// alargar a projeção de `/api/leads/:id` para os campos de moeda, `mrr` caiu
+// da lista do Code node, e a oportunidade 1576 (mrr 632,00 em `view_lead_360`)
+// chegava sem a chave. **A chave foi reposta na projeção do n8n em 2026-09-16
+// e vem hoje** — o caminho `undefined` não é mais alcançável pela API atual.
+//
+// Mantido mesmo assim, e de propósito: `/api/leads/:id` monta a resposta com
+// uma projeção EXPLÍCITA de campos (ver o Code node "Montar resposta"), então
+// qualquer edição futura daquela lista pode derrubar a chave de novo, em
+// silêncio. Preservar `undefined` é o que faz a view dizer "não veio" em vez
+// de "não existe" quando isso acontecer.
+function _mrrDaResposta(o) {
+  if (!('mrr' in o)) return undefined;
+  return o.mrr ?? null;
+}
 
 // Adapta a resposta de /api/leads/{id} (view_lead_360 + view_jornada_unificada)
 // para a forma de três blocos que a Etapa A já espera (data-contract.md §2).
@@ -325,11 +373,19 @@ function _adaptarDetalheReal(real) {
       // a API real (fn_search_leads/view_receita) usa `stage_name`/
       // `contrato_valor`. Mapear os nomes aqui, não espalhar esse
       // conhecimento pelo resto da UI.
+      //
+      // `moeda` e `valor_contrato_brl` entram AO LADO de `valor_contrato`, não
+      // no lugar dele: o card de oportunidade imprimia "R$" fixo em cima de um
+      // número que podia estar em peso ou dólar (org multi-moeda, migration
+      // 090). Sem a moeda aqui, a view não tem como nem converter nem rotular.
       oportunidade: oportunidades[0] ? {
         id: oportunidades[0].id,
-        mrr: oportunidades[0].mrr,
+        mrr: _mrrDaResposta(oportunidades[0]),
         estagio: oportunidades[0].stage_name,
         valor_contrato: oportunidades[0].contrato_valor,
+        moeda: oportunidades[0].moeda ?? null,
+        valor_contrato_brl: oportunidades[0].contrato_valor_brl ?? null,
+        conversao_indisponivel_motivo: oportunidades[0].conversao_indisponivel_motivo ?? null,
       } : null,
       // TODAS as oportunidades, não só a primeira. Uma pessoa com 7
       // oportunidades tinha 6 invisíveis na ficha — o bloco de desfecho
@@ -341,14 +397,31 @@ function _adaptarDetalheReal(real) {
       // oportunidade (decisão de 2026-09-15, migration 088). As duas bases
       // rivais (`contrato_por_amount`/`contrato_por_mrr`) sumiram junto com a
       // indecisão que as criou.
+      //
+      // A migration 090 acrescentou a camada de MOEDA, e ela anda em PAR com o
+      // cru, nunca no lugar dele: a org é multi-moeda (BRL/USD/MXN) e `amount`
+      // vem na moeda do registro. Quem exibe precisa dos dois — `amount` para
+      // mostrar o dado da origem, `amount_brl` para mostrar a grandeza
+      // comparável, e `moeda` para nunca carimbar R$ em cima de peso.
+      // `amount_brl` NULL não é ausência de valor: é conversão impossível, e o
+      // porquê vem em `conversao_indisponivel_motivo` (a view nunca assume
+      // taxa 1 — ver comentário da 090 sobre fabricar número).
+      //
+      // `mrr` NÃO tem par convertido na view. Segue cru, e é a view que decide
+      // como rotulá-lo (ver `_fmtValor` em views/lead-detalhe.js).
       oportunidades: oportunidades.map((o) => ({
         id: o.id,
         stage_name: o.stage_name,
         fase_comercial: o.fase_comercial ?? null,
         record_type_name: o.record_type_name ?? null,
+        moeda: o.moeda ?? null,
         amount: o.amount ?? null,
-        mrr: o.mrr ?? null,
+        amount_brl: o.amount_brl ?? null,
+        mrr: _mrrDaResposta(o),
         contrato_valor: o.contrato_valor ?? null,
+        contrato_valor_brl: o.contrato_valor_brl ?? null,
+        conversao_indisponivel_motivo: o.conversao_indisponivel_motivo ?? null,
+        contrato_indisponivel_motivo: o.contrato_indisponivel_motivo ?? null,
       })),
       // TODO conhecido: ad_campaign/cadeia de campanha ainda não está
       // ligada à API real.
@@ -670,6 +743,87 @@ export async function obterPessoas(filtros = {}) {
   };
 }
 
+/**
+ * A ABA OPORTUNIDADES sobre a base inteira (migrations 097/098/100).
+ *
+ * Substitui a planilha Google de 513 linhas que alimentava a aba antiga. A
+ * base tem 8.073 oportunidades e a planilha era subconjunto ESTRITO: 93% da
+ * receita ganha vinha de leads que ela não continha, e era por isso que a aba
+ * dizia "100% atribuído a marketing".
+ *
+ * NÃO existe período padrão nesta função, de propósito. Sem `de`/`ate` a API
+ * devolve o universo inteiro e declara `periodo_aplicado: false` — o recorte é
+ * decisão da TELA, e ela tem de mandá-lo explicitamente (a view manda os
+ * últimos 12 meses ao abrir). Embutir um padrão aqui esconderia de quem lê o
+ * número qual recorte ele está vendo.
+ *
+ * `de` é INCLUSIVO e `ate` é EXCLUSIVO, sobre `criada_em`.
+ *
+ * @param {Object} params de, ate, segmento, fase, desfecho, record_type, moeda,
+ *   lead_vinculo_regra, lead_source, busca, so_divergentes, so_sem_valor,
+ *   ordenar_por, limit, offset. Listas podem ir como array ou string separada
+ *   por vírgula — a API aceita as duas formas (fn_filtro_casa).
+ * @returns {Promise<Object>} { gerado_em, filtros, periodo_aplicado, cards,
+ *   funil[], segmento[], lista{} }
+ */
+export async function obterOportunidades(params = {}) {
+  if (_modoReal()) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined || v === null || v === '' || v === false) continue;
+      qs.set(k, Array.isArray(v) ? v.join(',') : String(v));
+    }
+    const res = await _fetchReal(`api/oportunidades?${qs.toString()}`);
+    if (!res.ok) throw new Error(`data-api (real): falha ao obter oportunidades (HTTP ${res.status})`);
+    const body = await res.json();
+    return Array.isArray(body) ? body[0] : body;
+  }
+
+  // ── MODO MOCK ────────────────────────────────────────────────────────────
+  // O fixture NÃO refiltra no cliente: reproduzir aqui os predicados de
+  // `fn_oportunidades_cards` seria escrever um segundo motor de números, e a
+  // primeira divergência entre os dois apareceria na tela como card que não
+  // bate com a lista — exatamente o defeito da aba antiga. O que o mock faz é
+  // devolver um recorte COERENTE (a partição fecha, a receita soma) e marcar
+  // `mock: true`, que a view exibe como aviso de que filtro não está aplicado.
+  //
+  // Os cenários existem porque o fixture precisa exercitar os caminhos que a
+  // base real quase nunca produz e que a tela é OBRIGADA a tratar:
+  // `soma_fecha:false`, `periodo_anterior_tem_dado:false` e `periodo_aplicado:
+  // false`. Sem eles a verificação passaria sempre pelo caminho feliz — e foi
+  // um campo que o mock não emitia (`source_id_ficha`) que produziu
+  // `data-lead-row="undefined"` nesta mesma epic.
+  const fixture = await _loadOportunidades();
+  const base = _CENARIO_MOCK_LOCAL && fixture.cenarios?.[_CENARIO_MOCK_LOCAL]
+    ? fixture.cenarios[_CENARIO_MOCK_LOCAL]
+    : fixture.padrao;
+
+  // Paginação é a única coisa que o mock aplica de verdade, porque ela é do
+  // cliente (offset/limit) e não muda nenhum agregado.
+  const limite = Number(params.limit) || 50;
+  const offset = Number(params.offset) || 0;
+  const todas = base.lista.oportunidades;
+  const pagina = todas.slice(offset, offset + limite);
+  return {
+    ...base,
+    lista: {
+      ...base.lista,
+      offset,
+      limite,
+      oportunidades: pagina,
+      // `tem_mais` é sobre o que o MOCK tem, não sobre `total`. O fixture
+      // declara `total: 420` (o recorte que os cards descrevem) e carrega 60
+      // linhas de exemplo — comparar contra `total` faria o botão "Carregar
+      // mais" ficar visível para sempre sem nada para carregar, que foi
+      // exatamente o defeito achado pelo QA.
+      tem_mais: offset + pagina.length < todas.length,
+      // Só no mock: deixa a view escrever na tela que a lista termina antes do
+      // total por ser fixture, em vez de parecer paginação quebrada.
+      linhas_no_fixture: todas.length,
+    },
+  };
+}
+
 export async function obterMarketingFunil() {
   if (_modoReal()) {
     const res = await _fetchReal('api/marketing-funil');
@@ -759,4 +913,5 @@ export async function obterQualidadeDados() {
 export function _resetCacheParaTestes() {
   _listCache = null;
   _detailCache = null;
+  _oportunidadesCache = null;
 }

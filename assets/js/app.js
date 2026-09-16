@@ -43,7 +43,10 @@ window.SNAPSHOT_DATA_ISO = '2026-08-21'; // data do último snapshot congelado c
 // 'leads-crm'/'qualidade-dados' nunca foram snapshot: são views novas
 // (5.9-5.11, 5.15), leem o fixture curado via data-api.js desde o
 // primeiro commit — não entram no banner.
-window.MIGRATED_VIEWS = ['leads-crm', 'qualidade-dados', 'marketing-funil'];
+// 'oportunidades-crm' (2026-09-16) lê /api/oportunidades ao vivo desde o
+// primeiro commit — substitui a aba `oportunidades`, que lia uma planilha
+// Google de 513 linhas contra as 8.073 oportunidades da base.
+window.MIGRATED_VIEWS = ['leads-crm', 'qualidade-dados', 'marketing-funil', 'oportunidades-crm'];
 
 function _formatarDataBanner(iso) {
   const [ano, mes, dia] = iso.split('-');

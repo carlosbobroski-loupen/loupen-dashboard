@@ -93,6 +93,15 @@ function resolverRota(segments, search) {
     return `${N8N_BASE}/api/pessoas${search || ''}`;
   }
 
+  // GET /api/oportunidades?<filtros>
+  // A aba Oportunidades sobre dado real. Substitui a planilha Google de 513
+  // linhas que alimentava a aba antiga -- a base tem 8.073 oportunidades, e a
+  // planilha era subconjunto estrito: 93% da receita ganha vinha de leads que
+  // ela nao continha. Ver db/queries/verificacao/aba-oportunidades.sql.
+  if (segments.length === 1 && segments[0] === 'oportunidades') {
+    return `${N8N_BASE}/api/oportunidades${search || ''}`;
+  }
+
   // GET /api/marketing-funil
   // Leads de marketing do RD Station cruzados com o desfecho deles no
   // Salesforce (migration 077). Sem query string: o recorte é a própria

@@ -29,8 +29,14 @@
     <button class="nav-item" onclick="showView('utm')"><i class="ti ti-link"></i>Campanhas UTM</button>
     <button class="nav-item" onclick="showView('lp')"><i class="ti ti-browser"></i>Landing Pages</button>
     <div class="nav-label">Comercial</div>
-    <button class="nav-item" onclick="showView('oportunidades')"><i class="ti ti-briefcase"></i>Oportunidades</button>
-    <button class="nav-item" onclick="showView('oportunidades_v2')"><i class="ti ti-brand-salesforce"></i>Oportunidades v2 (Salesforce)</button>
+    <!-- Oportunidades: a aba nova lê /api/oportunidades ao vivo (8.073 registros).
+         Os dois botões antigos saíram do menu em 2026-09-16 e o markup deles
+         continua na página, dormente: a aba `oportunidades` lia uma planilha de
+         513 linhas (subconjunto estrito da base — 93% da receita ganha vinha de
+         leads que ela não continha) e a `oportunidades_v2` uma ponte manual de
+         44 linhas. Tirar do menu em vez de operar views-legacy.js (3.828 linhas)
+         é reversível numa linha e não arrisca as outras 13 abas. -->
+    <button class="nav-item" onclick="showView('oportunidades-crm')"><i class="ti ti-briefcase"></i>Oportunidades<span style="margin-left:auto;font-size:9px;font-weight:700;background:var(--green-dim);color:var(--green);padding:1px 6px;border-radius:5px">novo</span></button>
     <button class="nav-item" onclick="showView('srd_ia')"><i class="ti ti-brand-whatsapp"></i>SRD IA</button>
     <button class="nav-item" onclick="showView('campanhas')"><i class="ti ti-speakerphone"></i>Campanhas</button>
     <button class="nav-item" onclick="showView('criativos')"><i class="ti ti-photo"></i>Criativos</button>
@@ -244,7 +250,16 @@
     <div class="kpi-grid-8">
       <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Soma do investimento em Google Ads + Meta Ads + LinkedIn Ads no período selecionado."><i class="ti ti-coin"></i>Investimento total</div><div class="kpi-value" id="ovx-spend-value">—</div><div class="kpi-footer" id="ovx-spend-trend"></div></div>
       <div class="kpi blue kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="Total de leads recebidos no período, vindos do RD Station (todos os canais e formulários)."><i class="ti ti-users"></i>Leads (RD, período)</div><div class="kpi-value" id="ovx-leads-value">—</div><div class="kpi-footer" id="ovx-leads-trend"></div></div>
-      <div class="kpi green kpi-nav" onclick="showView('oportunidades', true)"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período (Salesforce). O rodapé mostra quanto disso é atribuível a marketing (lead rastreado por e-mail)."><i class="ti ti-cash"></i>Receita ganha</div><div class="kpi-value" id="ovx-receita-value" style="font-size:18px">—</div><div class="kpi-footer" id="ovx-receita-foot"></div></div>
+      <!-- Destino trocado em 2026-09-16: era showView('oportunidades'), a aba da
+           planilha de 513 linhas. O drill caía numa SEGUNDA página com o mesmo
+           título "Oportunidades", sem marcação no menu (nav-item.active = 0
+           elementos, porque o botão dela foi removido) e publicando o card
+           "Tempo mediano da oportunidade virar ganho" — a métrica que a aba
+           nova recusa por ser fim de contrato, não ciclo de venda.
+           O número DESTE card ainda vem da planilha, e a Visão geral já carrega
+           o banner de snapshot congelado avisando isso; sair dele para dado ao
+           vivo é melhora, e o rodapé diz para onde o detalhe leva. -->
+      <div class="kpi green kpi-nav" onclick="showView('oportunidades-crm', true)"><div class="kpi-label" title="Receita ganha = soma do valor de oportunidades fechadas como ganhas no período (Salesforce). O rodapé mostra quanto disso é atribuível a marketing (lead rastreado por e-mail). Clicar abre a aba Oportunidades, que lê a base ao vivo — o número de detalhe pode divergir deste, que é do snapshot."><i class="ti ti-cash"></i>Receita ganha</div><div class="kpi-value" id="ovx-receita-value" style="font-size:18px">—</div><div class="kpi-footer" id="ovx-receita-foot"></div><div class="kpi-footer" style="color:var(--dim)">o detalhe abre sobre dado ao vivo</div></div>
       <div class="kpi purple kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="ROAS blended = receita ganha atribuída a marketing ÷ investimento total em mídia paga no período. Acima de 1x significa que o marketing devolveu mais do que custou. Usa só a receita rastreada até a mídia, não a receita comercial direta."><i class="ti ti-trending-up"></i>ROAS blended</div><div class="kpi-value" id="ovx-roas-value">—</div><div class="kpi-footer" id="ovx-roas-trend"></div></div>
       <div class="kpi amber kpi-nav" role="button" tabindex="0" data-action="scrollToCard" data-arg="card-canais"><div class="kpi-label" title="Custo por Lead combinado: investimento total em mídia paga dividido pelo total de leads do período (não separa por canal)."><i class="ti ti-target"></i>CPL blended</div><div class="kpi-value" id="ovx-cpl-value">—</div><div class="kpi-footer" id="ovx-cpl-trend"></div></div>
       <div class="kpi green kpi-nav" onclick="showView('leads', true)"><div class="kpi-label" title="% dos leads do período marcados como 'Lead Qualificado' no RD Station."><i class="ti ti-star"></i>Taxa de qualificação</div><div class="kpi-value" id="ovx-qualif-value">—</div><div class="kpi-footer" id="ovx-qualif-trend"></div></div>
@@ -593,6 +608,146 @@
   </div>
 
   <!-- OPORTUNIDADES (CRM Comercial) -->
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       OPORTUNIDADES (CRM ao vivo) — GET /api/oportunidades, migrations 097/098/100.
+       Lógica em assets/js/views/oportunidades.js. As regras da tela (win rate com
+       denominador, receita nunca sozinha, funil de ESTOQUE, partição que fecha)
+       estão documentadas no cabeçalho daquele arquivo.
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="view" id="view-oportunidades-crm">
+
+    <!-- RECORTE. Período é decisão explícita do front: a API não tem padrão e,
+         sem de/ate, devolve o universo inteiro dizendo periodo_aplicado:false. -->
+    <div class="filter-bar" id="opc-recorte" style="flex-wrap:wrap;gap:8px">
+      <span class="filter-glabel">Período</span>
+      <div class="date-range-wrap">
+        <i class="ti ti-calendar" style="color:var(--muted);font-size:15px"></i>
+        <input type="date" class="date-input" id="opc-de" aria-label="Início do recorte (inclusivo)" title="Início INCLUSIVO, sobre a data de criação da oportunidade.">
+        <span style="color:var(--muted);font-size:12px">até</span>
+        <input type="date" class="date-input" id="opc-ate" aria-label="Fim do recorte (exclusivo)" title="Fim EXCLUSIVO: a API não inclui este dia.">
+        <div class="date-presets" id="opc-presets">
+          <button class="preset-btn" data-preset="30d">30d</button>
+          <button class="preset-btn" data-preset="90d">90d</button>
+          <button class="preset-btn active" data-preset="12m">12m</button>
+          <button class="preset-btn" data-preset="24m">24m</button>
+          <button class="preset-btn" data-preset="tudo">Tudo</button>
+        </div>
+      </div>
+      <span class="mono-sm" style="color:var(--dim)">início inclusivo · fim exclusivo</span>
+      <button class="filter-clear" id="opc-limpar" style="margin-left:auto;background:none;border:1px solid var(--border2);color:var(--muted);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer"><i class="ti ti-x"></i> Limpar</button>
+    </div>
+
+    <div class="filter-bar" id="opc-filtros" style="flex-wrap:wrap;gap:8px;margin-top:-6px">
+      <div style="position:relative;flex:0 0 240px">
+        <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:14px;pointer-events:none"></i>
+        <input type="search" id="opc-busca" placeholder="Buscar por conta, estágio ou origem"
+               autocomplete="off" spellcheck="false"
+               style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                      border-radius:7px;padding:7px 10px 7px 28px;font-size:12.5px;font-family:var(--font)">
+      </div>
+      <select class="filter-sel" id="opc-segmento" title="Marketing / Comercial / Parceiro / Não atribuído / Não classificado / Sem origem. As opções vêm do dado, com contagem — nunca de enum embutido."><option value="">Todos os segmentos</option></select>
+      <select class="filter-sel" id="opc-fase" title="Fase ATUAL da oportunidade. Filtrar por fase estreita os cards e a lista, mas NÃO o funil (ver aviso na seção)."><option value="">Todas as fases</option></select>
+      <select class="filter-sel" id="opc-desfecho" title="Partição total em seis valores, declarada pela origem (IsWon/IsClosed)."><option value="">Todos os desfechos</option></select>
+      <select class="filter-sel" id="opc-moeda" title="A org é multi-moeda. BRL + USD + MXN cobrem 100% das 8.073 oportunidades (conferido contra a API em 2026-09-16).">
+        <option value="">Todas as moedas</option>
+        <option value="BRL">BRL (real)</option>
+        <option value="USD">USD (dólar)</option>
+        <option value="MXN">MXN (peso mexicano)</option>
+      </select>
+      <select class="filter-sel" id="opc-vinculo" title="Qual regra ligou a oportunidade a uma origem. Partição total em seis valores (COMMENT de view_oportunidade_analitica.lead_vinculo_regra).">
+        <option value="">Todo tipo de vínculo</option>
+        <option value="oportunidade">Lead por oportunidade</option>
+        <option value="conta">Lead por conta</option>
+        <option value="leadsource">LeadSource traduzido</option>
+        <option value="leadsource_desconhecido">LeadSource sem tradução</option>
+        <option value="lead_sem_classificacao">Lead sem classificação</option>
+        <option value="sem_origem">Sem lead e sem LeadSource</option>
+      </select>
+      <span style="display:inline-flex;align-items:center;gap:6px"><span class="filter-glabel">Ordenar</span>
+      <select class="filter-sel" id="opc-ordem" style="min-width:140px">
+        <option value="recentes">Mais recentes</option>
+        <option value="valor">Maior valor</option>
+        <option value="fase">Fase</option>
+      </select></span>
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);cursor:pointer" title="Interruptor de AUDITORIA: estreita SÓ a lista, não os cards.">
+        <input type="checkbox" id="opc-so-divergentes"> só divergentes
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);cursor:pointer" title="Interruptor de AUDITORIA: estreita SÓ a lista, não os cards.">
+        <input type="checkbox" id="opc-so-sem-valor"> só sem valor
+      </label>
+    </div>
+
+    <div id="opc-recorte-info" style="margin:0 0 16px 2px"></div>
+
+    <!-- A conferência da partição vem ANTES dos números: se ela não fecha, os
+         números não são desenhados (regra 3). -->
+    <div id="opc-integridade"></div>
+
+    <div id="opc-kpis"></div>
+
+    <div class="card">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-stack-2"></i>Onde a coorte está AGORA — estoque por fase, não progressão</div>
+        <div class="section-badge" id="opc-funil-badge">&mdash;</div>
+      </div>
+      <div id="opc-funil"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-route"></i>Marketing &times; Comercial, com o denominador de cada balde</div>
+        <div class="section-badge" id="opc-segmento-badge">&mdash;</div>
+      </div>
+      <div id="opc-segmento-tbl"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-row">
+          <div class="section-title"><i class="ti ti-cash-off"></i>Ganhas que ficaram fora da receita</div>
+          <div class="section-badge" id="opc-fora-badge">&mdash;</div>
+        </div>
+        <div id="opc-fora-valor"></div>
+      </div>
+      <div class="card">
+        <div class="section-row">
+          <div class="section-title"><i class="ti ti-clock-exclamation"></i>Por que não há card de ciclo de venda</div>
+          <div class="section-badge">ressalva declarada pela camada</div>
+        </div>
+        <div id="opc-ciclo"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-list"></i>Oportunidades, uma a uma</div>
+        <div class="section-badge" id="opc-lista-badge">&mdash;</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl" style="min-width:1100px;table-layout:fixed;border-spacing:0">
+          <colgroup>
+            <col style="width:17%"><col style="width:11%"><col style="width:19%">
+            <col style="width:14%"><col style="width:15%"><col style="width:18%"><col style="width:6%">
+          </colgroup>
+          <thead><tr>
+            <th style="padding-right:12px">Conta</th><th style="text-align:left;padding-right:12px">Estágio</th><th style="text-align:left;padding-right:12px">Desfecho</th>
+            <th style="text-align:left;padding-right:12px">Segmento / origem</th><th style="text-align:left;padding-right:12px">Vínculo</th>
+            <th style="padding-right:12px">Valor</th><th>Moeda</th>
+          </tr></thead>
+          <tbody id="opc-lista-rows"></tbody>
+        </table>
+      </div>
+      <div id="opc-mais" style="display:none;padding:12px;text-align:center;border-top:1px solid var(--border)">
+        <button id="opc-btn-mais" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                padding:7px 16px;border-radius:7px;font-size:12.5px;cursor:pointer">Carregar mais</button>
+      </div>
+      <div id="opc-lista-foot" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- DORMENTE desde 2026-09-16: fora do menu, substituída por view-oportunidades-crm.
+       Markup e lógica (views-legacy.js) preservados intocados — a reversão é
+       devolver o botão ao menu. -->
   <div class="view" id="view-oportunidades">
     <div class="chart-click-hint" style="margin-bottom:12px">Cruza a planilha Leads Salesforce (CRM comercial) com a Central de Leads (canal/origem pago) por e-mail. Filtrado pelo período selecionado no topo (Data da conversão).</div>
     <div class="kpi-grid-6">
