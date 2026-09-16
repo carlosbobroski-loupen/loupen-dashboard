@@ -36,6 +36,9 @@ db/
 ├── README.md                    (este arquivo)
 ├── migrations/*.sql             Schema versionado, forward-only, aplicado em ordem
 │                                 lexical (ver subtask 2.2, db/apply.sh)
+├── propostas/*.sql              SQL escrito mas NÃO aplicado, deliberadamente fora
+│                                 do runner (decisão pendente de aprovação humana) —
+│                                 ver db/propostas/README.md
 └── queries/verificacao/*.sql    Asserções SQL versionadas — zero linhas retornadas
                                   significa que a invariante vale; linhas retornadas
                                   SÃO o relatório da violação (spec.md §5.1/§6.1)
@@ -107,6 +110,122 @@ cliente Postgres: DBeaver, pgAdmin, TablePlus). O que se perde ao fazer isso à 
   — por isso migrations devem ir por `apply.sh` sempre que possível;
 - o *exit code* das asserções. No console, o sinal equivalente é a mensagem: um
   `RAISE NOTICE` de sucesso apareceu, ou um `ERROR:` com o nome do requisito violado.
+
+### Reconciliação do ledger — 2026-09-16
+
+`schema_migrations` ficou congelado na `073` enquanto as migrations **075 a 093 já
+estavam no banco**. Causa: a `074` (retenção/anonimização LGPD) estava parada em
+`db/migrations/` sem aprovação e abortava o runner em `gen_random_bytes` (`pgcrypto`
+não instalada); como `apply.sh` aborta na primeira falha, ele nunca chegava nas
+seguintes — que passaram a ser aplicadas à mão por `psql`. A `074` foi movida para
+`db/propostas/` (ver o README de lá) e o ledger foi acertado.
+
+**As linhas `075_*` a `089_*` têm `applied_at = 2026-09-16` porque essa é a data da
+RECONCILIAÇÃO, não a da aplicação.** O momento real em que cada uma rodou não foi
+registrado por ninguém e não será inventado aqui; o que se sabe com certeza é que foi
+entre a `073` (2026-09-15 14:54Z) e a `090` (2026-09-16 11:43Z). Isso está declarado
+também em `COMMENT ON TABLE schema_migrations` e `COMMENT ON COLUMN
+schema_migrations.applied_at`, para quem olhar só o banco. (`090`–`093` já estavam no
+ledger com hora real de aplicação e não foram tocadas.)
+
+Nenhuma linha foi registrada sem verificação. O que foi conferido no banco, objeto a
+objeto, antes de registrar:
+
+| Migration | Evidência no banco |
+|---|---|
+| 075 | 54 de 54 `valor_bruto` do arquivo presentes em `leadsource_crosswalk` |
+| 076 | `fn_reclassificar_lead` existe e o `prosrc` bate **byte a byte** (normalizado) com o arquivo |
+| 077 | `fn_marketing_funil` e `fn_marketing_funil_por_categoria` batem byte a byte; a view foi redefinida depois (080 → 093) |
+| 078 | superada pela **081**, que é o mesmo corpo + `identificador_rd` e comprovadamente rodou (ver 081) |
+| 079 | tabela `opportunity_stage_fase` com 29 linhas |
+| 080 | superada: `view_receita`/`view_lead_360` estão na versão da 090 (têm `amount_brl`) e `view_marketing_rd_sf` na da 093 |
+| 081 | coluna `lead.identificador_rd` + índice `idx_lead_identificador_rd` existem, e **308 leads têm o campo preenchido** — a versão 081 da função rodou em produção |
+| 082 | colunas de `view_pessoa` idênticas à lista do arquivo (`pessoa_chave`…`fontes`) |
+| 083 | superada pela 088/090 (`view_pessoa_jornada_desfecho` tem `amount_brl`) |
+| 084 | superada pela 087/091 |
+| 085 | `opportunity_stage_fase`: `fase='perdido'` está com `ordem = 5` |
+| 086 | `view_jornada_unificada` expõe `id_anuncio`, `criativo`, `publico` |
+| 087 | corpo atual de `fn_search_pessoas` contém o pivô de campanha |
+| 088 | superada pela 090/093 |
+| 089 | `pg_proc.proconfig = {plan_cache_mode=force_custom_plan}` nas duas funções |
+
+"Superada" significa: o objeto foi redefinido por uma migration posterior
+comprovadamente aplicada, o banco está **à frente** desse arquivo, e reaplicá-lo seria
+**regressão**, não conserto. Em todos os casos o ledger encoda a mesma coisa — não rodar.
+
+#### Sequela encontrada durante a conferência
+
+`fn_run_ingest_batch` no banco era, byte a byte, a versão da **092** — que descende
+da **073** e perdeu o que a 078 e a 081 tinham acrescentado. A 090 foi escrita sobre
+o corpo da 073 (o topo do ledger na época, justamente por causa da dessincronia
+acima) e **reverteu em silêncio duas migrations que já estavam aplicadas**. Nenhum
+erro, nenhum aviso: a função continuou ingerindo tudo, só parou de gravar campos.
+
+Medido no corpo vivo, por token (contagens de `grep`, não impressão):
+
+| token | 073 | 078 | 081 | 090 | 092 | vivo (antes da 099) |
+|---|---|---|---|---|---|---|
+| `identificador_rd` (081) | 0 | 0 | **8** | 0 | 0 | **0** |
+| `custom_fields` (078) | 0 | **14** | 14 | 0 | 0 | **0** |
+| `Campanha de Origem` (078) | 0 | **2** | 2 | 0 | 0 | **0** |
+| `last_conversion` | 9 | 39 | 39 | 9 | 9 | **9** |
+
+⚠️ **`last_conversion` é armadilha de medição.** Ele aparece 9 vezes no corpo vivo,
+mas 9 é o **valor de base da 073**, anterior à 078 — a 078 levava a 39 e trazia junto
+`custom_fields`. Procurar só por `last_conversion` dá falso positivo e faz concluir
+que "a 078 sobreviveu". Ela não sobreviveu. A checagem que decide é `custom_fields`
+(ou `Campanha de Origem`), que está em **zero**.
+
+**Estado: as duas reversões foram repostas em 2026-09-16.** Em ambos os casos a
+função foi reemitida a partir do corpo **vivo**, com adição pura, e cada uma tem
+asserção de comportamento que **falha contra o corpo anterior**:
+
+| Perdida | Reposta por | Asserção |
+|---|---|---|
+| 081 — `identificador_rd` na ingestão do Lead do Salesforce | `099_repoe_identificador_rd_na_ingestao.sql` (diff: 3 inserções, 0 remoções) | `db/queries/verificacao/identificador-rd-na-ingestao.sql` |
+| 078 — enriquecimento do lead pelo webhook do RD (UTM de `custom_fields`) | `101_repoe_enriquecimento_do_webhook_rd.sql` (diff: 123 linhas adicionadas, 0 removidas, 0 modificadas) | `db/queries/verificacao/webhook-rd-enriquece-o-lead.sql` |
+
+Contagens no corpo vivo depois das duas: `identificador_rd` 3, `custom_fields` 14,
+`Campanha de Origem` 2, `last_conversion` 39 — e `CurrencyType` 6,
+`OpportunityStage` 5, `ConvertedOpportunityId` 1, ou seja, 090 e 092 intactas.
+
+**Quanto se perdeu de fato:** nada. Medido antes de consertar — dos 24 eventos de
+webhook que existem em `stg_rdstation`, os 24 já tinham virado linha em `lead` com
+evento de UTM; o último entrou às 04:41Z e a reversão (090) foi às 11:43Z do mesmo
+dia, então nenhum evento atravessou a janela quebrada. Não houve reprocessamento e
+nenhuma linha de produção foi reescrita. A perda era **prospectiva e total**: o
+próximo webhook não viraria lead nenhum — e a ingestão reportaria
+`ConversionEvent 1 1 ok`, como se estivesse saudável. É esse o perigo desse modo
+de falha, e é por isso que a asserção olha a coluna, não o status.
+
+### Regra de processo: função se reescreve a partir do corpo VIVO
+
+O que aconteceu acima não foi descuido isolado — é um modo de falha que se repete
+sozinho, e a defesa precisa ser mecânica:
+
+> **Reescrever uma função inteira a partir de um arquivo de migration antigo reverte,
+> em silêncio, tudo que veio depois daquele arquivo.**
+
+`CREATE OR REPLACE FUNCTION` substitui o corpo INTEIRO. Se o ponto de partida foi o
+último `.sql` que você viu — ou o último que o ledger mostra, que pode estar
+desatualizado — todas as migrations posteriores àquele arquivo somem sem barulho.
+
+Ao alterar uma função existente, sempre:
+
+1. **Parta do corpo vivo**, não de um arquivo:
+   ```bash
+   psql "$NEON_DATABASE_URL" -tA \
+     -c "SELECT pg_get_functiondef('public.fn_x(text)'::regprocedure)" > /tmp/vivo.sql
+   ```
+2. **Edite por inserção e diffe contra o vivo.** O diff tem de ser adição pura. Uma
+   linha que aparece como modificada só passa se a mudança for inserção de texto
+   *dentro* da linha — o teste objetivo é reversibilidade: desfazer exatamente os
+   trechos inseridos tem de devolver o corpo vivo byte a byte.
+3. **Prove por comportamento, não por leitura.** "A função agora contém a string
+   `x`" é asserção fraca: um comentário com a palavra `x` a satisfaz. Escreva uma
+   asserção em `db/queries/verificacao/` que exercite o caminho real dentro de
+   `BEGIN`/`ROLLBACK` e **confirme que ela falha contra o corpo anterior** antes de
+   declarar verde.
 
 ## Como executar as asserções
 

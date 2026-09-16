@@ -1,0 +1,1050 @@
+-- db/migrations/102_corpo_final_da_ingestao.sql
+--
+-- O CORPO DEFINITIVO DE fn_run_ingest_batch — E A LIÇÃO QUE CUSTOU DUAS
+-- REVERSÕES SILENCIOSAS.
+--
+-- Esta migration não acrescenta funcionalidade nenhuma. Ela existe para que uma
+-- RECONSTRUÇÃO DO ZERO com `db/apply.sh` chegue ao mesmo corpo que está em
+-- produção hoje. Sem ela, o banco está certo e um rebuild estaria errado — que
+-- é a pior combinação possível, porque ninguém descobre até precisar do rebuild.
+--
+-- ═════════════════════════════════════════════════════════════════════════════
+-- O PROBLEMA: ORDEM LEXICAL CONTRA ORDEM DE ESCRITA
+-- ═════════════════════════════════════════════════════════════════════════════
+--
+-- `fn_run_ingest_batch` é REEMITIDA INTEIRA por quase toda migration que toca
+-- ingestão. `CREATE OR REPLACE FUNCTION` troca o corpo inteiro — não faz merge.
+-- Logo, num runner forward-only por ordem lexical, QUEM RODA POR ÚLTIMO VENCE.
+--
+-- Medido nos arquivos em 2026-09-16:
+--
+--   arquivo   LeadSource   custom_fields   o que carrega
+--   -------   ----------   -------------   ---------------------------------
+--   100            19            17        corpo mesclado (após o reparo)
+--   101             1            20        NÃO tem o bloco de lead_source
+--
+-- `101` > `100` na ordem lexical. Um rebuild rodaria 099 → 100 → 101 e a 101,
+-- que foi ESCRITA antes da 100 mas se CHAMA depois dela, reverteria
+-- `lead_source` — o mapeamento inteiro de Opportunity.LeadSource, que é o que
+-- leva a atribuição da aba de 6,4% para 82,7%.
+--
+-- O banco AGORA está correto (corpo vivo conferido: custom_fields=14,
+-- identificador_rd=5, LeadSource=3, CurrencyType=6, OpportunityStage=5). O
+-- risco é exclusivamente de reconstrução.
+--
+-- ═════════════════════════════════════════════════════════════════════════════
+-- 🔴 A LIÇÃO: "PARTIR DO CORPO VIVO" NÃO BASTA
+-- ═════════════════════════════════════════════════════════════════════════════
+--
+-- Duas reversões silenciosas nesta epic, com causas DIFERENTES:
+--
+--   1ª — a 090 reescreveu a função a partir do ARQUIVO da 073 (o topo do ledger
+--        naquele momento, porque o ledger estava dessincronizado). O banco já
+--        estava na 081. Levou junto os blocos da 078 e da 081. As migrations
+--        099 e 101 existem só para desfazer isso.
+--
+--   2ª — a 100 (esta camada) fez o que a regra mandava: partiu de
+--        `pg_get_functiondef`. E MESMO ASSIM reverteu a 101. O dump foi lido às
+--        13:24 UTC; a 099 entrou 13:20 e a 101 entrou 13:29, de outro agente,
+--        na MESMA função; a 100 foi aplicada ~13:35. A janela de 11 minutos
+--        entre o dump e o apply foi suficiente.
+--
+-- Ou seja: a regra "parta do corpo vivo" resolve o caso 1 e NÃO resolve o caso
+-- 2. O que fecha os dois é um procedimento de três passos:
+--
+--   (a) RELEIA `pg_get_functiondef` IMEDIATAMENTE ANTES de aplicar — não no
+--       começo da sessão, não "há pouco". Esta migration foi gerada assim: o
+--       corpo abaixo saiu de um `pg_get_functiondef` executado no ato da
+--       escrita deste arquivo, com os 5 tokens conferidos na geração.
+--   (b) DIFF o que você gerou contra o corpo vivo DEPOIS de aplicar, e exija
+--       igualdade byte a byte. É o método que a 101 registrou e é o que pegou
+--       o problema.
+--   (c) CONFIRA POR TOKEN que os blocos das migrations vizinhas sobreviveram.
+--
+-- ⚠️ ARMADILHA DE MEDIÇÃO, herdada do cabeçalho da 101 e reconfirmada aqui:
+-- procurar `last_conversion` para saber se o bloco do webhook do RD está
+-- presente dá FALSO POSITIVO. Ele aparece 9 vezes já na base da 073, SEM a
+-- 078/101 (com elas, 42). O token que DECIDE é `custom_fields`: zero sem o
+-- bloco, 14 com ele. Foi `custom_fields=0` que denunciou a segunda reversão.
+--
+-- ═════════════════════════════════════════════════════════════════════════════
+-- POR QUE A SOLUÇÃO É "A ÚLTIMA MIGRATION É A DONA DO CORPO", E NÃO OUTRA
+-- ═════════════════════════════════════════════════════════════════════════════
+--
+-- Considerei e NÃO fiz:
+--
+--   Reescrever a 101 para incluir `lead_source` — resolveria de forma mais
+--   limpa e é PROIBIDO: o runner é forward-only e recusa arquivo já aplicado
+--   cujo checksum mudou. Recusa com razão: um histórico que se reescreve não é
+--   histórico. (E a 100 também já está no ledger.)
+--
+--   Transformar 099/100/101 em no-op verificável — exigiria editar os três
+--   arquivos, esbarrando na mesma proibição.
+--
+--   Um trigger de evento ou um teste no CI que recuse `CREATE OR REPLACE` sobre
+--   esta função — resolveria de verdade, e é grande demais para caber nesta
+--   migration. Fica como dívida declarada: a guarda equivalente existe hoje em
+--   `db/queries/verificacao/aba-oportunidades.sql`, seção J11, que conta os
+--   cinco tokens e FALHA em voz alta. Ela é executada à mão, não
+--   automaticamente — essa é a fraqueza conhecida.
+--
+-- O que fiz é o mínimo que funciona dentro das regras: como o runner aplica em
+-- ordem lexical, a migration de MAIOR número que toca a função é a que decide.
+-- A 102 assume esse papel com o corpo COMPLETO, e o corpo completo é o vivo.
+--
+-- 📌 CONTRATO PARA QUEM VIER DEPOIS: qualquer migration futura que toque
+-- `fn_run_ingest_batch` DEVE partir do corpo vivo relido no ato, DEVE diffar
+-- depois de aplicar, e DEVE rodar a seção J11 da verificação. Se acrescentar um
+-- bloco novo, acrescente também o token dele à J11 — a guarda só protege o que
+-- ela conta.
+--
+-- ═════════════════════════════════════════════════════════════════════════════
+-- O QUE ESTA MIGRATION NÃO FAZ
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Não muda uma vírgula de comportamento: o corpo abaixo é IDÊNTICO ao que está
+-- em produção neste instante. Não cria, não altera e não apaga tabela, coluna,
+-- índice, view, dado ou permissão. Não toca em `sync_state` — a watermark já
+-- foi reposicionada pela releitura da 100 e não há reset a dar aqui.
+--
+-- Só o COMMENT da função muda, para registrar a v16 e o motivo dela.
+
+BEGIN;
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- O CORPO MESCLADO, LIDO DO BANCO NO INSTANTE DA ESCRITA DESTE ARQUIVO
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Os cinco blocos, com a contagem de token conferida NA GERAÇÃO deste arquivo:
+--
+--   custom_fields    = 14   -> webhook do RD enriquece o lead        (101)
+--   identificador_rd =  5   -> identificador do RD no Lead do SF     (099)
+--   LeadSource       =  3   -> origem própria da oportunidade        (100)
+--   CurrencyType     =  6   -> moeda e taxa de conversão             (090)
+--   OpportunityStage =  5   -> declaração de IsWon/IsClosed da origem (092)
+
+CREATE OR REPLACE FUNCTION public.fn_run_ingest_batch(p_batch_id text)
+ RETURNS TABLE(object_type text, rows_source integer, rows_target integer, status text)
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  v_rows_source integer;
+  v_rows_target integer;
+  v_pendente_nao_mapeado integer;
+  v_leads_classificados integer;
+  v_lead_id_atribuicao bigint;
+  r_we RECORD;
+  r_fs RECORD;
+  v_lead_source_id text;
+  v_lead_id_fs bigint;
+  v_stage_ref_id bigint;
+  v_ultimo_stage_ref_id bigint;
+  v_touchpoints_gravados integer;
+  v_touchpoints_sem_lead integer;
+  v_estagios_gravados integer;
+  v_estagios_sem_lead integer;
+  v_touchpoint_id_novo bigint;
+  v_pendente_ads integer;
+  -- v9 (migration 048)
+  v_lead_source_system text;
+  v_lead_id_we bigint;
+  r_lc RECORD;
+  v_lead_id_lc bigint;
+  v_conv_gravadas integer;
+  v_conv_sem_lead integer;
+  v_leads_escalados integer;
+  v_lead_id_rd bigint;
+  -- v11 (migration 058)
+  v_conv_status_preenchido integer;
+  v_inicio_lote timestamptz;
+  -- v13 (migration 062)
+  v_conv_distintas integer;
+  v_conv_presentes integer;
+BEGIN
+  v_inicio_lote := clock_timestamp();
+  -- Owner (Salesforce)
+  SELECT count(*) INTO v_rows_source FROM stg_salesforce s WHERE s.batch_id = p_batch_id AND s.object_type = 'Owner';
+  IF v_rows_source > 0 THEN
+    INSERT INTO owner (source_system, source_id, nome, email, collected_at)
+    SELECT 'salesforce', s.payload->>'Id', s.payload->>'Name', s.payload->>'Email', s.collected_at
+    FROM stg_salesforce s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'Owner'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome = EXCLUDED.nome, email = EXCLUDED.email, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('salesforce', 'Owner', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'Owner'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- Account (Salesforce)
+  SELECT count(*) INTO v_rows_source FROM stg_salesforce s WHERE s.batch_id = p_batch_id AND s.object_type = 'Account';
+  IF v_rows_source > 0 THEN
+    INSERT INTO account (source_system, source_id, nome, collected_at)
+    SELECT 'salesforce', s.payload->>'Id', s.payload->>'Name', s.collected_at
+    FROM stg_salesforce s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'Account'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome = EXCLUDED.nome, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('salesforce', 'Account', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'Account'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- Lead (Salesforce)
+  SELECT count(*) INTO v_rows_source FROM stg_salesforce s WHERE s.batch_id = p_batch_id AND s.object_type = 'Lead';
+  IF v_rows_source > 0 THEN
+    INSERT INTO lead (source_system, source_id, nome, empresa, email, telefone, status, origem_bruta, campanha_linkedin_bruta, identificador_rd, converted_account_id, converted_opportunity_id, owner_id, created_at_source, collected_at)
+    SELECT
+      'salesforce', s.payload->>'Id', s.payload->>'Name', s.payload->>'Company', s.payload->>'Email', s.payload->>'Phone',
+      s.payload->>'Status', s.payload->>'LeadSource', s.payload->>'Campanha_LinkedIn__c', NULLIF(s.payload->>'Identificador_RD__c',''), s.payload->>'ConvertedAccountId',
+      -- migration 090: o vinculo INDIVIDUAL lead->oportunidade. Ate aqui so havia
+      -- ConvertedAccountId, e uma conta com 3 oportunidades creditava as 3 ao
+      -- mesmo lead. Cobertura medida na origem: 320 de 325 convertidos (98,5%).
+      NULLIF(s.payload->>'ConvertedOpportunityId',''),
+      o.id, NULLIF(s.payload->>'CreatedDate','')::timestamptz, s.collected_at
+    FROM stg_salesforce s
+    LEFT JOIN owner o ON o.source_system = 'salesforce' AND o.source_id = s.payload->>'OwnerId'
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'Lead'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome = EXCLUDED.nome, empresa = EXCLUDED.empresa, email = EXCLUDED.email, telefone = EXCLUDED.telefone,
+      status = EXCLUDED.status, origem_bruta = EXCLUDED.origem_bruta, campanha_linkedin_bruta = EXCLUDED.campanha_linkedin_bruta,
+      -- identificador_rd so avanca: NULL da fonte nao apaga o que ja foi
+      -- capturado. Regra original da 081, reposta pela 099.
+      identificador_rd = COALESCE(EXCLUDED.identificador_rd, lead.identificador_rd),
+      converted_account_id = EXCLUDED.converted_account_id,
+      converted_opportunity_id = EXCLUDED.converted_opportunity_id, owner_id = EXCLUDED.owner_id,
+      collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('salesforce', 'Lead', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'Lead'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+
+    v_leads_classificados := 0;
+    FOR v_lead_id_atribuicao IN
+      SELECT l.id
+      FROM lead l
+      JOIN stg_salesforce s ON s.batch_id = p_batch_id AND s.object_type = 'Lead' AND s.payload->>'Id' = l.source_id
+      LEFT JOIN lead_origin_classification cur ON cur.lead_id = l.id AND cur.valid_to IS NULL
+      WHERE cur.id IS NULL
+         OR cur.valor_bruto IS DISTINCT FROM COALESCE(l.campanha_linkedin_bruta, l.origem_bruta)
+    LOOP
+      DECLARE
+        v_result RECORD;
+        v_versao_atual lead_origin_classification%ROWTYPE;
+        v_proxima_versao integer;
+        v_ja_teve_first_touch boolean;
+      BEGIN
+        SELECT * INTO v_result FROM fn_classify_origin(v_lead_id_atribuicao);
+
+        SELECT * INTO v_versao_atual FROM lead_origin_classification
+        WHERE lead_id = v_lead_id_atribuicao AND valid_to IS NULL;
+
+        SELECT EXISTS (
+          SELECT 1 FROM lead_origin_classification WHERE lead_id = v_lead_id_atribuicao AND is_first_touch = true
+        ) INTO v_ja_teve_first_touch;
+
+        SELECT COALESCE(MAX(version), 0) + 1 INTO v_proxima_versao
+        FROM lead_origin_classification WHERE lead_id = v_lead_id_atribuicao;
+
+        IF v_versao_atual.id IS NOT NULL THEN
+          UPDATE lead_origin_classification SET valid_to = now() WHERE id = v_versao_atual.id;
+        END IF;
+
+        INSERT INTO lead_origin_classification (
+          lead_id, version, segmento, categoria, detalhe, campanha_id, sinal_id, valor_bruto, razao,
+          is_first_touch, ruleset_version, classified_by, supersedes_id, reclass_reason, valid_from
+        ) VALUES (
+          v_lead_id_atribuicao, v_proxima_versao, v_result.segmento, v_result.categoria, v_result.detalhe,
+          v_result.campanha_id, v_result.sinal_id, v_result.valor_bruto, v_result.razao,
+          NOT v_ja_teve_first_touch,
+          'v1-s1-s3-s5-s9-s6',
+          CASE WHEN v_versao_atual.id IS NOT NULL THEN 'reclass:fn_run_ingest_batch' ELSE 'ingest:fn_run_ingest_batch' END,
+          v_versao_atual.id,
+          CASE WHEN v_versao_atual.id IS NOT NULL
+            THEN format('Sinal bruto mudou de "%s" para "%s" entre execuções de ingestão.', v_versao_atual.valor_bruto, v_result.valor_bruto)
+            ELSE NULL END,
+          now()
+        );
+        v_leads_classificados := v_leads_classificados + 1;
+      END;
+    END LOOP;
+
+    IF v_leads_classificados > 0 THEN
+      object_type := 'Lead_Atribuicao'; rows_source := v_leads_classificados; rows_target := v_leads_classificados; status := 'ok';
+      RETURN NEXT;
+    END IF;
+  END IF;
+
+  -- ── CurrencyType (Salesforce) — migration 090 ───────────────────────────
+  -- ANTES de Opportunity de proposito: a oportunidade so tem valor comparavel
+  -- depois que a taxa esta na tabela. Se a ordem fosse invertida, o primeiro
+  -- lote de um lote novo converteria contra uma taxa velha.
+  --
+  -- A taxa e DADO DE ORIGEM, ingerido como qualquer outro objeto. Nunca CASE
+  -- com numero escrito no codigo: taxa de cambio muda sozinha, e regra
+  -- hardcoded so e descoberta quando o numero ja saiu errado na tela.
+  SELECT count(*) INTO v_rows_source FROM stg_salesforce s WHERE s.batch_id = p_batch_id AND s.object_type = 'CurrencyType';
+  IF v_rows_source > 0 THEN
+    INSERT INTO currency_rate (iso_code, conversion_rate, is_corporate, is_active, decimal_places, source_id, collected_at)
+    SELECT
+      s.payload->>'IsoCode',
+      NULLIF(s.payload->>'ConversionRate','')::numeric,
+      COALESCE(NULLIF(s.payload->>'IsCorporate','')::boolean, false),
+      COALESCE(NULLIF(s.payload->>'IsActive','')::boolean, true),
+      NULLIF(s.payload->>'DecimalPlaces','')::integer,
+      s.payload->>'Id',
+      s.collected_at
+    FROM stg_salesforce s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'CurrencyType'
+      AND s.payload->>'IsoCode' IS NOT NULL
+    ON CONFLICT (iso_code) DO UPDATE SET
+      conversion_rate = EXCLUDED.conversion_rate, is_corporate = EXCLUDED.is_corporate,
+      is_active = EXCLUDED.is_active, decimal_places = EXCLUDED.decimal_places,
+      source_id = EXCLUDED.source_id, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('salesforce', 'CurrencyType', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'CurrencyType'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- ── OpportunityStage (Salesforce) — migration 092 ───────────────────────
+  -- ANTES de Opportunity pelo mesmo motivo de CurrencyType: a oportunidade só
+  -- é classificável depois que a declaração do estágio está na tabela.
+  --
+  -- Lido INTEIRO a cada execução, sem watermark: são 114 linhas, e a
+  -- classificação de um estágio muda no Setup sem tocar em registro nenhum --
+  -- ler incremental congelaria a regra antiga.
+  --
+  -- Sem DISTINCT ON de propósito: ApiName é único na org (medido, 114 de 114).
+  -- Se um dia chegar duplicado, o ON CONFLICT aborta o lote em voz alta, que é
+  -- melhor do que escolher uma das duas declarações em silêncio.
+  SELECT count(*) INTO v_rows_source FROM stg_salesforce s WHERE s.batch_id = p_batch_id AND s.object_type = 'OpportunityStage';
+  IF v_rows_source > 0 THEN
+    INSERT INTO opportunity_stage (api_name, master_label, is_active, is_won, is_closed, default_probability, forecast_category, sort_order, source_id, collected_at)
+    SELECT
+      s.payload->>'ApiName',
+      s.payload->>'MasterLabel',
+      NULLIF(s.payload->>'IsActive','')::boolean,
+      NULLIF(s.payload->>'IsWon','')::boolean,
+      NULLIF(s.payload->>'IsClosed','')::boolean,
+      NULLIF(s.payload->>'DefaultProbability','')::numeric,
+      NULLIF(s.payload->>'ForecastCategoryName',''),
+      NULLIF(s.payload->>'SortOrder','')::integer,
+      s.payload->>'Id',
+      s.collected_at
+    FROM stg_salesforce s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'OpportunityStage'
+      AND s.payload->>'ApiName' IS NOT NULL
+    ON CONFLICT (api_name) DO UPDATE SET
+      master_label = EXCLUDED.master_label, is_active = EXCLUDED.is_active,
+      is_won = EXCLUDED.is_won, is_closed = EXCLUDED.is_closed,
+      default_probability = EXCLUDED.default_probability,
+      forecast_category = EXCLUDED.forecast_category, sort_order = EXCLUDED.sort_order,
+      source_id = EXCLUDED.source_id, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('salesforce', 'OpportunityStage', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'OpportunityStage'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+  -- Opportunity (Salesforce)
+  SELECT count(*) INTO v_rows_source FROM stg_salesforce s WHERE s.batch_id = p_batch_id AND s.object_type = 'Opportunity';
+  IF v_rows_source > 0 THEN
+    INSERT INTO opportunity (source_system, source_id, account_id, record_type_name, stage_name, lead_source, amount, currency_iso_code, mrr, duracao_meses_contrato, owner_id, created_at_source, closed_at_source, collected_at)
+    SELECT
+      'salesforce', s.payload->>'Id', a.id, s.payload#>>'{RecordType,Name}', s.payload->>'StageName',
+      -- migration 100: a ORIGEM da propria oportunidade. 93,6% das oportunidades
+      -- nao tem lead convertido, entao sem este campo a atribuicao marketing x
+      -- comercial cobria 6,4% da base. Cobertura de LeadSource na org: 8.071 de
+      -- 8.073 (99,98%).
+      NULLIF(s.payload->>'LeadSource',''),
+      NULLIF(s.payload->>'Amount','')::numeric,
+      -- migration 090: a org e MULTI-MOEDA. Sem este campo, `amount` e um numero
+      -- sem unidade e a soma mistura dolar com real.
+      NULLIF(s.payload->>'CurrencyIsoCode',''),
+      NULLIF(s.payload->>'MRR__c','')::numeric,
+      round(NULLIF(s.payload->>'Termo_do_Contrato__c','')::numeric)::integer,
+      o.id, NULLIF(s.payload->>'CreatedDate','')::timestamptz, NULLIF(s.payload->>'CloseDate','')::timestamptz, s.collected_at
+    FROM stg_salesforce s
+    LEFT JOIN account a ON a.source_system = 'salesforce' AND a.source_id = s.payload->>'AccountId'
+    LEFT JOIN owner o ON o.source_system = 'salesforce' AND o.source_id = s.payload->>'OwnerId'
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'Opportunity'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      account_id = EXCLUDED.account_id, record_type_name = EXCLUDED.record_type_name, stage_name = EXCLUDED.stage_name,
+      lead_source = EXCLUDED.lead_source,
+      amount = EXCLUDED.amount, currency_iso_code = EXCLUDED.currency_iso_code,
+      mrr = EXCLUDED.mrr, duracao_meses_contrato = EXCLUDED.duracao_meses_contrato, owner_id = EXCLUDED.owner_id,
+      closed_at_source = EXCLUDED.closed_at_source, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('salesforce', 'Opportunity', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'Opportunity'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- ── RDLead (RD Station) — DESCOBERTA de lead, subtask 8.4. ─────────────
+  -- Payload esperado (montado pelo n8n a partir de
+  -- segmentations/{id}/contacts + contacts/{uuid}):
+  --   {uuid, name, email, empresa, job_title, cf_tamanho_da_empresa,
+  --    cf_falou_com, tags[], created_at, origem_primeira_conversao}
+  --
+  -- Precede as demais seções de RD de propósito: contato e lead têm de
+  -- existir antes de ConversionEvent/WorkflowEvent/FunnelStage tentarem
+  -- resolvê-los.
+  SELECT count(*) INTO v_rows_source FROM stg_rdstation s WHERE s.batch_id = p_batch_id AND s.object_type = 'RDLead';
+  IF v_rows_source > 0 THEN
+    INSERT INTO contact (source_system, source_id, nome, email, collected_at)
+    SELECT 'rd_station', s.payload->>'uuid', NULLIF(s.payload->>'name',''), NULLIF(s.payload->>'email',''), s.collected_at
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'RDLead'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome = EXCLUDED.nome, email = EXCLUDED.email,
+      collected_at = EXCLUDED.collected_at, ingested_at = now();
+
+    INSERT INTO lead (
+      source_system, source_id, nome, empresa, email, origem_bruta,
+      cargo, tamanho_empresa_bruto, atendido_por, tags,
+      is_teste, teste_regra, lista_regra, created_at_source, collected_at
+    )
+    SELECT
+      'rd_station', s.payload->>'uuid',
+      NULLIF(s.payload->>'name',''),
+      NULLIF(s.payload->>'empresa',''),
+      NULLIF(s.payload->>'email',''),
+      NULLIF(s.payload->>'origem_primeira_conversao',''),
+      NULLIF(s.payload->>'job_title',''),
+      NULLIF(s.payload->>'cf_tamanho_da_empresa',''),
+      NULLIF(s.payload->>'cf_falou_com',''),
+      CASE WHEN jsonb_typeof(s.payload->'tags') = 'array'
+           THEN ARRAY(SELECT jsonb_array_elements_text(s.payload->'tags'))
+           ELSE NULL END,
+      fn_lead_e_teste(NULLIF(s.payload->>'email','')) IS NOT NULL,
+      fn_lead_e_teste(NULLIF(s.payload->>'email','')),
+      fn_lead_lista_regra(CASE WHEN jsonb_typeof(s.payload->'tags') = 'array'
+           THEN ARRAY(SELECT jsonb_array_elements_text(s.payload->'tags'))
+           ELSE NULL END),
+      NULLIF(s.payload->>'created_at','')::timestamptz,
+      s.collected_at
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'RDLead'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome                  = EXCLUDED.nome,
+      empresa               = COALESCE(EXCLUDED.empresa, lead.empresa),
+      email                 = EXCLUDED.email,
+      origem_bruta          = COALESCE(lead.origem_bruta, EXCLUDED.origem_bruta),
+      cargo                 = EXCLUDED.cargo,
+      tamanho_empresa_bruto = EXCLUDED.tamanho_empresa_bruto,
+      atendido_por          = EXCLUDED.atendido_por,
+      tags                  = EXCLUDED.tags,
+      -- is_teste é MONOTÔNICO: uma execução nova nunca "des-marca" um lead.
+      is_teste              = lead.is_teste OR EXCLUDED.is_teste,
+      teste_regra           = COALESCE(lead.teste_regra, EXCLUDED.teste_regra),
+      -- lista_regra NAO e monotonica, ao contrario de is_teste: a tag e o dado
+      -- da fonte, e se a fonte tirar a tag o lead deixa de ser de lista. Fixar
+      -- seria decidir contra o dado.
+      lista_regra           = fn_lead_lista_regra(EXCLUDED.tags),
+      collected_at          = EXCLUDED.collected_at,
+      ingested_at           = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+
+    PERFORM fn_registrar_ingest('rd_station', 'RDLead', v_rows_source, v_rows_target,
+      CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'RDLead'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+
+    -- Classificação de origem dos leads nativos do RD. Sem isto, `segmento`
+    -- ficaria nulo para 100% dos leads do RD e o contrato (que exige sempre
+    -- um dos 3 valores) seria violado na primeira consulta.
+    v_leads_classificados := 0;
+    FOR v_lead_id_rd IN
+      SELECT l.id FROM lead l
+      JOIN stg_rdstation s ON s.batch_id = p_batch_id AND s.object_type = 'RDLead'
+                          AND s.payload->>'uuid' = l.source_id
+      WHERE l.source_system = 'rd_station'
+    LOOP
+      IF fn_reclassificar_lead(v_lead_id_rd) THEN
+        v_leads_classificados := v_leads_classificados + 1;
+      END IF;
+    END LOOP;
+
+    IF v_leads_classificados > 0 THEN
+      object_type := 'RDLead_Atribuicao'; rows_source := v_leads_classificados;
+      rows_target := v_leads_classificados; status := 'ok';
+      RETURN NEXT;
+    END IF;
+  END IF;
+
+  -- ── LeadConversion (RD Station) — evento de conversão com firmografia e
+  -- atribuição DO INSTANTE, subtask 8.4. Grava em lead_conversion_event
+  -- (migration 045).
+  --
+  -- Payload esperado (do endpoint de eventos, event_type CONVERSION):
+  --   {contact_uuid, origem_conversao, event_type, occurred_at,
+  --    empresa_bruta, cargo, tamanho_empresa_bruto,
+  --    primeiro_toque_bruto, ultimo_toque_bruto,
+  --    utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id,
+  --    gclid, midia, campanha_de_origem}
+  --
+  -- primeiro_toque_bruto/ultimo_toque_bruto vêm da decodificação base64 de
+  -- `traffic_source` feita no n8n (JS tem base64 nativo; SQL precisaria de
+  -- decode+convert_from e ficaria ilegível). O valor CRU de cada sessão é
+  -- preservado porque quando não há UTM a fonte manda a URL da sessão ou o
+  -- literal `(none)` — e os dois são informação, não ausência dela.
+  -- v13: `rows_source` conta EVENTOS DISTINTOS do lote, nao linhas de
+  -- staging. Ver o cabecalho desta migration: contar linhas de staging fazia
+  -- a deduplicacao legitima (145 duplicatas de fonte num lote real) parecer
+  -- perda de dado, e a assercao AC-8.1 acusava "sincronizacao parcial
+  -- disfarcada de completa" num lote que estava perfeito.
+  SELECT count(*) INTO v_rows_source
+  FROM (
+    SELECT DISTINCT s.payload->>'contact_uuid', s.payload->>'origem_conversao',
+                    NULLIF(s.payload->>'occurred_at','')::timestamptz
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'LeadConversion'
+  ) d;
+  IF v_rows_source > 0 THEN
+    v_conv_gravadas := 0;
+    v_conv_sem_lead := 0;
+    v_conv_status_preenchido := 0;
+    v_conv_presentes := 0;
+    FOR r_lc IN
+      SELECT s.payload AS payload, s.collected_at AS collected_at
+      FROM stg_rdstation s
+      WHERE s.batch_id = p_batch_id AND s.object_type = 'LeadConversion'
+    LOOP
+      v_lead_id_lc := fn_resolve_lead_por_rd_uuid(r_lc.payload->>'contact_uuid');
+
+      IF v_lead_id_lc IS NULL THEN
+        v_conv_sem_lead := v_conv_sem_lead + 1;
+        CONTINUE;
+      END IF;
+
+      INSERT INTO lead_conversion_event (
+        lead_id, origem_conversao, event_type, occurred_at,
+        empresa_bruta, cargo, tamanho_empresa_bruto, tamanho_empresa,
+        primeiro_toque_bruto, ultimo_toque_bruto,
+        utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id,
+        gclid, midia, campanha_de_origem, source_system, collected_at,
+        atribuicao_status
+      ) VALUES (
+        v_lead_id_lc,
+        r_lc.payload->>'origem_conversao',
+        COALESCE(NULLIF(r_lc.payload->>'event_type',''), 'CONVERSION'),
+        NULLIF(r_lc.payload->>'occurred_at','')::timestamptz,
+        NULLIF(r_lc.payload->>'empresa_bruta',''),
+        NULLIF(r_lc.payload->>'cargo',''),
+        NULLIF(r_lc.payload->>'tamanho_empresa_bruto',''),
+        fn_normalizar_tamanho_empresa(NULLIF(r_lc.payload->>'tamanho_empresa_bruto','')),
+        NULLIF(r_lc.payload->>'primeiro_toque_bruto',''),
+        NULLIF(r_lc.payload->>'ultimo_toque_bruto',''),
+        NULLIF(r_lc.payload->>'utm_source',''),
+        NULLIF(r_lc.payload->>'utm_medium',''),
+        NULLIF(r_lc.payload->>'utm_campaign',''),
+        NULLIF(r_lc.payload->>'utm_content',''),
+        NULLIF(r_lc.payload->>'utm_term',''),
+        NULLIF(r_lc.payload->>'utm_id',''),
+        NULLIF(r_lc.payload->>'gclid',''),
+        NULLIF(r_lc.payload->>'midia',''),
+        NULLIF(r_lc.payload->>'campanha_de_origem',''),
+        'rd_station',
+        r_lc.collected_at,
+        -- v10: separa "a fonte nao mandou" de "mandou e nao conseguimos ler".
+        -- O coletor no n8n envia o marcador; se vier ausente do payload,
+        -- infere-se pelo que chegou, sem inventar: sessao presente => ok.
+        COALESCE(
+          NULLIF(r_lc.payload->>'atribuicao_status', ''),
+          CASE WHEN NULLIF(r_lc.payload->>'primeiro_toque_bruto','') IS NOT NULL
+                 OR NULLIF(r_lc.payload->>'ultimo_toque_bruto','') IS NOT NULL
+               THEN 'ok' ELSE NULL END
+        )
+      )
+      -- Dedup por regra de negócio (data-contract.md §1.7): mesmo lead,
+      -- mesma origem, mesmo instante É o mesmo evento. Duplicata real
+      -- observada na fonte, diferindo só na codificação de um acento.
+      -- v11: a dedup continua sendo regra de negocio (mesmo lead, mesma
+      -- origem, mesmo instante E o mesmo evento), mas passa a PREENCHER
+      -- atribuicao_status quando ele ainda esta nulo. Isso permite que uma
+      -- reingestao complete os eventos gravados antes da migration 057 sem
+      -- reescrever NENHUM dado de negocio: o COALESCE nunca sobrescreve um
+      -- status ja definido, e nenhuma outra coluna e tocada.
+      -- v12: duas regras, e ambas sao conservadoras.
+      --
+      -- 1. PREENCHER LACUNA. Colunas de atribuicao recebem valor novo apenas
+      --    quando estao NULL. COALESCE garante que valor ja gravado nunca e
+      --    sobrescrito. Nenhuma coluna de identidade, firmografia ou data
+      --    entra no SET.
+      --
+      -- 2. CORRIGIR FALHA AUTODECLARADA. `ilegivel` significa "nos falhamos
+      --    ao ler" — nao e um fato sobre o lead, e um registro de defeito
+      --    nosso. Quando o coletor melhora e passa a ler, manter o
+      --    `ilegivel` seria preservar a memoria de um bug ja corrigido.
+      --    Entao `ilegivel` PODE ser substituido; qualquer outro status, nao.
+      --
+      -- Isto nao afrouxa a dedup: a regra de negocio (mesmo lead, mesma
+      -- origem, mesmo instante E o mesmo evento) continua intacta, e nenhum
+      -- dado de negocio e reescrito.
+      ON CONFLICT (lead_id, origem_conversao, occurred_at) DO UPDATE
+        SET atribuicao_status =
+              CASE WHEN lead_conversion_event.atribuicao_status IS NULL
+                     OR lead_conversion_event.atribuicao_status = 'ilegivel'
+                   THEN COALESCE(EXCLUDED.atribuicao_status, lead_conversion_event.atribuicao_status)
+                   ELSE lead_conversion_event.atribuicao_status END,
+            utm_source   = COALESCE(lead_conversion_event.utm_source,   EXCLUDED.utm_source),
+            utm_medium   = COALESCE(lead_conversion_event.utm_medium,   EXCLUDED.utm_medium),
+            utm_campaign = COALESCE(lead_conversion_event.utm_campaign, EXCLUDED.utm_campaign),
+            utm_term     = COALESCE(lead_conversion_event.utm_term,     EXCLUDED.utm_term),
+            midia        = COALESCE(lead_conversion_event.midia,        EXCLUDED.midia)
+        WHERE lead_conversion_event.atribuicao_status IS NULL
+           OR lead_conversion_event.atribuicao_status = 'ilegivel'
+           OR lead_conversion_event.utm_source   IS NULL
+           OR lead_conversion_event.utm_medium   IS NULL
+           OR lead_conversion_event.utm_campaign IS NULL
+           OR lead_conversion_event.utm_term     IS NULL
+           OR lead_conversion_event.midia        IS NULL;
+
+      -- ARMADILHA DA v11: com DO UPDATE condicional, `FOUND` passa a ser
+      -- true tambem quando o conflito apenas PREENCHEU o status de um evento
+      -- que ja existia. Contar isso como "gravado" inflaria a metrica e
+      -- destruiria a prova de idempotencia (reprocessar o mesmo lote
+      -- passaria a reportar linhas novas). Distingo pelo xmin: linha recem
+      -- inserida tem xmin igual a transacao corrente.
+      IF FOUND THEN
+        IF EXISTS (
+          SELECT 1 FROM lead_conversion_event e
+          WHERE e.lead_id = v_lead_id_lc
+            AND e.origem_conversao = r_lc.payload->>'origem_conversao'
+            AND e.occurred_at = NULLIF(r_lc.payload->>'occurred_at','')::timestamptz
+            AND e.ingested_at >= v_inicio_lote
+        ) THEN
+          v_conv_gravadas := v_conv_gravadas + 1;
+        ELSE
+          v_conv_status_preenchido := v_conv_status_preenchido + 1;
+        END IF;
+      END IF;
+    END LOOP;
+
+    -- v13: `rows_target` conta os eventos do lote PRESENTES no destino
+    -- depois desta execucao — nao os recem-inseridos.
+    --
+    -- Sem isso, o invariante AC-8.1 (ok => source == target) seria
+    -- incompativel com idempotencia: numa reexecucao correta nada e inserido,
+    -- `rows_target` daria 0, e o lote perfeito seria acusado de perda total.
+    -- "Quantos eventos do lote estao no destino" e a pergunta de
+    -- reconciliacao; "quantos entraram agora" e uma metrica de operacao, e
+    -- continua reportada separado.
+    SELECT count(*) INTO v_conv_presentes
+    FROM (
+      SELECT DISTINCT s.payload->>'contact_uuid' AS uuid,
+                      s.payload->>'origem_conversao' AS origem,
+                      NULLIF(s.payload->>'occurred_at','')::timestamptz AS quando
+      FROM stg_rdstation s
+      WHERE s.batch_id = p_batch_id AND s.object_type = 'LeadConversion'
+    ) d
+    WHERE EXISTS (
+      SELECT 1 FROM lead_conversion_event e
+      WHERE e.lead_id = fn_resolve_lead_por_rd_uuid(d.uuid)
+        AND e.origem_conversao = d.origem
+        AND e.occurred_at = d.quando
+    );
+
+    PERFORM fn_registrar_ingest('rd_station', 'LeadConversion', v_rows_source, v_conv_presentes,
+      CASE WHEN v_conv_sem_lead = 0 THEN 'ok' ELSE 'partial' END,
+      CASE WHEN v_conv_sem_lead > 0
+        THEN format('%s evento(s) de conversão sem lead resolvido — o contato não veio no mesmo lote de RDLead nem existe vínculo em identity_edge. Eventos NÃO foram descartados do staging: reprocessar o lote depois de ingerir os contatos.', v_conv_sem_lead)
+        ELSE NULL END);
+    object_type := 'LeadConversion'; rows_source := v_rows_source; rows_target := v_conv_presentes;
+    status := CASE WHEN v_conv_sem_lead = 0 THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+
+    -- Reportado separado de propósito: preencher status em evento antigo NAO
+    -- e ingestao de dado novo, e somar os dois esconderia que a ingestao foi
+    -- idempotente.
+    -- Metrica de operacao, separada da de reconciliacao.
+    IF v_conv_gravadas > 0 THEN
+      object_type := 'LeadConversion_Novos'; rows_source := v_conv_gravadas;
+      rows_target := v_conv_gravadas; status := 'ok';
+      RETURN NEXT;
+    END IF;
+
+    IF v_conv_status_preenchido > 0 THEN
+      PERFORM fn_registrar_ingest('rd_station', 'LeadConversion_StatusPreenchido',
+        v_conv_status_preenchido, v_conv_status_preenchido, 'ok',
+        format('%s evento(s) pre-existentes tiveram atribuicao_status preenchido (migration 057/058). Nenhum outro campo foi alterado.', v_conv_status_preenchido));
+      object_type := 'LeadConversion_StatusPreenchido';
+      rows_source := v_conv_status_preenchido; rows_target := v_conv_status_preenchido;
+      status := 'ok';
+      RETURN NEXT;
+    END IF;
+
+    -- Escalonamento de is_teste. As regras de gclid e de utm só podem ser
+    -- avaliadas no EVENTO — o cadastro não tem esses campos. Um lead que
+    -- passa pela regra de e-mail pode ainda assim ter eventos com utm de
+    -- teste, e nesse caso quem manda é o evento.
+    UPDATE lead l
+       SET is_teste = true,
+           teste_regra = COALESCE(l.teste_regra, s.regra),
+           ingested_at = now()
+      FROM (
+        SELECT DISTINCT e.lead_id, fn_lead_e_teste(
+                 NULL, e.gclid,
+                 ARRAY[e.utm_source, e.utm_medium, e.utm_campaign, e.utm_content, e.utm_term, e.utm_id],
+                 e.origem_conversao) AS regra
+        FROM lead_conversion_event e
+        JOIN lead l2 ON l2.id = e.lead_id AND NOT l2.is_teste
+      ) s
+     WHERE l.id = s.lead_id AND s.regra IS NOT NULL;
+    GET DIAGNOSTICS v_leads_escalados = ROW_COUNT;
+
+    IF v_leads_escalados > 0 THEN
+      PERFORM fn_registrar_ingest('rd_station', 'LeadConversion_MarcacaoTeste', v_leads_escalados, v_leads_escalados, 'ok',
+        format('%s lead(s) marcados como teste por regra de gclid/utm no evento — visível na aba Qualidade de dados, nunca deletados (data-contract.md §1.6).', v_leads_escalados));
+      object_type := 'LeadConversion_MarcacaoTeste'; rows_source := v_leads_escalados;
+      rows_target := v_leads_escalados; status := 'ok';
+      RETURN NEXT;
+    END IF;
+  END IF;
+
+  -- ConversionEvent (RD Station)
+  SELECT count(*) INTO v_rows_source FROM stg_rdstation s WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent';
+  IF v_rows_source > 0 THEN
+    INSERT INTO contact (source_system, source_id, nome, email, telefone, collected_at)
+    SELECT
+      'rd_station', s.payload->>'uuid',
+      COALESCE(s.payload#>>'{last_conversion,content,Nome}', s.payload->>'name'),
+      COALESCE(s.payload#>>'{last_conversion,content,email_lead}', s.payload->>'email'),
+      COALESCE(s.payload#>>'{last_conversion,content,Telefone}', s.payload->>'personal_phone'),
+      s.collected_at
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome = EXCLUDED.nome, email = EXCLUDED.email, telefone = EXCLUDED.telefone,
+      collected_at = EXCLUDED.collected_at, ingested_at = now();
+
+    INSERT INTO campaign (source_system, source_id, nome, codigo_leadsource, canal, collected_at)
+    SELECT DISTINCT ON (codigo)
+      'rd_station', codigo, codigo, codigo, 'rd_station', s.collected_at
+    FROM (
+      SELECT
+        COALESCE(s.payload#>>'{last_conversion,content,identificador}', s.payload#>>'{last_conversion,content,utm_campaign}') AS codigo,
+        s.collected_at
+      FROM stg_rdstation s
+      WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent'
+    ) s
+    WHERE codigo IS NOT NULL
+    ON CONFLICT (source_system, source_id) DO NOTHING;
+
+    INSERT INTO conversion_event (contact_id, campaign_ref_id, tipo, ativo_de_origem, source_system, source_event_id, occurred_at, date_traceable, collected_at)
+    SELECT
+      c.id, camp.id, 'conversao',
+      COALESCE(s.payload#>>'{last_conversion,content,identificador}', s.payload#>>'{last_conversion,content,event_identifier}'),
+      'rd_station',
+      s.payload#>>'{last_conversion,content,__cdp__original_event,event_uuid}',
+      NULLIF(s.payload#>>'{last_conversion,created_at}', '')::timestamptz,
+      (s.payload#>>'{last_conversion,created_at}') IS NOT NULL,
+      s.collected_at
+    FROM stg_rdstation s
+    JOIN contact c ON c.source_system = 'rd_station' AND c.source_id = s.payload->>'uuid'
+    LEFT JOIN campaign camp ON camp.source_system = 'rd_station'
+      AND camp.source_id = COALESCE(s.payload#>>'{last_conversion,content,identificador}', s.payload#>>'{last_conversion,content,utm_campaign}')
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent'
+    ON CONFLICT (source_system, source_event_id, occurred_at) WHERE source_event_id IS NOT NULL DO UPDATE SET
+      contact_id = EXCLUDED.contact_id, campaign_ref_id = EXCLUDED.campaign_ref_id, tipo = EXCLUDED.tipo,
+      ativo_de_origem = EXCLUDED.ativo_de_origem,
+      date_traceable = EXCLUDED.date_traceable, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+
+    -- REPOSTO PELA MIGRATION 101 (2026-09-16): este bloco inteiro sumiu quando a
+    -- 090 foi escrita sobre o corpo da 073. Texto identico ao da 078, reinserido
+    -- sobre o corpo vivo -- ver cabecalho da 101.
+    -- ── v12 (migration 078): o webhook passa a alimentar lead e
+    -- lead_conversion_event, nao so contact e conversion_event.
+    --
+    -- ATE AQUI o caminho do webhook (tempo real) escrevia em `contact` e na
+    -- tabela antiga `conversion_event`, que NAO TEM colunas de UTM. Todo o
+    -- resto do payload -- utm_source, utm_medium, utm_campaign, utm_content,
+    -- utm_term, utm_id (que e o ID do anuncio no Meta), Midia, Cargo, Tamanho
+    -- da Empresa -- ficava parado no JSON de staging e nunca chegava na tela.
+    --
+    -- Quem enriquecia era so o caminho do PULL de descoberta (object_type
+    -- 'LeadConversion'), que roda em lote. Resultado pratico: lead que chega
+    -- AGORA aparece no dashboard como linha crua, so com a origem; lead que
+    -- chegou no ultimo lote aparece completo. Dois caminhos, um so deles
+    -- entregando o dado que o RD ja mandou.
+    --
+    -- O payload do webhook e ANINHADO e cru (formato da API do RD); o do pull
+    -- vem achatado pelo coletor no n8n. Por isso o mapeamento abaixo nao pode
+    -- ser copiado do ramo LeadConversion -- ele le os mesmos campos nos
+    -- caminhos onde o RD de fato os coloca, com COALESCE entre
+    -- custom_fields e last_conversion.content (a fonte popula os dois, nem
+    -- sempre ambos).
+
+    INSERT INTO lead (
+      source_system, source_id, nome, empresa, email, telefone,
+      origem_bruta, cargo, tamanho_empresa_bruto, tags,
+      is_teste, teste_regra, lista_regra, created_at_source, collected_at
+    )
+    SELECT
+      'rd_station', s.payload->>'uuid',
+      COALESCE(s.payload#>>'{last_conversion,content,Nome}', s.payload->>'name'),
+      COALESCE(s.payload#>>'{last_conversion,content,Empresa}', s.payload->>'company'),
+      COALESCE(s.payload#>>'{last_conversion,content,email_lead}', s.payload->>'email'),
+      COALESCE(s.payload#>>'{last_conversion,content,Telefone}', s.payload->>'personal_phone'),
+      COALESCE(s.payload#>>'{first_conversion,content,conversion_identifier}',
+               s.payload#>>'{last_conversion,content,identificador}'),
+      COALESCE(s.payload#>>'{last_conversion,content,Cargo}', s.payload->>'job_title'),
+      COALESCE(s.payload#>>'{custom_fields,Tamanho da Empresa}',
+               s.payload#>>'{last_conversion,content,Tamanho da Empresa}'),
+      CASE WHEN jsonb_typeof(s.payload->'tags') = 'array'
+           THEN ARRAY(SELECT jsonb_array_elements_text(s.payload->'tags'))
+           ELSE NULL END,
+      fn_lead_e_teste(COALESCE(s.payload#>>'{last_conversion,content,email_lead}', s.payload->>'email')) IS NOT NULL,
+      fn_lead_e_teste(COALESCE(s.payload#>>'{last_conversion,content,email_lead}', s.payload->>'email')),
+      fn_lead_lista_regra(CASE WHEN jsonb_typeof(s.payload->'tags') = 'array'
+                               THEN ARRAY(SELECT jsonb_array_elements_text(s.payload->'tags'))
+                               ELSE NULL END),
+      NULLIF(s.payload->>'created_at','')::timestamptz,
+      s.collected_at
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent'
+      AND s.payload->>'uuid' IS NOT NULL
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome                  = COALESCE(EXCLUDED.nome, lead.nome),
+      empresa               = COALESCE(EXCLUDED.empresa, lead.empresa),
+      email                 = COALESCE(EXCLUDED.email, lead.email),
+      telefone              = COALESCE(EXCLUDED.telefone, lead.telefone),
+      -- origem_bruta e o PRIMEIRO toque: nao sobrescreve quando ja existe.
+      origem_bruta          = COALESCE(lead.origem_bruta, EXCLUDED.origem_bruta),
+      cargo                 = COALESCE(EXCLUDED.cargo, lead.cargo),
+      tamanho_empresa_bruto = COALESCE(EXCLUDED.tamanho_empresa_bruto, lead.tamanho_empresa_bruto),
+      tags                  = COALESCE(EXCLUDED.tags, lead.tags),
+      is_teste              = lead.is_teste OR EXCLUDED.is_teste,
+      teste_regra           = COALESCE(lead.teste_regra, EXCLUDED.teste_regra),
+      lista_regra           = fn_lead_lista_regra(COALESCE(EXCLUDED.tags, lead.tags)),
+      collected_at          = EXCLUDED.collected_at,
+      ingested_at           = now();
+
+    INSERT INTO lead_conversion_event (
+      lead_id, origem_conversao, event_type, occurred_at,
+      empresa_bruta, cargo, tamanho_empresa_bruto, tamanho_empresa,
+      primeiro_toque_bruto, ultimo_toque_bruto,
+      utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id,
+      gclid, midia, campanha_de_origem, source_system, collected_at,
+      atribuicao_status
+    )
+    SELECT
+      l.id,
+      COALESCE(s.payload#>>'{last_conversion,content,identificador}',
+               s.payload#>>'{last_conversion,content,conversion_identifier}',
+               s.payload#>>'{last_conversion,source}'),
+      COALESCE(NULLIF(s.payload#>>'{last_conversion,content,event_type}',''), 'CONVERSION'),
+      NULLIF(s.payload#>>'{last_conversion,created_at}','')::timestamptz,
+      COALESCE(s.payload#>>'{last_conversion,content,Empresa}', s.payload->>'company'),
+      COALESCE(s.payload#>>'{last_conversion,content,Cargo}', s.payload->>'job_title'),
+      COALESCE(s.payload#>>'{custom_fields,Tamanho da Empresa}',
+               s.payload#>>'{last_conversion,content,Tamanho da Empresa}'),
+      fn_normalizar_tamanho_empresa(COALESCE(s.payload#>>'{custom_fields,Tamanho da Empresa}',
+                                             s.payload#>>'{last_conversion,content,Tamanho da Empresa}')),
+      NULLIF(s.payload#>>'{first_conversion,content,traffic_source}',''),
+      NULLIF(s.payload#>>'{last_conversion,content,traffic_source}',''),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,utm_source}',''),  NULLIF(s.payload#>>'{last_conversion,content,utm_source}','')),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,utm_medium}',''),  NULLIF(s.payload#>>'{last_conversion,content,utm_medium}','')),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,utm_campaign}',''),NULLIF(s.payload#>>'{last_conversion,content,utm_campaign}','')),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,utm_content}',''), NULLIF(s.payload#>>'{last_conversion,content,utm_content}','')),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,utm_term}',''),    NULLIF(s.payload#>>'{last_conversion,content,utm_term}','')),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,utm_id}',''),      NULLIF(s.payload#>>'{last_conversion,content,utm_id}','')),
+      NULLIF(s.payload#>>'{custom_fields,gclid}',''),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,Mídia}',''), NULLIF(s.payload#>>'{last_conversion,content,Mídia}','')),
+      COALESCE(NULLIF(s.payload#>>'{custom_fields,Campanha de Origem}',''),
+               NULLIF(s.payload#>>'{last_conversion,content,Campanha de Origem}','')),
+      'rd_station',
+      s.collected_at,
+      -- Mesma regra do ramo do pull: 'ok' quando a fonte mandou sinal de
+      -- sessao/trafego; NULL quando nao mandou. Nunca inventa.
+      CASE WHEN NULLIF(s.payload#>>'{last_conversion,content,traffic_source}','') IS NOT NULL
+                OR NULLIF(s.payload#>>'{custom_fields,utm_source}','') IS NOT NULL
+           THEN 'ok' ELSE NULL END
+    FROM stg_rdstation s
+    JOIN lead l ON l.source_system = 'rd_station' AND l.source_id = s.payload->>'uuid'
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent'
+      AND NULLIF(s.payload#>>'{last_conversion,created_at}','') IS NOT NULL
+    ON CONFLICT DO NOTHING;
+
+    -- Classifica o lead recem-chegado com as regras vigentes, para ele nao
+    -- ficar 'NaoAtribuido' ate a proxima reclassificacao manual.
+    PERFORM fn_reclassificar_lead(l.id)
+    FROM stg_rdstation s
+    JOIN lead l ON l.source_system = 'rd_station' AND l.source_id = s.payload->>'uuid'
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'ConversionEvent';
+
+    PERFORM fn_registrar_ingest('rd_station', 'ConversionEvent', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'ConversionEvent'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- ── WorkflowEvent (RD Station) — S7, segunda metade de P-ING-5. ────────
+  -- Payload esperado (montado pelo workflow n8n a partir de
+  -- workflow_leads_started_list/workflow_leads_exited_list):
+  -- {contact_uuid, workflow_id, workflow_nome, tipo: 'workflow_entrada'|
+  --  'workflow_saida', occurred_at}. Grava via fn_record_touchpoint (3.13),
+  -- nunca direto em lead_touchpoint.
+  SELECT count(*) INTO v_rows_source FROM stg_rdstation s WHERE s.batch_id = p_batch_id AND s.object_type = 'WorkflowEvent';
+  IF v_rows_source > 0 THEN
+    INSERT INTO automation_workflow (source_system, source_id, nome, collected_at)
+    SELECT DISTINCT ON (s.payload->>'workflow_id')
+      'rd_station', s.payload->>'workflow_id', s.payload->>'workflow_nome', s.collected_at
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'WorkflowEvent'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      nome = EXCLUDED.nome, collected_at = EXCLUDED.collected_at, ingested_at = now();
+
+    v_touchpoints_gravados := 0;
+    v_touchpoints_sem_lead := 0;
+    FOR r_we IN
+      SELECT s.payload AS payload, s.collected_at AS collected_at
+      FROM stg_rdstation s
+      WHERE s.batch_id = p_batch_id AND s.object_type = 'WorkflowEvent'
+    LOOP
+      -- v9: resolve via fn_resolve_lead_por_rd_uuid (Tier1 Salesforce, senao
+      -- lead nativo do RD). Antes daqui a resolucao era SO Salesforce, e os
+      -- leads nativos do RD ficariam orfaos de funil/workflow.
+      v_lead_id_we := fn_resolve_lead_por_rd_uuid(r_we.payload->>'contact_uuid');
+      v_lead_source_system := NULL;
+      v_lead_source_id := NULL;
+      IF v_lead_id_we IS NOT NULL THEN
+        SELECT l.source_system, l.source_id
+          INTO v_lead_source_system, v_lead_source_id
+        FROM lead l WHERE l.id = v_lead_id_we;
+      END IF;
+
+      IF v_lead_source_id IS NULL THEN
+        v_touchpoints_sem_lead := v_touchpoints_sem_lead + 1;
+        CONTINUE;
+      END IF;
+
+      SELECT fn_record_touchpoint(
+        v_lead_source_system, v_lead_source_id,
+        NULLIF(r_we.payload->>'occurred_at', '')::timestamptz::date,
+        'rd_station', r_we.payload->>'tipo', NULL,
+        'rd_station', r_we.payload->>'workflow_id',
+        r_we.collected_at
+      ) INTO v_touchpoint_id_novo;
+      IF v_touchpoint_id_novo IS NOT NULL THEN
+        v_touchpoints_gravados := v_touchpoints_gravados + 1;
+      END IF;
+    END LOOP;
+
+    PERFORM fn_registrar_ingest('rd_station', 'WorkflowEvent', v_rows_source, v_touchpoints_gravados, CASE WHEN v_touchpoints_sem_lead = 0 THEN 'ok' ELSE 'partial' END, CASE WHEN v_touchpoints_sem_lead > 0
+        THEN format('%s evento(s) de workflow sem lead vinculado via identity_edge (contato ainda não resolvido pela Tier 1 — rodar fn_identity_tier1_resolve antes deste pull).', v_touchpoints_sem_lead)
+        ELSE NULL END);
+    object_type := 'WorkflowEvent'; rows_source := v_rows_source; rows_target := v_touchpoints_gravados;
+    status := CASE WHEN v_touchpoints_sem_lead = 0 THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- ── FunnelStage (RD Station) — DM-8 por lead, segunda metade de P-ING-5.
+  -- Payload esperado (de contact_funnel_stage_get): {contact_uuid,
+  -- lifecycle_stage}. Vocabulário upsertado dinamicamente (nunca um enum
+  -- fixo adivinhado). Só grava quando o estágio DIFERE do último já
+  -- registrado para aquele lead.
+  SELECT count(*) INTO v_rows_source FROM stg_rdstation s WHERE s.batch_id = p_batch_id AND s.object_type = 'FunnelStage';
+  IF v_rows_source > 0 THEN
+    INSERT INTO funnel_stage (origem, nome)
+    SELECT DISTINCT 'rd_station', s.payload->>'lifecycle_stage'
+    FROM stg_rdstation s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'FunnelStage' AND s.payload->>'lifecycle_stage' IS NOT NULL
+    ON CONFLICT (origem, nome) DO NOTHING;
+
+    v_estagios_gravados := 0;
+    v_estagios_sem_lead := 0;
+    FOR r_fs IN
+      SELECT s.payload AS payload, s.collected_at AS collected_at
+      FROM stg_rdstation s
+      WHERE s.batch_id = p_batch_id AND s.object_type = 'FunnelStage'
+    LOOP
+      -- v9: idem WorkflowEvent.
+      v_lead_id_fs := fn_resolve_lead_por_rd_uuid(r_fs.payload->>'contact_uuid');
+
+      IF v_lead_id_fs IS NULL THEN
+        v_estagios_sem_lead := v_estagios_sem_lead + 1;
+        CONTINUE;
+      END IF;
+
+      SELECT fs.id INTO v_stage_ref_id FROM funnel_stage fs
+      WHERE fs.origem = 'rd_station' AND fs.nome = r_fs.payload->>'lifecycle_stage';
+
+      SELECT fse.funnel_stage_ref_id INTO v_ultimo_stage_ref_id
+      FROM lead_funnel_stage_event fse
+      WHERE fse.lead_id = v_lead_id_fs
+      ORDER BY fse.occurred_on DESC, fse.id DESC
+      LIMIT 1;
+
+      IF v_ultimo_stage_ref_id IS NOT DISTINCT FROM v_stage_ref_id THEN
+        CONTINUE;
+      END IF;
+
+      INSERT INTO lead_funnel_stage_event (lead_id, funnel_stage_ref_id, occurred_on, fonte, collected_at)
+      VALUES (v_lead_id_fs, v_stage_ref_id, r_fs.collected_at::date, 'rd_station', r_fs.collected_at)
+      ON CONFLICT (lead_id, funnel_stage_ref_id, occurred_on) DO NOTHING;
+      v_estagios_gravados := v_estagios_gravados + 1;
+    END LOOP;
+
+    PERFORM fn_registrar_ingest('rd_station', 'FunnelStage', v_rows_source, v_estagios_gravados, CASE WHEN v_estagios_sem_lead = 0 THEN 'ok' ELSE 'partial' END, CASE WHEN v_estagios_sem_lead > 0
+        THEN format('%s contato(s) sem lead vinculado via identity_edge (não resolvido pela Tier 1).', v_estagios_sem_lead)
+        ELSE NULL END);
+    object_type := 'FunnelStage'; rows_source := v_rows_source; rows_target := v_estagios_gravados;
+    status := CASE WHEN v_estagios_sem_lead = 0 THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- ── ad_campaign (Meta/Google/LinkedIn Ads) — 2.18, ADAPT do workflow de ads
+  -- existente. campaign_ref_id fica NULL por desenho (DM-6: nem toda ad_campaign
+  -- tem uma campaign correspondente conhecida) — não força um match adivinhado.
+  SELECT count(*) INTO v_rows_source FROM stg_ads s WHERE s.batch_id = p_batch_id AND s.object_type = 'campaign';
+  IF v_rows_source > 0 THEN
+    INSERT INTO ad_campaign (source_system, source_id, plataforma, campanha_id, metricas, collected_at)
+    SELECT s.source_system, s.payload->>'source_id', s.payload->>'plataforma', s.payload->>'source_id', s.payload->'metricas', s.collected_at
+    FROM stg_ads s
+    WHERE s.batch_id = p_batch_id AND s.object_type = 'campaign'
+    ON CONFLICT (source_system, source_id) DO UPDATE SET
+      plataforma = EXCLUDED.plataforma, metricas = EXCLUDED.metricas, collected_at = EXCLUDED.collected_at, ingested_at = now();
+    GET DIAGNOSTICS v_rows_target = ROW_COUNT;
+    PERFORM fn_registrar_ingest('ads', 'ad_campaign', v_rows_source, v_rows_target, CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END, NULL);
+    object_type := 'ad_campaign'; rows_source := v_rows_source; rows_target := v_rows_target;
+    status := CASE WHEN v_rows_source = v_rows_target THEN 'ok' ELSE 'partial' END;
+    RETURN NEXT;
+  END IF;
+
+  -- Fontes ainda sem mapeamento (ads/sheets, e RD Station fora dos 3 tipos
+  -- já cobertos): reportadas como falha explícita, nunca zero silencioso.
+  SELECT count(*) INTO v_pendente_nao_mapeado
+  FROM (
+    SELECT r.batch_id FROM stg_rdstation r WHERE r.batch_id = p_batch_id AND r.object_type NOT IN ('ConversionEvent', 'WorkflowEvent', 'FunnelStage', 'RDLead', 'LeadConversion')
+    UNION ALL
+    SELECT a.batch_id FROM stg_ads a WHERE a.batch_id = p_batch_id AND a.object_type <> 'campaign'
+    UNION ALL
+    SELECT sh.batch_id FROM stg_sheets sh WHERE sh.batch_id = p_batch_id
+  ) pendentes;
+
+  IF v_pendente_nao_mapeado > 0 THEN
+    INSERT INTO ingest_run (source, object, started_at, finished_at, rows_source, rows_target, status, error_message)
+    VALUES ('ads_sheets_ou_rdstation_outro_tipo', 'nao_mapeado', now(), now(), v_pendente_nao_mapeado, 0, 'failed',
+      'Mapeamento staging→canônico ainda não implementado para este object_type — staging recebido mas NÃO processado, reportado como falha explícita.');
+    object_type := 'nao_mapeado'; rows_source := v_pendente_nao_mapeado; rows_target := 0; status := 'failed';
+    RETURN NEXT;
+  END IF;
+
+  RETURN;
+END;
+$function$;
+
+
+COMMENT ON FUNCTION public.fn_run_ingest_batch(text) IS
+  'v13 (migration 062): LeadConversion passa a reportar rows_source = eventos DISTINTOS do lote e rows_target = quantos deles estao no destino apos a execucao. Antes contava linhas de staging contra recem-inseridos, o que (a) fazia a deduplicacao legitima parecer perda de dado e (b) tornava o invariante AC-8.1 incompativel com idempotencia (reexecucao correta daria target=0). Os recem-inseridos seguem reportados como LeadConversion_Novos. Resto herdado da v12/060. v14 (migration 099): repoe `identificador_rd` no caminho de Lead do Salesforce, que a 090 apagou sem querer ao reescrever esta funcao a partir do ARQUIVO da 073 em vez do corpo vivo. v15 (migration 101): repoe o enriquecimento do webhook do RD (lead + lead_conversion_event com UTM vindo de custom_fields/last_conversion), perdido na mesma reversao da 090. v16 (migration 102): acrescenta o mapeamento de Opportunity.LeadSource (bloco da 100) e CONSOLIDA os cinco blocos num corpo unico. A 102 existe porque a ordem LEXICAL do runner roda 101 depois de 100, e o arquivo da 101 nao tem lead_source: num rebuild do zero a 101 reverteria a 100. Regra para quem for tocar nesta funcao: releia pg_get_functiondef IMEDIATAMENTE antes de aplicar (a 100 partiu do corpo vivo e mesmo assim reverteu a 101, porque o dump tinha 11 minutos), diffe contra o corpo vivo DEPOIS de aplicar, e rode a secao J11 de db/queries/verificacao/aba-oportunidades.sql, que conta os tokens dos cinco blocos. Atencao: `last_conversion` da falso positivo (9 ocorrencias existem sem o bloco do webhook); o token que decide e `custom_fields`.';
+
+COMMIT;
