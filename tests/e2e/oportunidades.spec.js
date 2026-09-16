@@ -181,15 +181,379 @@ test.describe('Aba Oportunidades (CRM ao vivo)', () => {
     await expect(linha).not.toContainText('R$ 600.000,00');
   });
 
-  test('a lista não expõe nome de lead (repositório público, aba é sobre o negócio)', async ({ page }) => {
+  test('a aba não expõe PESSOA: nem coluna de identificação, nem e-mail ou telefone no conteúdo', async ({ page }) => {
+    // A VERSÃO ANTERIOR PROIBIA A PALAVRA "lead" EM QUALQUER CABEÇALHO, e isso
+    // deixou de servir quando a seção de categoria trouxe a coluna "Leads
+    // gerados" — que é uma CONTAGEM agregada, não identificação de ninguém. A
+    // regra foi reescrita para dizer o que ela sempre quis dizer, e ficou mais
+    // rígida, não mais frouxa:
+    //
+    //   1. nenhum cabeçalho pode identificar uma PESSOA (nome, e-mail, telefone,
+    //      ou uma coluna "Lead"/"Contato" no singular, que é o que carregaria
+    //      um indivíduo);
+    //   2. e agora o CONTEÚDO inteiro da aba é varrido atrás de e-mail e
+    //      telefone — que é o dado do incidente, e que o teste antigo nunca
+    //      olhou porque só lia cabeçalho.
     await page.goto('/?view=oportunidades-crm&dados=mock');
     await expect(page.locator('#opc-lista-foot')).toContainText('não exibe nome de lead');
+
     const cols = await page.locator('#view-oportunidades-crm thead th').allInnerTexts();
-    expect(cols.join('|')).not.toMatch(/lead|nome|e-mail|telefone/i);
+    const juntos = cols.join('|');
+    expect(juntos).not.toMatch(/nome|e-?mail|telefone|celular|cpf/i);
+    // "Lead"/"Contato" no singular identificaria um indivíduo; "Leads gerados"
+    // é contagem. A distinção é o plural seguido de qualificador agregado.
+    for (const col of cols) {
+      expect(col.trim()).not.toMatch(/^(lead|contato|pessoa)$/i);
+    }
+    expect(cols.some((c) => /^leads gerados$/i.test(c.trim()))).toBe(true);
+
+    // O conteúdo, e não só os títulos. Vale para a tabela de baixo e para o painel.
+    const varrer = async () => {
+      const texto = await page.locator('#view-oportunidades-crm').innerText();
+      expect(texto).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
+      expect(texto).not.toMatch(/\(?\d{2}\)?\s?9?\d{4}-?\d{4}/);
+    };
+    await varrer();
+    await page.click('#opc-kpis .kpi[data-drill="ganhas"]');
+    await page.waitForSelector('#opc-det-rows tr');
+    await varrer();
   });
 
   test('sem recorte de período a tela diz isso por escrito, em vez de deixar o leitor supor', async ({ page }) => {
     await page.goto('/?view=oportunidades-crm&dados=mock&cenario=sem_periodo');
     await expect(page.locator('#opc-recorte-info')).toContainText('sem recorte de período');
+  });
+
+  // ── DRILL-DOWN: o painel que abre ao clicar num número ────────────────────
+  // Em modo mock o fixture NÃO refiltra (ver data-api.js), então aqui não dá
+  // para verificar a igualdade painel × card — ela é medida contra a API real
+  // em tests/contract/oportunidades-drilldown-api.test.mjs. O que estes specs
+  // pegam é a FIAÇÃO: abrir, fechar, teclado, URL, paginação, e quais números
+  // podem ou não virar botão.
+
+  test('clicar num card abre o painel, com o recorte escrito no título', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    await expect(page.locator('#opc-detalhe')).toBeHidden();
+
+    await page.click('#opc-kpis .kpi[data-drill="ganhas"]');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+    await expect(page.locator('#opc-det-titulo')).toContainText('Ganhas');
+    await expect(page.locator('#opc-det-titulo')).toContainText('oportunidades');
+    // o recorte, por extenso, e não "detalhe"
+    await expect(page.locator('#opc-det-sub')).toContainText('Recorte:');
+    await expect(page.locator('#opc-det-sub')).toContainText('desfecho = Ganhas');
+    await expect(page.locator('#opc-det-rows tr')).toHaveCount(50);
+    // e o estado do painel vai para a URL (F5 e link compartilhado)
+    await expect(page).toHaveURL(/odet=ganhas/);
+  });
+
+  test('o painel fecha no X, no overlay e no Esc — e some da URL', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+
+    // O overlay é fechado por CLIQUE NA MARGEM VISÍVEL, não no centro: o
+    // diálogo fica por cima do meio da tela (é a mesma geometria do modal
+    // legado). `page.click` miraria o centro do overlay, que está coberto — o
+    // usuário clica no canto, e é isso que o teste faz.
+    const fecharPor = {
+      'botão X': () => page.click('#opc-det-fechar'),
+      'clique fora (canto superior esquerdo)': () => page.mouse.click(8, 8),
+      'tecla Esc': () => page.keyboard.press('Escape'),
+    };
+    for (const [, acao] of Object.entries(fecharPor)) {
+      await page.click('#opc-kpis .kpi[data-drill="perdidas"]');
+      await expect(page.locator('#opc-detalhe')).toBeVisible();
+      await expect(page).toHaveURL(/odet=perdidas/);
+      await acao();
+      await expect(page.locator('#opc-detalhe')).toBeHidden();
+      await expect(page).not.toHaveURL(/odet=/);
+    }
+  });
+
+  test('o painel sobrevive ao F5 — ele vive na URL como o resto da aba', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock&odet=segmento:Marketing');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+    await expect(page.locator('#opc-det-titulo')).toContainText('Marketing');
+    await expect(page.locator('#opc-det-rows tr')).toHaveCount(50);
+    // a chave de sessão de teste não pode ser apagada pela reescrita da URL
+    await expect(page).toHaveURL(/dados=mock/);
+    await expect(page).toHaveURL(/odet=segmento/);
+  });
+
+  test('`odet` adulterado não abre painel nenhum nem derruba a aba', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock&odet=xpto');
+    await expect(page.locator('#opc-kpis .kpi')).toHaveCount(12);
+    await expect(page.locator('#opc-detalhe')).toBeHidden();
+    // par positivo: o mesmo caminho com um tipo válido ABRE
+    await page.goto('/?view=oportunidades-crm&dados=mock&odet=abertas');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+  });
+
+  test('o painel abre pelo teclado (role=button precisa responder a Enter)', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    await page.locator('#opc-kpis .kpi[data-drill="total"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+    await expect(page.locator('#opc-det-titulo')).toContainText('Todas as oportunidades');
+  });
+
+  test('a paginação do painel obedece `tem_mais`, e não mexe na lista de baixo', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-lista-rows tr');
+    const listaAntes = await page.locator('#opc-lista-rows tr').count();
+
+    await page.click('#opc-kpis .kpi[data-drill="total"]');
+    await expect(page.locator('#opc-det-rows tr')).toHaveCount(50);
+    await expect(page.locator('#opc-det-mais')).toBeVisible();
+    const primeira = await page.locator('#opc-det-rows tr').first().innerText();
+
+    await page.click('#opc-det-btn-mais');
+    await expect(page.locator('#opc-det-rows tr')).toHaveCount(60);
+    // `tem_mais` da camada, nunca `acumulado.length < total` (bloqueador 2 do QA)
+    await expect(page.locator('#opc-det-mais')).toBeHidden();
+    expect(await page.locator('#opc-det-rows tr').first().innerText()).toBe(primeira);
+    // os dois offsets são independentes: a lista de baixo não se mexeu
+    expect(await page.locator('#opc-lista-rows tr').count()).toBe(listaAntes);
+  });
+
+  test('mexer num filtro fecha o painel — o recorte que ele herdou mudou', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    await page.click('#opc-kpis .kpi[data-drill="ganhas"]');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+    await page.selectOption('#opc-moeda', 'USD');
+    await expect(page.locator('#opc-detalhe')).toBeHidden();
+    await expect(page).not.toHaveURL(/odet=/);
+  });
+
+  test('número que não é conjunto não vira botão: win rate, receita, ticket e pipeline', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    // 12 cards, 8 clicáveis — os 4 de razão/soma ficam de fora, com o motivo escrito
+    await expect(page.locator('#opc-kpis .kpi')).toHaveCount(12);
+    // 8 dos 12 definem conjunto; "Sem declaração da origem" vale 0 no fixture
+    // (e na base real), e card de zero não abre — ver o teste dedicado.
+    await expect(page.locator('#opc-kpis .kpi[data-drill]')).toHaveCount(7);
+    for (const rotulo of ['Win rate', 'Receita ganha', 'Ticket médio', 'Pipeline aberto']) {
+      const card = page.locator('#opc-kpis .kpi', { hasText: rotulo });
+      await expect(card).toHaveCount(1);
+      await expect(card).not.toHaveAttribute('data-drill', /.*/);
+      await expect(card).toContainText('Sem lista:');
+    }
+  });
+
+  test('a linha "(fora de qualquer fase)" do funil não abre, e diz por quê', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-funil .funil2-row');
+    const semFase = page.locator('#opc-funil .funil2-row', { hasText: '(fora de qualquer fase)' });
+    await expect(semFase).toHaveCount(1);
+    await expect(semFase).not.toHaveAttribute('data-drill', /.*/);
+    await expect(page.locator('#opc-funil')).toContainText('a API não aceita filtrar por ausência de fase');
+    // par positivo: as linhas com fase abrem
+    await expect(page.locator('#opc-funil .funil2-row[data-drill]')).toHaveCount(6);
+    await page.click('#opc-funil .funil2-row[data-drill="fase:reuniao"]');
+    await expect(page.locator('#opc-det-titulo')).toContainText('Reunião');
+  });
+
+  test('clicar numa LINHA da tabela de segmento abre o painel daquele balde', async ({ page }) => {
+    // O alvo aqui é um <tr>, não um card: o clique chega num <td> e a delegação
+    // tem de subir até a linha. Caminho diferente do card e do funil, e o único
+    // que nenhum outro spec exercita por clique.
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-segmento-tbl tbody tr');
+    await expect(page.locator('#opc-segmento-tbl tbody tr[data-drill]')).toHaveCount(6);
+    await page.click('#opc-segmento-tbl tbody tr[data-drill="segmento:Comercial"] td:first-child');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+    await expect(page.locator('#opc-det-titulo')).toContainText('Segmento: Comercial');
+    await expect(page).toHaveURL(/odet=segmento%3AComercial|odet=segmento:Comercial/);
+  });
+
+  test('o painel não expõe nome de lead (mesma regra da lista de baixo)', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock&odet=ganhas');
+    await expect(page.locator('#opc-det-rows tr').first()).toBeVisible();
+    await expect(page.locator('#opc-det-foot')).toContainText('não exibe nome de lead');
+    const cols = await page.locator('#opc-detalhe thead th').allInnerTexts();
+    expect(cols.join('|')).not.toMatch(/lead|nome|e-mail|telefone/i);
+  });
+
+  test('em modo mock o painel SUSPENDE a conferência por escrito, em vez de fingir', async ({ page }) => {
+    // O fixture não refiltra: comparar o total dele com o número do card
+    // levantaria um alarme vermelho que não é sobre o produto.
+    await page.goto('/?view=oportunidades-crm&dados=mock&odet=ganhas');
+    await expect(page.locator('#opc-det-sub')).toContainText('o mock não refiltra');
+    await expect(page.locator('#opc-det-sub')).not.toContainText('se contradizendo');
+  });
+
+  // ── CATEGORIA DE ORIGEM ───────────────────────────────────────────────────
+
+  test('a seção de categoria aparece, com o lado do lead ao lado e sem nenhuma taxa', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-categoria-tbl tbody tr');
+    await expect(page.locator('#opc-categoria-tbl tbody tr')).toHaveCount(16);
+    await expect(page.locator('#opc-categoria-badge')).toHaveText('16 categorias · 3 só do lado do lead');
+    // as duas colunas convivem e nenhuma divide a outra
+    const cols = await page.locator('#opc-categoria-tbl thead th').allInnerTexts();
+    const nomes = cols.map((c) => c.trim().toLowerCase());
+    expect(nomes).toContain('leads gerados');
+    expect(nomes).toContain('oportunidades');
+    expect(cols.join('|')).not.toMatch(/taxa|convers/i);
+    await expect(page.locator('#opc-categoria-tbl')).toContainText('nenhuma divide a outra');
+    await expect(page.locator('#opc-categoria-tbl')).toContainText('uma taxa ali marcaria 167%');
+    // as duas conferências
+    await expect(page.locator('#opc-categoria-tbl')).toContainText('as categorias somam 420');
+    await expect(page.locator('#opc-categoria-tbl')).toContainText('748 = o total de leads do recorte');
+  });
+
+  test('categoria que só existe do lado do lead fica na tabela e não vira botão', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-categoria-tbl tbody tr');
+    const ebook = page.locator('#opc-categoria-tbl tbody tr', { hasText: 'Conteúdo/Ebook' });
+    await expect(ebook).toHaveCount(1);
+    await expect(ebook).toContainText('55'); // os leads continuam visíveis
+    await expect(ebook).not.toHaveAttribute('data-drill', /.*/);
+    await expect(ebook).toContainText('sem lista: nenhuma oportunidade neste recorte');
+    await expect(ebook).toContainText('o lado do lead trouxe 55');
+    // par: uma linha com oportunidade É botão
+    const inbound = page.locator('#opc-categoria-tbl tbody tr', { hasText: 'Inbound Web' });
+    await expect(inbound).toHaveAttribute('data-drill', 'categoria:Marketing:Inbound Web');
+  });
+
+  test('clicar numa categoria abre o painel do PAR segmento × categoria', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-categoria-tbl tbody tr');
+    await page.click('#opc-categoria-tbl tbody tr[data-drill="categoria:Marketing:Evento/Webinar"] td:first-child');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+    await expect(page.locator('#opc-det-titulo')).toContainText('Marketing · Evento/Webinar');
+    await expect(page.locator('#opc-det-sub')).toContainText('segmento = Marketing');
+    await expect(page.locator('#opc-det-sub')).toContainText('categoria = Evento/Webinar');
+    // a barra do nome sobrevive ao round-trip pela URL
+    await expect(page).toHaveURL(/odet=categoria%3AMarketing%3AEvento%2FWebinar/);
+    await page.reload();
+    await expect(page.locator('#opc-det-titulo')).toContainText('Marketing · Evento/Webinar');
+  });
+
+  test('a linha de categoria NULA abre pelo segmento, com a ressalva na cara', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-categoria-tbl tbody tr');
+    // duas linhas nulas no fixture (NaoClassificado e SemOrigem), como na base inteira
+    await expect(page.locator('#opc-categoria-tbl tbody tr', { hasText: 'sem categoria — origem não classificada' })).toHaveCount(2);
+    await page.click('#opc-categoria-tbl tbody tr[data-drill="categoria:NaoClassificado:"] td:first-child');
+    await expect(page.locator('#opc-det-titulo')).toContainText('Sem categoria — segmento Não classificado');
+    await expect(page.locator('#opc-det-sub')).toContainText('Não existe filtro de “categoria nula”');
+    await expect(page.locator('#opc-det-sub')).toContainText('segmento = Não classificado');
+  });
+
+  // ── correções do QA ───────────────────────────────────────────────────────
+
+  test('sair da aba com o painel aberto: Esc NÃO sequestra a URL de outra view', async ({ page }) => {
+    // Defeito reproduzido: `_painel.tipo` não zerava na troca de view, o
+    // listener de Esc do document seguia vivo, e `fecharPainel()` chamava
+    // `persistirNaUrl()`, que crava `view`. A tela mostrava Leads e a URL dizia
+    // `view=oportunidades-crm` — F5 abria a aba errada.
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    await page.click('#opc-kpis .kpi[data-drill="ganhas"]');
+    await expect(page.locator('#opc-detalhe')).toBeVisible();
+
+    // O MENU FICA COBERTO pelo overlay enquanto o painel está aberto (medido:
+    // `elementFromPoint` sobre o item "Leads" devolve o overlay), e com a
+    // armadilha de foco o Tab também não chega lá. Sobra o caminho
+    // PROGRAMÁTICO — que existe de verdade: o card "Receita ganha" da Visão
+    // geral chama `showView('oportunidades-crm')`, e o botão "voltar" faz o
+    // inverso. É esse caminho que este teste exercita.
+    await page.evaluate(() => window.showView('leads-crm'));
+    // sair da aba fecha o painel: senão a trava de rolagem vazaria para a view seguinte
+    await expect(page.locator('#opc-detalhe')).toBeHidden();
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('visible');
+
+    const urlAntes = page.url();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await expect(page.locator('.view.active')).toHaveId('view-leads-crm');
+    // A GARANTIA É ESTA: fora da aba, esta view não escreve mais a URL. Antes,
+    // o Esc chamava `persistirNaUrl()`, que crava `view=oportunidades-crm` e
+    // apagava `odet` — com `view-leads-crm` na tela.
+    expect(page.url()).toBe(urlAntes);
+    // (A URL já estava desatualizada ANTES do Esc: `showView` legado não a
+    // reescreve nesta chamada programática. Isso é de views-legacy.js, que este
+    // módulo não edita — o defeito corrigido aqui é esta aba PIORAR a URL de
+    // outra view, não a troca de view em si.)
+  });
+
+  test('o painel prende o foco e trava a rolagem — `aria-modal` com o comportamento que promete', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('visible');
+
+    await page.click('#opc-kpis .kpi[data-drill="ganhas"]');
+    await page.waitForSelector('#opc-det-rows tr');
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden');
+
+    // Medido antes da correção: de 40 Tabs, 38 paradas caíam fora do diálogo
+    // (a segunda já era o BODY). Agora nenhuma pode cair.
+    let fora = 0;
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab');
+      const dentro = await page.evaluate(() => {
+        const a = document.activeElement;
+        return !!(a && a.closest && a.closest('#opc-detalhe'));
+      });
+      if (!dentro) fora++;
+    }
+    expect(fora).toBe(0);
+
+    // Shift+Tab também, que é o outro sentido da armadilha
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press('Shift+Tab');
+      const dentro = await page.evaluate(() => {
+        const a = document.activeElement;
+        return !!(a && a.closest && a.closest('#opc-detalhe'));
+      });
+      if (!dentro) fora++;
+    }
+    expect(fora).toBe(0);
+
+    // e fechar devolve a rolagem
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('visible');
+  });
+
+  test('card valendo ZERO não convida a abrir lista vazia', async ({ page }) => {
+    // Com o payload real de 12 meses, "Sem declaração da origem" e "Divergência
+    // origem × fase" valem 0 e o rodapé imprimia "abrir as 0 oportunidades".
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-kpis .kpi');
+    await expect(page.locator('#opc-kpis')).not.toContainText('abrir as 0 oportunidades');
+    const zerado = page.locator('#opc-kpis .kpi', { hasText: 'Sem declaração da origem' });
+    await expect(zerado).not.toHaveAttribute('data-drill', /.*/);
+    await expect(zerado).toContainText('não há nenhuma para listar');
+    // par positivo: um card com conteúdo continua abrindo
+    await expect(page.locator('#opc-kpis .kpi[data-drill="ganhas"]')).toHaveCount(1);
+  });
+
+  test('a tabela de segmento mostra o lado do lead, adjacente às oportunidades', async ({ page }) => {
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-segmento-tbl tbody tr');
+    const cols = (await page.locator('#opc-segmento-tbl thead th').allInnerTexts()).map((c) => c.trim().toLowerCase());
+    expect(cols.slice(0, 3)).toEqual(['segmento', 'oportunidades', 'leads gerados']);
+    await expect(page.locator('#opc-segmento-tbl')).toContainText('viraram oportunidade');
+    await expect(page.locator('#opc-segmento-tbl')).toContainText('nenhuma divide a outra');
+    await expect(page.locator('#opc-segmento-tbl')).toContainText('748 = o total de leads do recorte');
+  });
+
+  test('CENÁRIO vínculo não fecha: o alarme da camada aparece nas duas tabelas', async ({ page }) => {
+    // `soma_vinculo_fecha` é true em 100% das linhas reais; sem este cenário o
+    // aviso seria mais uma guarda que só consegue passar.
+    await page.goto('/?view=oportunidades-crm&dados=mock&cenario=vinculo_nao_fecha');
+    await page.waitForSelector('#opc-segmento-tbl tbody tr');
+    await expect(page.locator('#opc-segmento-tbl')).toContainText('A partição por regra de vínculo não fecha');
+    await expect(page.locator('#opc-categoria-tbl')).toContainText('A partição por regra de vínculo não fecha');
+    // par negativo: no cenário saudável o alarme não existe
+    await page.goto('/?view=oportunidades-crm&dados=mock');
+    await page.waitForSelector('#opc-segmento-tbl tbody tr');
+    await expect(page.locator('#opc-segmento-tbl')).not.toContainText('não fecha');
+    await expect(page.locator('#opc-categoria-tbl')).not.toContainText('não fecha');
   });
 });

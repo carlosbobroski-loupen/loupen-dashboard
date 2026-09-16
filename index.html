@@ -701,6 +701,20 @@
       <div id="opc-segmento-tbl"></div>
     </div>
 
+    <!-- CATEGORIA DE ORIGEM. O agregado vem de fn_oportunidades_por_categoria
+         (migration 103), no array `categoria[]`. As contagens de lead ficam ao
+         lado das de oportunidade e NENHUMA divide a outra: são duas populações
+         atribuídas por caminhos diferentes (ver o cabeçalho de oportunidades.js).
+         Não há seletor de categoria na barra de filtros de propósito —
+         `categoria` estreita a lista e esta tabela, mas NÃO os cards. -->
+    <div class="card">
+      <div class="section-row">
+        <div class="section-title"><i class="ti ti-category"></i>Por categoria de origem, com o lado do lead ao lado</div>
+        <div class="section-badge" id="opc-categoria-badge">&mdash;</div>
+      </div>
+      <div id="opc-categoria-tbl"></div>
+    </div>
+
     <div class="two-col">
       <div class="card">
         <div class="section-row">
@@ -742,6 +756,43 @@
                 padding:7px 16px;border-radius:7px;font-size:12.5px;cursor:pointer">Carregar mais</button>
       </div>
       <div id="opc-lista-foot" style="margin-top:10px"></div>
+    </div>
+
+    <!-- PAINEL DE DRILL-DOWN. Mesmo modelo de interação do modal da aba antiga
+         (#lead-detail-modal + abrirDetalheCard, views-legacy.js:1966): clica no
+         número, abre a lista que o compõe, fecha no X, no overlay ou no Esc.
+         Markup PRÓPRIO, dentro da view, porque a delegação desta aba é local
+         (#view-oportunidades-crm) e o modal legado é servido pela delegação
+         global de views-legacy.js — reusar aquele elemento acoplaria esta aba
+         justamente ao arquivo que ela foi criada para não depender. -->
+    <div id="opc-detalhe" style="display:none;position:fixed;inset:0;z-index:9999;align-items:flex-start;justify-content:center;padding:48px 20px;overflow-y:auto">
+      <div data-drill-fechar="overlay" aria-hidden="true" style="position:fixed;inset:0;background:rgba(5,7,10,.72)"></div>
+      <div role="dialog" aria-modal="true" aria-labelledby="opc-det-titulo" class="card" style="position:relative;z-index:1;max-width:1180px;width:100%;margin:0;max-height:calc(100vh - 96px);display:flex;flex-direction:column;overflow:hidden">
+        <div class="section-row" style="margin-bottom:10px">
+          <div class="section-title"><i class="ti ti-list-search"></i><span id="opc-det-titulo">Detalhe</span></div>
+          <button type="button" id="opc-det-fechar" data-drill-fechar="btn" aria-label="Fechar o painel" class="filter-clear" style="padding:4px 8px;cursor:pointer"><i class="ti ti-x"></i></button>
+        </div>
+        <div id="opc-det-sub" style="margin-bottom:12px"></div>
+        <div style="overflow:auto">
+          <table class="tbl" style="min-width:1100px;table-layout:fixed;border-spacing:0">
+            <colgroup>
+              <col style="width:17%"><col style="width:11%"><col style="width:19%">
+              <col style="width:14%"><col style="width:15%"><col style="width:18%"><col style="width:6%">
+            </colgroup>
+            <thead><tr>
+              <th style="padding-right:12px">Conta</th><th style="text-align:left;padding-right:12px">Estágio</th><th style="text-align:left;padding-right:12px">Desfecho</th>
+              <th style="text-align:left;padding-right:12px">Segmento / origem</th><th style="text-align:left;padding-right:12px">Vínculo</th>
+              <th style="padding-right:12px">Valor</th><th>Moeda</th>
+            </tr></thead>
+            <tbody id="opc-det-rows"></tbody>
+          </table>
+        </div>
+        <div id="opc-det-mais" style="display:none;padding:12px;text-align:center;border-top:1px solid var(--border)">
+          <button type="button" id="opc-det-btn-mais" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                  padding:7px 16px;border-radius:7px;font-size:12.5px;cursor:pointer">Carregar mais</button>
+        </div>
+        <div id="opc-det-foot" style="margin-top:10px"></div>
+      </div>
     </div>
   </div>
 

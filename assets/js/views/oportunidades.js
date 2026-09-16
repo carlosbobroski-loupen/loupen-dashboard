@@ -53,20 +53,53 @@
 //     ela devolve o universo e diz `periodo_aplicado: false`. Esta tela manda
 //     os últimos 12 meses ao abrir e mostra, por escrito, qual recorte está
 //     aplicado.
+// 10. TODO NÚMERO QUE É CONJUNTO ABRE O CONJUNTO, E O TOTAL DO PAINEL É O
+//     NÚMERO CLICADO. Mesmo modelo de interação do modal da aba antiga
+//     (`abrirDetalheCard`), com a conferência painel × card escrita na tela.
+//     Número que NÃO é conjunto (win rate, receita, ticket, pipeline) não vira
+//     botão: abrir uma lista embaixo de uma razão ou de uma soma obrigaria o
+//     painel a exibir um total que não é o número do card. Ver a seção
+//     DRILL-DOWN mais abaixo.
 //
 // ⚠️ OS FILTROS NÃO CHEGAM TODOS EM TODA SEÇÃO — e isso é da camada de dados,
-// não desta tela. Medido contra a API em 2026-09-16:
+// não desta tela. Medido contra a API em 2026-09-16, linha a linha, depois da
+// correção da borda:
 //
-//   cards    : de/ate, segmento, fase, desfecho, record_type, moeda, vínculo, lead_source
-//   funil    : de/ate, segmento,              record_type, moeda, vínculo, lead_source   (IGNORA fase e desfecho)
-//   segmento : de/ate,           fase, desfecho, record_type, moeda,        lead_source   (IGNORA segmento e vínculo)
-//   lista    : tudo acima + busca + so_divergentes + so_sem_valor + ordenar_por
+//   cards     : de/ate, segmento, fase, desfecho, record_type, moeda, vínculo
+//   funil     : de/ate, segmento,                 record_type, moeda, vínculo   (IGNORA fase e desfecho)
+//   segmento  : de/ate,           fase, desfecho, record_type, moeda            (IGNORA segmento e vínculo)
+//   categoria : de/ate, segmento, fase, desfecho, record_type, moeda, categoria (IGNORA vínculo)
+//   lista     : tudo acima + busca + so_divergentes + so_sem_valor + so_nao_classificado + ordenar_por
+//
+// A tabela de CATEGORIA não é a de segmento com outro eixo: ela APLICA
+// `segmento` (que a de segmento ignora) e IGNORA `lead_vinculo_regra` (que a de
+// segmento também ignora). Copiar a herança de uma para a outra por simetria
+// produziria painel que não bate com a linha — medido, não deduzido.
+//
+// HISTÓRICO DA BORDA, porque explica escolhas que sobraram no código: até
+// 2026-09-16 o Code node "Montar filtros" do n8n tinha uma whitelist escrita
+// antes das migrations 100 e 103/104, e DESCARTAVA EM SILÊNCIO `categoria`,
+// `lead_source` e `so_nao_classificado` — a tela pedia um recorte e recebia o
+// universo, com 200 e sem erro. Corrigido. Duas marcas ficaram:
+//   · o painel de cobertura é expresso em `segmento=NaoClassificado,SemOrigem`
+//     em vez de `so_nao_classificado=true`. Os dois predicados são idênticos no
+//     SQL; o primeiro nasceu do contorno e continua porque é o que o teste
+//     contra a API exercita hoje;
+//   · há um teste vigiando a whitelist (oportunidades-drilldown-api), com par
+//     negativo, para a regressão não voltar calada.
+//
+// `categoria` NÃO VIRA SELETOR NA BARRA DE FILTROS, e isso é medição, não
+// esquecimento: ela estreita a LISTA e a tabela de categoria, mas NÃO os cards
+// (com `categoria=Evento/Webinar` a lista vai a 33 e os cards continuam em
+// 5.415). Publicar o seletor faria os doze cards do topo contradizerem a tabela.
+// O caminho para "quais são essas 33" é o drill-down da linha.
 //
 // `so_divergentes` e `so_sem_valor` existem SÓ em `fn_search_oportunidades`:
 // eles estreitam a LISTA e não tocam nos cards (conferido: com
-// `so_sem_valor=true` a lista vai a 836 e os cards continuam em 8.073). Cada
-// seção declara na tela o que ela ignora — senão o usuário lê contradição e
-// conclui que o dado está errado, quando o errado seria o silêncio.
+// `so_sem_valor=true` a lista vai a 462 e os cards continuam em 5.415 no
+// recorte de 12 meses). Cada seção declara na tela o que ela ignora — senão o
+// usuário lê contradição e conclui que o dado está errado, quando o errado
+// seria o silêncio.
 
 import { obterOportunidades } from '../data-api.js';
 import { fmtValor, fmtBrl, fmtMrr } from '../formato-moeda.js';
@@ -243,11 +276,36 @@ export function renderIntegridade(cards) {
 // ---------------------------------------------------------------------------
 // KPIs — 12 cards, duas fileiras de 6
 // ---------------------------------------------------------------------------
-function kpi(cor, icone, rotulo, valor, rodape, titulo, tamanho) {
-  return `<div class="kpi ${cor}">
+/**
+ * Um card. `drill` é OPCIONAL e só existe para os cards cujo número é um
+ * CONJUNTO: recebe `{ tipo, esperado }` e transforma o card em botão.
+ *
+ * `data-esperado` sai da MESMA expressão que pintou o número do card, e não de
+ * uma segunda leitura do mesmo campo: é ele que o painel usa para conferir que
+ * a lista aberta tem exatamente o tamanho do número clicado. Duas leituras
+ * seriam duas chances de discordar.
+ */
+function kpi(cor, icone, rotulo, valor, rodape, titulo, tamanho, drill) {
+  // CARD VALENDO ZERO NÃO ABRE. A mesma regra das tabelas de segmento e
+  // categoria e da linha "(fora de qualquer fase)" do funil: um clique que só
+  // pode dar lista vazia informa menos do que a frase que explica o zero.
+  //
+  // Não é caso de canto: no payload real de 12 meses (e na base inteira)
+  // "Sem declaração da origem" e "Divergência origem × fase" valem 0, e o card
+  // convidava, escrito, a "abrir as 0 oportunidades". É o estado PADRÃO da aba.
+  const abre = Boolean(drill) && int(drill.esperado) > 0;
+  const clicavel = abre
+    ? ` role="button" tabindex="0" data-drill="${escapeHtml(drill.tipo)}" data-esperado="${int(drill.esperado)}"`
+      + ` style="cursor:pointer" aria-label="${escapeHtml(`${rotulo}: abrir as ${br(drill.esperado)} oportunidades que compõem este número`)}"`
+    : '';
+  const dica = abre
+    ? `<div class="kpi-footer" style="color:var(--dim);display:flex;align-items:center;gap:4px">
+        <i class="ti ti-list-search"></i>abrir as ${br(drill.esperado)} oportunidades</div>`
+    : (drill ? '<div class="kpi-footer" style="color:var(--dim);line-height:1.4">Sem lista: não há nenhuma para listar neste recorte.</div>' : '');
+  return `<div class="kpi ${cor}"${clicavel}>
     <div class="kpi-label"${titulo ? ` title="${escapeHtml(titulo)}"` : ''}><i class="ti ${icone}"></i>${escapeHtml(rotulo)}</div>
     <div class="kpi-value"${tamanho ? ` style="font-size:${tamanho}"` : ''}>${valor}</div>
-    ${rodape || ''}
+    ${rodape || ''}${dica}
   </div>`;
 }
 
@@ -277,22 +335,34 @@ export function renderKpis(cards) {
        <div class="kpi-footer">base da soma: ${br(cards.qtd_ganhas_no_valor)} ganhas com valor convertido</div>`
     : `<div class="kpi-footer" style="color:var(--green)">todas as ${br(ganhas)} ganhas entraram na soma</div>`;
 
+  // OS TRÊS CARDS SEM CLIQUE desta fileira são razão e soma, não conjunto: uma
+  // lista embaixo deles teria um total que não é o número exibido. O motivo
+  // fica escrito no card, porque "não clica" sem explicação vira suspeita de
+  // bug.
+  const semConjunto = (frase) => `<div class="kpi-footer" style="color:var(--dim);line-height:1.4">${frase}</div>`;
+
   const fileira1 = [
     kpi('blue', 'ti-briefcase', 'Oportunidades', br(total),
       `<div class="kpi-footer">criadas no recorte (campo <code>criada_em</code>)</div>${tendencia(total, cards.ant_total_oportunidades, temAnt, motivoAnt)}`,
-      'Todas as oportunidades do Salesforce criadas dentro do recorte. Universo inteiro — não é o recorte de nenhuma planilha.'),
+      'Todas as oportunidades do Salesforce criadas dentro do recorte. Universo inteiro — não é o recorte de nenhuma planilha.',
+      null, { tipo: 'total', esperado: total }),
     kpi('green', 'ti-trophy', 'Ganhas', br(ganhas),
       `<div class="kpi-footer">${parte(ganhas)}</div>${tendencia(ganhas, cards.ant_qtd_ganhas, temAnt, motivoAnt)}`,
-      'A origem declara IsWon = true. Não é "tem valor preenchido" — era isso que a aba antiga usava.'),
+      'A origem declara IsWon = true. Não é "tem valor preenchido" — era isso que a aba antiga usava.',
+      null, { tipo: 'ganhas', esperado: ganhas }),
     kpi('red', 'ti-mood-sad', 'Perdidas', br(cards.qtd_perdidas),
       `<div class="kpi-footer">${parte(int(cards.qtd_perdidas))}</div>${tendencia(cards.qtd_perdidas, cards.ant_qtd_perdidas, temAnt, motivoAnt, true)}`,
-      'A origem declara IsClosed = true e IsWon = false.'),
+      'A origem declara IsClosed = true e IsWon = false.',
+      null, { tipo: 'perdidas', esperado: int(cards.qtd_perdidas) }),
     kpi('blue', 'ti-progress', 'Abertas', br(cards.qtd_abertas),
       `<div class="kpi-footer">${parte(int(cards.qtd_abertas))} · ainda não decididas</div>${tendencia(cards.qtd_abertas, cards.ant_qtd_abertas, temAnt, motivoAnt)}`,
-      'IsClosed = false e o estágio está dentro do funil.'),
-    kpi('purple', 'ti-percentage', 'Win rate (decididas)', winRate, winFooter,
+      'IsClosed = false e o estágio está dentro do funil.',
+      null, { tipo: 'abertas', esperado: int(cards.qtd_abertas) }),
+    kpi('purple', 'ti-percentage', 'Win rate (decididas)', winRate,
+      `${winFooter}${semConjunto('Sem lista: é uma razão entre dois conjuntos, não um conjunto. Os dois lados dela abrem pelos cards Ganhas e Perdidas.')}`,
       'ganhas ÷ (ganhas + perdidas). A aba antiga dividia por TODAS as oportunidades e chegava a 6,8%.'),
-    kpi('green', 'ti-cash', 'Receita ganha', fmtBrl(cards.receita_ganha_brl) ?? '—', receitaFooter,
+    kpi('green', 'ti-cash', 'Receita ganha', fmtBrl(cards.receita_ganha_brl) ?? '—',
+      `${receitaFooter}${semConjunto('Sem lista: é uma soma em reais, e o total de qualquer lista seria uma contagem — outro número. As ganhas abrem pelo card ao lado; as que ficaram fora da soma, pela seção logo abaixo.')}`,
       'Soma de amount convertido para real. BRL/USD/MXN convertidos pela taxa de currency_rate; sem taxa, a linha NÃO entra na soma e é contada ao lado.', '17px'),
   ].join('');
 
@@ -305,29 +375,38 @@ export function renderKpis(cards) {
     kpi('amber', 'ti-stack-2', 'Pipeline aberto', fmtBrl(cards.pipeline_aberto_brl) ?? '—',
       `<div class="kpi-footer">${br(cards.qtd_abertas_no_pipeline)} com valor · ${br(cards.qtd_abertas_fora_do_pipeline)} sem valor</div>
        <div class="kpi-footer" style="line-height:1.4">É ESTOQUE do que está aberto agora — jamais previsão de receita.</div>
-       ${tendencia(cards.pipeline_aberto_brl, cards.ant_pipeline_aberto_brl, temAnt, motivoAnt)}`,
+       ${tendencia(cards.pipeline_aberto_brl, cards.ant_pipeline_aberto_brl, temAnt, motivoAnt)}
+       ${semConjunto('Sem lista: é uma soma em reais. As não decididas abrem pelos cards Abertas e Fora de qualquer fase.')}`,
       'Soma do valor das não decididas (abertas + fora de fase). Não tem probabilidade aplicada e não é forecast.', '17px'),
     kpi('blue', 'ti-receipt', 'Ticket médio das ganhas', fmtBrl(cards.ticket_medio_ganhas_brl) ?? '—',
       `<div class="kpi-footer">base: ${br(cards.ticket_medio_n)} ganhas com valor</div>
-       ${tendencia(cards.ticket_medio_ganhas_brl, cards.ant_ticket_medio_ganhas_brl, temAnt, motivoAnt)}`,
+       ${tendencia(cards.ticket_medio_ganhas_brl, cards.ant_ticket_medio_ganhas_brl, temAnt, motivoAnt)}
+       ${semConjunto('Sem lista: é uma média. E a base dela (“ganhas COM valor”) não é um recorte que a API saiba devolver — só existe o complemento, “sem valor”, que abre na seção abaixo.')}`,
       'Média do amount convertido das ganhas que têm valor. As ganhas sem valor não entram — e por isso a base aparece escrita.', '17px'),
     kpi('amber', 'ti-circle-dashed', 'Fora de qualquer fase', br(cards.qtd_fora_de_fase),
       `<div class="kpi-footer" style="line-height:1.4">Abertas na origem, em estágio que o nosso mapa declara fora do funil de propósito.</div>
        <div class="kpi-footer">aparece mesmo valendo ${br(cards.qtd_fora_de_fase)} — some nunca</div>`,
-      'Estágios como "Lista": IsClosed = false e fora do funil. Deixar este número invisível é como 56,5% dos leads sumiram da aba antiga.'),
+      'Estágios como "Lista": IsClosed = false e fora do funil. Deixar este número invisível é como 56,5% dos leads sumiram da aba antiga.',
+      null, { tipo: 'fora_de_fase', esperado: int(cards.qtd_fora_de_fase) }),
     kpi(semDeclaracao > 0 ? 'red' : 'purple', 'ti-help-octagon', 'Sem declaração da origem', br(semDeclaracao),
       `<div class="kpi-footer">${br(cards.qtd_estagio_nao_declarado)} estágio fora do catálogo · ${br(cards.qtd_declaracao_incompleta)} IsWon/IsClosed nulo</div>
        <div class="kpi-footer" style="line-height:1.4">A org tem 114 estágios e nós mapeamos 29 — este card é o alarme de estágio novo entrando calado.</div>`,
-      'Oportunidades cujo estágio não existe em opportunity_stage, ou existe com IsWon/IsClosed nulo. Nós não chutamos o desfecho delas.'),
+      'Oportunidades cujo estágio não existe em opportunity_stage, ou existe com IsWon/IsClosed nulo. Nós não chutamos o desfecho delas.',
+      null, { tipo: 'sem_declaracao', esperado: semDeclaracao }),
+    // O NÚMERO EXIBIDO É A COBERTURA; o conjunto que existe para abrir é o
+    // COMPLEMENTO dela. O painel diz isso no título em vez de abrir uma lista
+    // de 800 embaixo de um card que mostra 85,23%.
     kpi('purple', 'ti-route', 'Com origem classificada', pct(cards.pct_com_segmento) ?? '—',
       `<div class="kpi-footer">${br(cards.qtd_com_segmento)} de ${br(total)} oportunidades</div>
        <div class="kpi-footer" style="line-height:1.4">${br(naoClassificado)} com LeadSource que ninguém traduziu · ${br(semOrigem)} sem lead e sem LeadSource</div>`,
-      'Cobertura da atribuição. Tem de aparecer junto de qualquer corte Marketing × Comercial — ler participação por segmento sem saber a cobertura é como a planilha chegou a "100% marketing".'),
+      'Cobertura da atribuição. Tem de aparecer junto de qualquer corte Marketing × Comercial — ler participação por segmento sem saber a cobertura é como a planilha chegou a "100% marketing".',
+      null, { tipo: 'sem_origem_classificada', esperado: naoClassificado + semOrigem }),
     kpi(divergencias > 0 ? 'red' : 'green', 'ti-arrows-diff', 'Divergência origem × fase', br(divergencias),
       `<div class="kpi-footer" style="line-height:1.4">${divergencias > 0
         ? 'O Salesforce e o nosso mapa de fases discordam nestas linhas. Estão marcadas na lista.'
         : 'Nenhuma discordância entre IsWon/IsClosed da origem e a fase que nós traduzimos.'}</div>`,
-      'Existe para o dia em que um estágio novo com IsWon = true entrar pela porta da frente sem ninguém notar.'),
+      'Existe para o dia em que um estágio novo com IsWon = true entrar pela porta da frente sem ninguém notar.',
+      null, { tipo: 'divergentes', esperado: divergencias }),
   ].join('');
 
   return `<div class="kpi-grid-6">${fileira1}</div><div class="kpi-grid-6">${fileira2}</div>`;
@@ -364,7 +443,20 @@ export function renderFunil(funil, opcoes = {}) {
     const largura = (qtd / maior) * 100;
     const valor = fmtBrl(f.valor_brl);
     const semValor = int(f.qtd_sem_valor);
-    return `<div class="funil2-row" style="cursor:default">
+    // A LINHA "(fora de qualquer fase)" NÃO ABRE, e isto é limite da camada de
+    // dados, não esquecimento. Ela é `fase IS NULL`, e `fn_filtro_casa` nunca
+    // casa NULL com filtro presente (de propósito: filtrar por fase não deve
+    // trazer quem não tem fase) — não existe valor de `fase` que devolva
+    // exatamente estas linhas. Trocar por `desfecho=fora_de_fase` seria outro
+    // conjunto: uma ganha cujo estágio esteja fora do funil cai nesta barra e
+    // NÃO naquele desfecho. Hoje os dois números coincidem (4 e 4), e abrir a
+    // lista por causa da coincidência seria acertar por sorte.
+    const abre = Boolean(f.fase) && qtd > 0;
+    const attrs = abre
+      ? ` role="button" tabindex="0" data-drill="fase:${escapeHtml(f.fase)}" data-esperado="${qtd}" style="cursor:pointer"`
+        + ` aria-label="${escapeHtml(`${rotulo}: abrir as ${br(qtd)} oportunidades desta fase`)}"`
+      : ' style="cursor:default"';
+    return `<div class="funil2-row"${attrs}>
       <div class="funil2-name"${f.fase ? '' : ' style="color:var(--muted);font-style:italic"'}>${escapeHtml(rotulo)}</div>
       <div class="funil2-track">
         <div class="funil2-fill" style="width:${largura.toFixed(2)}%;background:${cor}"></div>
@@ -372,7 +464,9 @@ export function renderFunil(funil, opcoes = {}) {
       <div class="funil2-val">${br(qtd)}<span class="mono-sm" style="display:block;font-weight:400;color:var(--muted);font-size:10.5px">${pct(f.pct_da_coorte) ?? '—'} da coorte</span></div>
     </div>
     <div class="mono-sm" style="color:var(--dim);padding:0 10px 8px 184px;line-height:1.45">
-      ${valor ? `${escapeHtml(valor)} em valor convertido` : 'sem valor convertido'}${semValor > 0 ? ` · ${br(semValor)} sem valor na origem` : ''}
+      ${valor ? `${escapeHtml(valor)} em valor convertido` : 'sem valor convertido'}${semValor > 0 ? ` · ${br(semValor)} sem valor na origem` : ''}${abre ? '' : (f.fase
+        ? ' · <span style="color:var(--dim)">sem lista: nenhuma oportunidade nesta fase neste recorte</span>'
+        : ' · <span style="color:var(--amber)">sem lista: esta linha é “fase nula”, e a API não aceita filtrar por ausência de fase</span>')}
     </div>`;
   }).join('');
 
@@ -429,14 +523,34 @@ export function renderSegmento(segmento, opcoes = {}) {
     const nome = s.segmento_aba;
     const dec = int(s.qtd_decididas);
     const wr = pct(s.win_rate_decididas_pct);
-    return `<tr>
+    const qtd = int(s.qtd_oportunidades);
+    const leads = int(s.qtd_leads_gerados);
+    const notaJoin = PRESENTE_EM[s.segmento_presente_em] ?? null;
+    // MESMA REGRA DA TABELA DE CATEGORIA: só abre se houver o que listar.
+    // A migration 103 transformou esta função em FULL OUTER JOIN com o lado do
+    // lead, e com isso passaram a existir linhas de ZERO oportunidade (com
+    // `desfecho=fora_de_fase`, Marketing e Não atribuído vêm a 0 e `so_lead`).
+    // Antes desta guarda elas abriam painel vazio sem explicação nenhuma.
+    const abre = qtd > 0;
+    const attrs = abre
+      ? ` role="button" tabindex="0" data-drill="segmento:${escapeHtml(nome)}" data-esperado="${qtd}" style="cursor:pointer"`
+        + ` aria-label="${escapeHtml(`${ROTULO_SEG[nome] ?? nome}: abrir as ${br(qtd)} oportunidades deste segmento`)}"`
+      : '';
+    return `<tr${attrs}>
       <td>
         <div class="t-name" style="max-width:none">
           <span class="badge ${CLASSE_SEG[nome] ?? 'lead'}"><span class="b-dot"></span>${escapeHtml(ROTULO_SEG[nome] ?? nome)}</span>
         </div>
         <div class="t-sub" style="line-height:1.45;white-space:normal;max-width:52ch">${escapeHtml(NOTA_SEG[nome] ?? 'Balde não descrito nesta tela — aparece cru de propósito.')}</div>
+        ${notaJoin ? `<div class="t-sub" style="line-height:1.45;white-space:normal;max-width:52ch">${escapeHtml(notaJoin)}</div>` : ''}
+        ${abre ? '' : motivoSemLista(s.segmento_presente_em, leads)}
       </td>
       <td style="font-variant-numeric:tabular-nums">${br(s.qtd_oportunidades)}<div class="t-sub">${pct(s.pct_do_total) ?? '—'}</div></td>
+      <td style="font-variant-numeric:tabular-nums;padding-right:14px">
+        ${br(leads)}
+        <div class="t-sub">${leads > 0 ? `${br(s.qtd_leads_com_oportunidade)} viraram oportunidade` : 'nenhum lead neste segmento'}</div>
+        ${int(s.qtd_leads_fora_por_data_ausente) > 0 ? `<div class="t-sub" style="color:var(--amber)">${br(s.qtd_leads_fora_por_data_ausente)} fora do recorte por data ausente</div>` : ''}
+      </td>
       <td style="font-variant-numeric:tabular-nums;color:var(--green)">${br(s.qtd_ganhas)}</td>
       <td style="font-variant-numeric:tabular-nums;color:var(--red)">${br(s.qtd_perdidas)}</td>
       <td style="font-variant-numeric:tabular-nums;color:var(--muted)">${br(s.qtd_nao_decididas)}</td>
@@ -461,6 +575,24 @@ export function renderSegmento(segmento, opcoes = {}) {
     ? `<span style="color:var(--green)">os baldes somam ${br(somaQtd)} = o total do recorte</span>`
     : `<span style="color:var(--red)">⚠️ os baldes somam ${br(somaQtd)} mas o recorte tem ${br(totalRecorte)}</span>`;
 
+  // O LADO DO LEAD, que a migration 103 acrescentou e esta tabela não lia. É
+  // onde o dono do produto procura "quantos leads viram oportunidade" primeiro,
+  // e a coluna fica ADJACENTE à de oportunidades porque na ponta da tabela ela
+  // cai fora da área visível — medido na entrega anterior.
+  const totalLeads = int(linhas[0]?.total_leads_do_recorte);
+  const somaLeads = linhas.reduce((acc, x) => acc + int(x.qtd_leads_gerados), 0);
+  const confLead = somaLeads === totalLeads
+    ? `<span style="color:var(--green)">e ${br(somaLeads)} = o total de leads do recorte</span>`
+    : `<span style="color:var(--red)">⚠️ e somam ${br(somaLeads)} leads contra ${br(totalLeads)} do recorte</span>`;
+  const ignoradosNoLead = linhas.find((x) => x.leads_filtros_ignorados)?.leads_filtros_ignorados ?? null;
+  const avisoLead = ignoradosNoLead
+    ? `<div class="tl-idade" style="margin-bottom:10px;line-height:1.5">⚠️ A coluna de LEADS não honra ${escapeHtml(String(ignoradosNoLead))}:
+        esses campos existem na oportunidade e não em <code>lead</code>. As contagens de oportunidade desta tabela estão filtradas por eles; as de lead, não —
+        quem declara isso é a própria camada, no campo <code>leads_filtros_ignorados</code>.</div>`
+    : '';
+  const vinculo = conferirVinculo(linhas, (x) => ROTULO_SEG[x.segmento_aba] ?? x.segmento_aba);
+  const exemplo = exemploQueProibeATaxa(linhas.map((x) => ({ ...x, categoria_rotulo: ROTULO_SEG[x.segmento_aba] ?? x.segmento_aba })));
+
   // Os extremos saem DO DADO. A versão anterior deste rodapé trazia dois
   // números de exemplo escritos à mão ("80 decididas e 1.374") que, na primeira
   // carga real, não correspondiam a nenhuma linha da tabela logo acima —
@@ -470,11 +602,11 @@ export function renderSegmento(segmento, opcoes = {}) {
     ? `, e neste recorte eles vão de ${br(Math.min(...dens))} a ${br(Math.max(...dens))} decididas`
     : '';
 
-  return `${avisoFiltro}
+  return `${avisoFiltro}${avisoLead}${vinculo}
     <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr>
-          <th>Segmento</th><th>Oportunidades</th><th>Ganhas</th><th>Perdidas</th>
+          <th>Segmento</th><th>Oportunidades</th><th style="padding-right:14px">Leads gerados</th><th>Ganhas</th><th>Perdidas</th>
           <th>Não decididas</th><th>Win rate (decididas)</th><th>Receita ganha</th><th>Pipeline aberto</th>
         </tr></thead>
         <tbody>${corpo}</tbody>
@@ -484,7 +616,236 @@ export function renderSegmento(segmento, opcoes = {}) {
       Cada segmento traz o SEU denominador${denominadores}.
       Win rates apoiados em bases de tamanhos tão diferentes não são o mesmo tipo de afirmação,
       e a tela não deixa comparar às cegas.
-      <br>${conferencia}.
+      <br><strong style="color:var(--amber)">As duas contagens ficam lado a lado e nenhuma divide a outra.</strong>
+      A oportunidade é atribuída pela origem DELA (<code>Opportunity.LeadSource</code>), não herdada do lead${exemplo ? `, e neste recorte ${escapeHtml(exemplo)}` : ''}.
+      <br>${conferencia}, ${confLead}.
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Categoria de origem (Evento/Webinar, Paid Social, Inbound Web, ...)
+// ---------------------------------------------------------------------------
+// A CATEGORIA JÁ EXISTIA NA CAMADA e não aparecia na tela: `view_oportunidade_
+// analitica` projeta `categoria` desde a migration 100, e a lista sempre a
+// mostrou linha a linha. O que faltava era o AGREGADO — e ele chegou com
+// `fn_oportunidades_por_categoria` (migration 103), no array `categoria[]` da
+// resposta.
+//
+// O GRÃO É O PAR (segmento_aba, categoria), não a categoria sozinha. Hoje
+// nenhuma categoria aparece sob dois segmentos, mas a chave é o par para que
+// uma regra futura não funda duas linhas em silêncio — e o drill-down manda os
+// dois filtros, pelo mesmo motivo.
+//
+// ⚠️ AS DUAS CONTAGENS DE LEAD FICAM AO LADO E NENHUMA DIVIDE A OUTRA. Medido
+// em 2026-09-16: `Inbound Web` tem 75 leads e 133 oportunidades, `Sem origem`
+// tem 166 leads e 489 oportunidades. Uma "taxa lead → oportunidade" ali marcaria
+// 177% e 295%. Não é erro de dado: a oportunidade é atribuída pela origem DELA
+// (Opportunity.LeadSource), não herdada de um lead — são duas populações
+// atribuídas por caminhos diferentes, e dividir uma pela outra é o mesmo erro
+// de "Qualificados ÷ Em cadência" da aba antiga, com outra roupa. A frase na
+// tela sai DO DADO do recorte, nunca escrita à mão: ilustração congelada já
+// mentiu duas vezes neste arquivo.
+//
+// ⚠️ ZERO ESTRUTURAL ≠ ZERO MEDIDO, e `categoria_presente_em` é quem separa os
+// dois. `Conteúdo/Ebook` tem 460 leads e ZERO oportunidades porque a categoria
+// só existe do lado do lead (`so_lead`) — some da tabela se alguém filtrar por
+// "tem oportunidade", e é exatamente o dado interessante. Já `Suporte` é
+// `ambos` com zero leads: aí o zero foi MEDIDO. A tela diz qual é qual.
+//
+// NÃO HÁ FILTRO DE CATEGORIA NA BARRA, de propósito: medido contra a API,
+// `categoria` estreita a LISTA e a própria tabela de categoria, mas NÃO os
+// cards (com `categoria=Evento/Webinar` a lista vai a 33 e os cards continuam
+// em 5.415). Publicar o seletor faria os doze cards do topo contradizerem a
+// tabela. O caminho para "quais são essas 33" é o drill-down da linha, que
+// abre uma lista e confere o total contra o número da linha.
+
+// De qual lado do FULL OUTER JOIN a linha veio. Vale para os dois agregados
+// (`segmento_presente_em` e `categoria_presente_em`), com o mesmo significado.
+//
+// ⚠️ É MEDIDO NO RECORTE, NÃO É PROPRIEDADE ESTRUTURAL — e a versão anterior
+// deste bloco afirmava o contrário ("o zero é estrutural, não medido"). Medido
+// contra a API em 2026-09-16: `Comercial/Suporte` é `ambos` nos 12 meses e vira
+// `so_lead` assim que o filtro `desfecho=fora_de_fase` zera as oportunidades
+// dele. Chamar isso de estrutural era a tela prometendo uma garantia que o dado
+// não dá.
+//
+// Nas 105 linhas observadas em cinco recortes diferentes, `so_lead` sempre veio
+// com zero oportunidade e `ambos` sempre com pelo menos uma — mas quem decide o
+// texto aqui é a CONTAGEM, não o rótulo, para que um dia em que isso deixe de
+// valer a tela não passe a mentir por dedução.
+const PRESENTE_EM = {
+  ambos: null,
+  so_oportunidade: 'Neste recorte o lado do LEAD não trouxe nenhuma linha para este balde: a linha existe porque o lado da oportunidade trouxe. Outro recorte pode devolvê-la nos dois lados.',
+  so_lead: 'Neste recorte o lado da OPORTUNIDADE não trouxe nenhuma linha para este balde: a linha existe porque o lado do lead trouxe. Outro recorte pode devolvê-la nos dois lados.',
+};
+
+/**
+ * Por que uma linha de zero oportunidades não abre lista. Compartilhado por
+ * segmento e categoria: a regra é a mesma nas duas tabelas, e tê-la escrita em
+ * dois lugares foi como a de segmento ficou sem ela por uma entrega inteira.
+ */
+function motivoSemLista(presenteEm, leads) {
+  const base = 'sem lista: nenhuma oportunidade neste recorte';
+  const cor = presenteEm === 'so_lead' ? 'var(--amber)' : 'var(--dim)';
+  const extra = int(leads) > 0
+    ? ` — a linha continua na tabela porque o lado do lead trouxe ${br(leads)}`
+    : '';
+  return `<div class="t-sub" style="color:${cor};white-space:normal">${base}${extra}</div>`;
+}
+
+/**
+ * A conferência de `soma_vinculo_fecha`, que a camada emite em toda linha das
+ * duas funções e que a tela NÃO lia. A migration 103 escreveu essa partição com
+ * quatro FILTER explícitos porque "uma checagem que só consegue passar não é
+ * checagem" — e uma checagem que ninguém lê é ainda menos. Hoje é `true` em
+ * todas as linhas medidas; é justamente por isso que ela precisa de saída: um
+ * `lead_vinculo_regra` novo entraria sem alarme, que é o cenário que ela existe
+ * para pegar.
+ */
+export function conferirVinculo(linhas, rotuloDaLinha) {
+  const quebradas = (Array.isArray(linhas) ? linhas : []).filter((x) => x.soma_vinculo_fecha !== true);
+  if (quebradas.length === 0) return '';
+  const nomes = quebradas.map((x) => {
+    const partes = int(x.qtd_opps_rastreadas_ate_lead) + int(x.qtd_opps_so_por_leadsource)
+      + int(x.qtd_opps_lead_sem_classificacao) + int(x.qtd_opps_sem_origem);
+    return `${rotuloDaLinha(x)} (as quatro regras de vínculo somam ${br(partes)} contra ${br(x.qtd_oportunidades)} oportunidades)`;
+  });
+  return `<div class="card" style="border-color:var(--red);margin-bottom:10px;padding:10px 14px">
+    <div style="font-size:12.5px;line-height:1.6;color:var(--text)">
+      <strong style="color:var(--red)">⚠️ A partição por regra de vínculo não fecha em ${br(quebradas.length)} linha(s):</strong>
+      ${escapeHtml(nomes.join('; '))}.
+      <div class="mono-sm" style="color:var(--dim);margin-top:6px;line-height:1.55">
+        As quatro regras (<code>rastreada até o lead</code>, <code>só por LeadSource</code>, <code>lead sem classificação</code>, <code>sem origem</code>)
+        são partição TOTAL dos valores de <code>lead_vinculo_regra</code> e deveriam somar as oportunidades da linha.
+        Não somarem significa que a origem ganhou um valor de vínculo que a camada ainda não conhece — os números da linha continuam certos,
+        mas a atribuição dela deixou de ser explicável. O alarme é da camada (<code>soma_vinculo_fecha</code>), não desta tela.
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * A frase que proíbe a divisão, com o pior caso DO RECORTE ATUAL.
+ * Sai do dado porque números de exemplo escritos à mão já apareceram duas vezes
+ * neste arquivo citando um recorte que não estava na tela.
+ */
+export function exemploQueProibeATaxa(linhas) {
+  const candidatas = linhas
+    .filter((r) => int(r.qtd_leads_gerados) > 0 && int(r.qtd_oportunidades) > int(r.qtd_leads_gerados))
+    .map((r) => ({ r, razao: int(r.qtd_oportunidades) / int(r.qtd_leads_gerados) }))
+    .sort((a, b) => b.razao - a.razao);
+  if (candidatas.length === 0) return null;
+  const { r, razao } = candidatas[0];
+  // SEM "neste recorte" aqui: quem põe a moldura é a frase que a consome, e
+  // tê-la nos dois lugares produzia "e neste recorte X tem 75 leads e 322
+  // oportunidades neste recorte" — visto na primeira carga contra a API real.
+  return `${r.categoria_rotulo ?? r.categoria} tem ${br(r.qtd_leads_gerados)} leads e ${br(r.qtd_oportunidades)} oportunidades — uma taxa ali marcaria ${(razao * 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`;
+}
+
+export function renderCategoria(categoria, opcoes = {}) {
+  const linhas = Array.isArray(categoria) ? categoria : [];
+  if (linhas.length === 0) {
+    return '<div class="empty-state"><div class="es-title">Sem categorias no recorte</div><div>Nenhuma linha a exibir.</div></div>';
+  }
+  const totalRecorte = int(linhas[0]?.total_do_recorte);
+  const totalLeads = int(linhas[0]?.total_leads_do_recorte);
+  const somaOpp = linhas.reduce((s, x) => s + int(x.qtd_oportunidades), 0);
+  const somaLeads = linhas.reduce((s, x) => s + int(x.qtd_leads_gerados), 0);
+
+  const corpo = linhas.map((c) => {
+    const qtd = int(c.qtd_oportunidades);
+    const dec = int(c.qtd_decididas);
+    const leads = int(c.qtd_leads_gerados);
+    const rotulo = c.categoria_rotulo ?? c.categoria ?? '(sem categoria)';
+    const nota = PRESENTE_EM[c.categoria_presente_em] ?? null;
+    // A LINHA SÓ ABRE SE HOUVER O QUE LISTAR. Zero oportunidades é um clique
+    // que só pode dar lista vazia — dizer o motivo informa mais do que abrir um
+    // painel em branco. E os dois zeros não são a mesma coisa (ver acima).
+    const separavel = typeof c.categoria === 'string' && c.categoria.includes(',');
+    const abre = qtd > 0 && !separavel;
+    const alvo = `categoria:${c.segmento_aba}:${c.categoria ?? ''}`;
+    const attrs = abre
+      ? ` role="button" tabindex="0" data-drill="${escapeHtml(alvo)}" data-esperado="${qtd}" style="cursor:pointer"`
+        + ` aria-label="${escapeHtml(`${rotulo}: abrir as ${br(qtd)} oportunidades desta categoria`)}"`
+      : '';
+    const motivoSemClique = abre ? ''
+      : (separavel
+        ? '<div class="t-sub" style="color:var(--amber);white-space:normal">sem lista: o nome desta categoria tem vírgula, e o filtro viaja em lista separada por vírgula — o painel traria a união de dois recortes, não este</div>'
+        : motivoSemLista(c.categoria_presente_em, leads));
+    return `<tr${attrs}>
+      <td>
+        <div class="t-name" style="max-width:none">
+          <span class="badge ${CLASSE_SEG[c.segmento_aba] ?? 'lead'}"><span class="b-dot"></span>${escapeHtml(ROTULO_SEG[c.segmento_aba] ?? c.segmento_aba)}</span>
+          <span style="margin-left:6px">${escapeHtml(rotulo)}</span>
+        </div>
+        ${nota ? `<div class="t-sub" style="line-height:1.45;white-space:normal;max-width:52ch">${escapeHtml(nota)}</div>` : ''}
+        ${motivoSemClique}
+      </td>
+      <td style="font-variant-numeric:tabular-nums">${br(qtd)}<div class="t-sub">${pct(c.pct_do_total) ?? '—'}</div></td>
+      <td style="font-variant-numeric:tabular-nums;padding-right:14px">
+        ${br(leads)}
+        <div class="t-sub">${leads > 0 ? `${br(c.qtd_leads_com_oportunidade)} viraram oportunidade` : 'nenhum lead nesta categoria'}</div>
+        ${int(c.qtd_leads_fora_por_data_ausente) > 0 ? `<div class="t-sub" style="color:var(--amber)">${br(c.qtd_leads_fora_por_data_ausente)} fora do recorte por data ausente</div>` : ''}
+      </td>
+      <td style="font-variant-numeric:tabular-nums;color:var(--green)">${br(c.qtd_ganhas)}</td>
+      <td style="font-variant-numeric:tabular-nums;color:var(--red)">${br(c.qtd_perdidas)}</td>
+      <td style="font-variant-numeric:tabular-nums;color:var(--muted)">${br(c.qtd_nao_decididas)}</td>
+      <td style="font-variant-numeric:tabular-nums">
+        ${dec > 0 ? `<strong>${pct(c.win_rate_decididas_pct) ?? '—'}</strong><div class="t-sub">${br(c.qtd_ganhas)} de ${br(dec)} decididas</div>`
+                  : '<span style="color:var(--dim)">—</span><div class="t-sub">nenhuma decidida</div>'}
+      </td>
+      <td style="font-variant-numeric:tabular-nums">${escapeHtml(fmtBrl(c.receita_ganha_brl) ?? '—')}
+        <div class="t-sub">${pct(c.pct_da_receita) ?? '—'} da receita${int(c.qtd_ganhas_fora_do_valor) > 0 ? ` · ${br(c.qtd_ganhas_fora_do_valor)} fora da soma` : ''}</div>
+      </td>
+      <td style="font-variant-numeric:tabular-nums;color:var(--muted)">${escapeHtml(fmtBrl(c.pipeline_aberto_brl) ?? '—')}</td>
+    </tr>`;
+  }).join('');
+
+  // DOIS AVISOS DIFERENTES, e colapsá-los num só apagaria a distinção:
+  //  · `ignorando` — filtros que a SEÇÃO INTEIRA não aplica (medido por nós);
+  //  · `leads_filtros_ignorados` — filtros que a camada aplicou à oportunidade
+  //    e NÃO conseguiu aplicar ao lead, porque o campo não existe em `lead`.
+  //    Este vem declarado pela própria API, como string.
+  const avisoSecao = opcoes.ignorando && opcoes.ignorando.length
+    ? `<div class="tl-idade" style="margin-bottom:10px;line-height:1.5">⚠️ Esta seção IGNORA ${escapeHtml(opcoes.ignorando.join(' e '))} —
+        <code>fn_oportunidades_por_categoria</code> não aceita esse filtro. Os cards acima estão filtrados; esta tabela não.</div>`
+    : '';
+  const ignoradosNoLead = linhas.find((x) => x.leads_filtros_ignorados)?.leads_filtros_ignorados ?? null;
+  const avisoLead = ignoradosNoLead
+    ? `<div class="tl-idade" style="margin-bottom:10px;line-height:1.5">⚠️ A coluna de LEADS não honra ${escapeHtml(String(ignoradosNoLead))}:
+        esses campos existem na oportunidade e não em <code>lead</code>. As contagens de oportunidade desta tabela estão filtradas por eles; as de lead, não —
+        quem declara isso é a própria camada, no campo <code>leads_filtros_ignorados</code>.</div>`
+    : '';
+
+  const confOpp = somaOpp === totalRecorte
+    ? `<span style="color:var(--green)">as categorias somam ${br(somaOpp)} = o total de oportunidades do recorte</span>`
+    : `<span style="color:var(--red)">⚠️ as categorias somam ${br(somaOpp)} mas o recorte tem ${br(totalRecorte)} oportunidades</span>`;
+  const confLead = somaLeads === totalLeads
+    ? `<span style="color:var(--green)">e ${br(somaLeads)} = o total de leads do recorte</span>`
+    : `<span style="color:var(--red)">⚠️ e somam ${br(somaLeads)} leads contra ${br(totalLeads)} do recorte</span>`;
+
+  const exemplo = exemploQueProibeATaxa(linhas);
+  const soLead = linhas.filter((x) => x.categoria_presente_em === 'so_lead');
+  const vinculo = conferirVinculo(linhas, (x) => x.categoria_rotulo ?? x.categoria ?? '(sem categoria)');
+
+  return `${avisoSecao}${avisoLead}${vinculo}
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Segmento / categoria</th><th>Oportunidades</th><th style="padding-right:14px">Leads gerados</th><th>Ganhas</th><th>Perdidas</th>
+          <th>Não decididas</th><th>Win rate (decididas)</th><th>Receita ganha</th><th>Pipeline aberto</th>
+        </tr></thead>
+        <tbody>${corpo}</tbody>
+      </table>
+    </div>
+    <div class="mono-sm" style="color:var(--dim);margin-top:10px;line-height:1.6">
+      <strong style="color:var(--amber)">As duas contagens ficam lado a lado e nenhuma divide a outra.</strong>
+      A oportunidade é atribuída pela origem DELA (<code>Opportunity.LeadSource</code>), não herdada do lead — são duas populações
+      atribuídas por caminhos diferentes${exemplo ? `, e neste recorte ${escapeHtml(exemplo)}` : ''}.
+      Dividir uma pela outra é “Qualificados ÷ Em cadência” com outra roupa.
+      ${soLead.length ? `<br>${br(soLead.length)} categoria(s) aparecem só do lado do lead (${soLead.map((x) => escapeHtml(x.categoria_rotulo ?? x.categoria)).join(', ')}):
+        neste recorte nenhuma oportunidade caiu nelas, e elas continuam na tabela de propósito — sumir com elas esconderia justamente o dado interessante.` : ''}
+      <br>${confOpp}, ${confLead}.
     </div>`;
 }
 
@@ -500,6 +861,18 @@ export function renderForaDoValor(cards) {
       <div>As ${br(cards.qtd_ganhas)} oportunidades ganhas do recorte entraram inteiras na receita.</div></div>`;
   }
   const somaMotivos = motivos.reduce((s, [, q]) => s + int(q), 0);
+  // O MOTIVO NÃO É FILTRO na camada (`conversao_indisponivel_motivo` não entra
+  // em fn_search_oportunidades), então a lista abre pelo CONJUNTO INTEIRO e não
+  // linha a linha. Abrir "só as sem taxa" exigiria filtrar no cliente sobre uma
+  // página de 50, o que é fingir que a página é o conjunto.
+  const abrirTodas = `<div style="margin-top:12px">
+      <button type="button" class="filter-clear" data-drill="ganhas_sem_valor" data-esperado="${fora}"
+        style="cursor:pointer;display:inline-flex;align-items:center;gap:6px"
+        aria-label="Abrir as ${escapeHtml(br(fora))} ganhas que ficaram fora da receita">
+        <i class="ti ti-list-search"></i>Ver as ${br(fora)} ganhas fora da soma
+      </button>
+      <span class="mono-sm" style="color:var(--dim);margin-left:8px">o motivo não é filtro na camada — a lista abre o conjunto inteiro, não um motivo</span>
+    </div>`;
   return `<div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>Motivo declarado pela camada de dados</th><th>Ganhas</th></tr></thead>
@@ -513,7 +886,7 @@ export function renderForaDoValor(cards) {
       continuam contadas como ganhas, no win rate e no funil — o que falta é o valor delas, e o motivo está acima.
       A soma dos motivos é ${br(somaMotivos)}${somaMotivos === fora ? '' : ` <span style="color:var(--red)">⚠️ e deveria ser ${br(fora)}</span>`}.
       <br>Converter mesmo assim (<code>amount × 1</code>) seria inventar receita; deixá-las de fora sem contar seria esconder a falta.
-    </div>`;
+    </div>${abrirTodas}`;
 }
 
 export function renderRessalvaCiclo(cards) {
@@ -676,6 +1049,353 @@ const PADROES = {
 
 const estado = { ...PADROES, offset: 0 };
 
+// ---------------------------------------------------------------------------
+// DRILL-DOWN — abrir o conjunto que está por trás de um número
+// ---------------------------------------------------------------------------
+// MESMO MODELO DE INTERAÇÃO da aba antiga (`abrirDetalheCard`,
+// views-legacy.js:1966): clica no número, abre um painel modal com as linhas
+// que o compõem, fecha no X, no overlay ou no Esc. O que muda aqui é a
+// PROMESSA que o painel faz:
+//
+//  · O TOTAL DO PAINEL É O NÚMERO CLICADO. Não "parecido", não "a primeira
+//    página": o painel recebe o número que estava no card, pergunta o total à
+//    API sob o recorte que ele mesmo montou, e ESCREVE a conferência na tela.
+//    Divergiu, ele denuncia — é literalmente o defeito que esta aba existe
+//    para não ter.
+//
+//  · UM NÚMERO QUE NÃO DEFINE CONJUNTO NÃO VIRA BOTÃO. Win rate é razão;
+//    receita, ticket médio e pipeline são somas. Abrir uma lista embaixo de um
+//    deles obrigaria o painel a exibir um total que não é o número do card —
+//    e "lista que não corresponde ao número" é a forma mais barata de a tela
+//    mentir. Eles ficam sem clique, com o motivo escrito no próprio card.
+//
+//  · O PAINEL REPRODUZ O PREDICADO DA SEÇÃO, não o da barra de filtros. As
+//    seções desta aba aplicam conjuntos DIFERENTES de filtros (medido contra a
+//    API em 2026-09-16 e reconferido nesta entrega: o funil devolve as mesmas
+//    sete linhas com `desfecho=ganha`; a tabela de segmento devolve as mesmas
+//    cinco com `lead_vinculo_regra=conta`). Herdar o que a seção ignora faria
+//    o total do painel discordar da linha que o abriu.
+//
+// `busca`, `so_divergentes` e `so_sem_valor` NÃO entram em herança nenhuma:
+// eles estreitam só a LISTA (medido: com `busca=LOGMEIN` a lista vai a 40 e os
+// cards continuam em 5.415). O painel declara, por escrito, o que deixou de
+// fora e por quê.
+const HERANCA_DO_PAINEL = {
+  cards: ['de', 'ate', 'segmento', 'fase', 'desfecho', 'moeda', 'lead_vinculo_regra'],
+  funil: ['de', 'ate', 'segmento', 'moeda', 'lead_vinculo_regra'],
+  segmento: ['de', 'ate', 'fase', 'desfecho', 'moeda'],
+  // `fn_oportunidades_por_categoria` APLICA segmento (ao contrário da tabela de
+  // segmento, que o ignora) e IGNORA lead_vinculo_regra — medido contra a API
+  // em 2026-09-16, linha a linha: com `lead_vinculo_regra=conta` as 16 linhas
+  // voltam idênticas; com `segmento=Marketing` a tabela cai para 6.
+  categoria: ['de', 'ate', 'segmento', 'fase', 'desfecho', 'moeda'],
+};
+
+const ROTULO_CAMPO = {
+  segmento: 'segmento', fase: 'fase', desfecho: 'desfecho',
+  moeda: 'moeda', lead_vinculo_regra: 'vínculo', categoria: 'categoria',
+};
+
+const ROTULO_DESFECHO = Object.fromEntries(DESFECHOS.map((d) => [d.valor, d.rotulo]));
+
+function rotuloDeValor(campo, valor) {
+  if (campo === 'segmento') return ROTULO_SEG[valor] ?? valor;
+  if (campo === 'fase') return ROTULO_FASE[valor] ?? valor;
+  if (campo === 'desfecho') return ROTULO_DESFECHO[valor] ?? valor;
+  if (campo === 'lead_vinculo_regra') return ROTULO_VINCULO[valor] ?? valor;
+  return valor;
+}
+
+// Os dois baldes que a camada considera SEM origem classificada. A lista é
+// LITERALMENTE o predicado de `so_nao_classificado` em fn_search_oportunidades
+// (`segmento_aba IN ('NaoClassificado','SemOrigem')`).
+//
+// CORREÇÃO de um comentário que ficou velho dentro da mesma sessão: a versão
+// anterior deste bloco dizia, como medição datada, que o endpoint NÃO
+// encaminhava `so_nao_classificado`. Isso era verdade quando foi escrito e
+// deixou de ser quando a whitelist do n8n foi corrigida — hoje o parâmetro
+// devolve 795 no recorte de 12 meses, e o teste de contrato afirma isso. Num
+// arquivo onde comentário é prova, um comentário vencido é pior que nenhum.
+//
+// Mantemos `segmento` (e não o interruptor) por um motivo que continua válido:
+// ele é o mesmo parâmetro que a linha de categoria nula precisa usar, e um
+// caminho só é um caminho só para testar. Os dois predicados são idênticos.
+const SEM_CLASSIFICACAO = ['NaoClassificado', 'SemOrigem'];
+
+/**
+ * Os painéis de recorte fixo. Cada um declara:
+ *   `secao`    — de qual seção o número veio (define o que é herdado);
+ *   `extra`    — os filtros que ESTE recorte acrescenta;
+ *   `esperado` — de onde sai o número que o painel tem de bater, lido da MESMA
+ *                resposta que pintou o card. É esta função que o teste contra
+ *                a API real usa como fonte do esperado: mexer no recorte sem
+ *                mexer no esperado (ou vice-versa) deixa o teste vermelho.
+ */
+export const PAINEIS = {
+  total: {
+    rotulo: 'Todas as oportunidades do recorte',
+    secao: 'cards',
+    extra: () => ({}),
+    esperado: (r) => int(r?.cards?.total_oportunidades),
+  },
+  ganhas: {
+    rotulo: 'Ganhas',
+    secao: 'cards',
+    extra: () => ({ desfecho: ['ganha'] }),
+    esperado: (r) => int(r?.cards?.qtd_ganhas),
+  },
+  perdidas: {
+    rotulo: 'Perdidas',
+    secao: 'cards',
+    extra: () => ({ desfecho: ['perdida'] }),
+    esperado: (r) => int(r?.cards?.qtd_perdidas),
+  },
+  abertas: {
+    rotulo: 'Abertas',
+    secao: 'cards',
+    extra: () => ({ desfecho: ['aberta'] }),
+    esperado: (r) => int(r?.cards?.qtd_abertas),
+  },
+  fora_de_fase: {
+    rotulo: 'Fora de qualquer fase',
+    secao: 'cards',
+    extra: () => ({ desfecho: ['fora_de_fase'] }),
+    esperado: (r) => int(r?.cards?.qtd_fora_de_fase),
+  },
+  sem_declaracao: {
+    rotulo: 'Sem declaração da origem',
+    secao: 'cards',
+    extra: () => ({ desfecho: ['estagio_nao_declarado', 'declaracao_incompleta'] }),
+    esperado: (r) => int(r?.cards?.qtd_estagio_nao_declarado) + int(r?.cards?.qtd_declaracao_incompleta),
+  },
+  divergentes: {
+    rotulo: 'Divergência origem × fase',
+    secao: 'cards',
+    extra: () => ({ so_divergentes: true }),
+    esperado: (r) => int(r?.cards?.qtd_divergencia_origem_vs_fase),
+  },
+  sem_origem_classificada: {
+    // O card mostra a COBERTURA (um percentual); o conjunto que dá para abrir é
+    // o COMPLEMENTO dela, e o título diz isso com todas as letras em vez de
+    // abrir uma lista que não corresponde ao número exibido.
+    rotulo: 'Sem origem classificada (o complemento da cobertura)',
+    secao: 'cards',
+    extra: () => ({ segmento: [...SEM_CLASSIFICACAO] }),
+    esperado: (r) => int(r?.cards?.qtd_nao_classificado) + int(r?.cards?.qtd_sem_origem),
+  },
+  ganhas_sem_valor: {
+    rotulo: 'Ganhas que ficaram fora da receita',
+    secao: 'cards',
+    extra: () => ({ desfecho: ['ganha'], so_sem_valor: true }),
+    esperado: (r) => int(r?.cards?.qtd_ganhas_fora_do_valor),
+  },
+};
+
+/**
+ * Resolve o tipo do painel, inclusive os dinâmicos (`fase:<v>`, `segmento:<v>`).
+ * Devolve `null` para tipo desconhecido — a URL é entrada não confiável e
+ * `?odet=xpto` não pode abrir painel nenhum nem derrubar a aba.
+ */
+export function definicaoDoPainel(tipo) {
+  if (typeof tipo !== 'string' || tipo === '') return null;
+  if (Object.prototype.hasOwnProperty.call(PAINEIS, tipo)) return { tipo, ...PAINEIS[tipo] };
+
+  // `categoria:<segmento_aba>:<categoria>` — precisa de parser próprio porque o
+  // GRÃO É O PAR e o nome da categoria não é um identificador: ele contém
+  // barras (Evento/Webinar, Outbound SDR/Vendas) e pode conter dois-pontos. Quem
+  // delimita é o PRIMEIRO dois-pontos depois do prefixo — `segmento_aba` é enum
+  // fechado, sem separador nenhum. Sufixo VAZIO é a linha de categoria NULA.
+  if (tipo.startsWith('categoria:')) {
+    const resto = tipo.slice('categoria:'.length);
+    const corteSeg = resto.indexOf(':');
+    if (corteSeg < 1) return null;
+    const seg = resto.slice(0, corteSeg);
+    const cru = resto.slice(corteSeg + 1);
+    const cat = cru === '' ? null : cru;
+    // VÍRGULA NO NOME DA CATEGORIA TORNA O RECORTE INEXPRIMÍVEL, e a tela
+    // recusa em vez de abrir a lista errada. `data-api.js` serializa lista de
+    // filtro com vírgula (`v.join(',')`), e a borda separa de volta pela
+    // vírgula: "Evento, Webinar" chegaria ao SQL como DOIS valores e o painel
+    // traria a UNIÃO dos dois, embaixo de uma linha que conta um só.
+    // Nenhuma das 15 categorias de hoje tem vírgula — mas elas vêm de
+    // `leadsource_crosswalk`, que é texto livre, então a guarda é de quando e
+    // não de se.
+    if (cat !== null && cat.includes(',')) return null;
+    const achaLinha = (r) => (r?.categoria ?? []).find(
+      (x) => x.segmento_aba === seg && (x.categoria ?? null) === cat);
+    if (cat === null) {
+      // NÃO EXISTE FILTRO DE "CATEGORIA NULA". `fn_filtro_casa` trata
+      // `categoria: null` como AUSÊNCIA de filtro, e mandar isso devolveria o
+      // recorte inteiro embaixo de uma linha de 795. O recorte possível é o
+      // SEGMENTO, e ele coincide com a linha porque só NaoClassificado e
+      // SemOrigem têm categoria nula — conferido nos dois recortes, inclusive
+      // na base inteira, onde as duas linhas existem (1.380 e 2) e
+      // `so_nao_classificado` sozinho devolveria a soma, 1.382, que não é
+      // nenhuma das duas. Se um dia um desses segmentos ganhar categoria, a
+      // conferência painel × linha fica VERMELHA em vez de o painel mentir.
+      return {
+        tipo,
+        arg: seg,
+        rotulo: `Sem categoria — segmento ${ROTULO_SEG[seg] ?? seg}`,
+        secao: 'categoria',
+        ressalva: 'Não existe filtro de “categoria nula” na camada: este recorte é o segmento inteiro, e ele coincide com a linha porque só os segmentos sem classificação têm categoria nula. A conferência acima é o que prova a coincidência a cada abertura.',
+        extra: () => ({ segmento: [seg] }),
+        esperado: (r) => { const l = achaLinha(r); return l ? int(l.qtd_oportunidades) : null; },
+      };
+    }
+    return {
+      tipo,
+      arg: cat,
+      rotulo: `${ROTULO_SEG[seg] ?? seg} · ${cat}`,
+      secao: 'categoria',
+      // OS DOIS FILTROS, porque a linha é o PAR. Hoje nenhuma categoria aparece
+      // sob dois segmentos e `categoria` sozinha bastaria; mandar o par é o que
+      // mantém o painel correto no dia em que uma regra nova fundir isso.
+      extra: () => ({ segmento: [seg], categoria: [cat] }),
+      esperado: (r) => { const l = achaLinha(r); return l ? int(l.qtd_oportunidades) : null; },
+    };
+  }
+
+  const corte = tipo.indexOf(':');
+  if (corte < 1) return null;
+  const prefixo = tipo.slice(0, corte);
+  const arg = tipo.slice(corte + 1);
+  if (!arg) return null;
+  if (prefixo === 'fase') {
+    return {
+      tipo,
+      arg,
+      rotulo: `Fase: ${ROTULO_FASE[arg] ?? arg}`,
+      secao: 'funil',
+      extra: () => ({ fase: [arg] }),
+      esperado: (r) => {
+        const linha = (r?.funil ?? []).find((f) => f.fase === arg);
+        return linha ? int(linha.qtd_da_coorte_agora) : null;
+      },
+    };
+  }
+  if (prefixo === 'segmento') {
+    return {
+      tipo,
+      arg,
+      rotulo: `Segmento: ${ROTULO_SEG[arg] ?? arg}`,
+      secao: 'segmento',
+      extra: () => ({ segmento: [arg] }),
+      esperado: (r) => {
+        const linha = (r?.segmento ?? []).find((s) => s.segmento_aba === arg);
+        return linha ? int(linha.qtd_oportunidades) : null;
+      },
+    };
+  }
+  return null;
+}
+
+/** O que a aba está filtrando e o painel DELIBERADAMENTE não herdou. */
+export function ignoradosDoPainel(def, est) {
+  const herda = HERANCA_DO_PAINEL[def.secao] ?? [];
+  const fora = [];
+  for (const campo of ['segmento', 'fase', 'desfecho', 'lead_vinculo_regra']) {
+    if (est[campo] && !herda.includes(campo)) {
+      fora.push(`o filtro de ${ROTULO_CAMPO[campo]} (${rotuloDeValor(campo, est[campo])}), que esta seção não aplica ao próprio número`);
+    }
+  }
+  if (est.busca) fora.push(`a busca “${est.busca}”, que estreita só a lista do rodapé e não o número clicado`);
+  const extra = def.extra();
+  if (est.so_divergentes && extra.so_divergentes !== true) fora.push('o interruptor “só divergentes”, que é de auditoria e estreita só a lista');
+  if (est.so_sem_valor && extra.so_sem_valor !== true) fora.push('o interruptor “só sem valor”, que é de auditoria e estreita só a lista');
+  return fora;
+}
+
+/**
+ * Monta o recorte do painel a partir do estado da aba.
+ *
+ * A parte que não é óbvia é a INTERSEÇÃO. Com `desfecho=perdida` na barra de
+ * filtros, o card "Ganhas" marca 0 — porque os cards já aplicam o filtro.
+ * Trocar `desfecho` por `ganha` abriria 987 linhas embaixo de um card que diz
+ * zero. O recorte certo é a interseção dos dois, que nesse caso é o conjunto
+ * VAZIO: a API não tem como expressar "nada", então o painel nem chama — ele
+ * declara a exclusão mútua e confere contra o zero do card.
+ */
+export function filtrosDoPainel(def, est = estado) {
+  if (!def) return null;
+  const filtros = { limit: PAGINA };
+  for (const campo of HERANCA_DO_PAINEL[def.secao] ?? []) {
+    const v = est[campo];
+    if (v !== null && v !== undefined && v !== '') filtros[campo] = v;
+  }
+  if (est.ordenar_por) filtros.ordenar_por = est.ordenar_por;
+
+  let vazio = false;
+  let motivoVazio = null;
+  for (const [campo, alvo] of Object.entries(def.extra())) {
+    if (typeof alvo === 'boolean') { filtros[campo] = alvo; continue; }
+    const herdado = filtros[campo];
+    if (!herdado) { filtros[campo] = alvo; continue; }
+    if (alvo.includes(herdado)) { filtros[campo] = [herdado]; continue; }
+    vazio = true;
+    motivoVazio = `o filtro de ${ROTULO_CAMPO[campo] ?? campo} ativo na aba (${rotuloDeValor(campo, herdado)}) e este recorte (${alvo.map((v) => rotuloDeValor(campo, v)).join(' ou ')}) são mutuamente exclusivos — a interseção é vazia, e é por isso que o número clicado é zero`;
+  }
+  return { filtros, vazio, motivoVazio, ignorados: ignoradosDoPainel(def, est) };
+}
+
+/** O recorte, por extenso, para o subtítulo do painel. */
+function recortePorExtenso(plano, est) {
+  const pedacos = [];
+  const de = plano.filtros.de ? dataDePeriodo(`${plano.filtros.de}T00:00:00.000Z`) : null;
+  const ate = plano.filtros.ate ? dataDePeriodo(`${plano.filtros.ate}T00:00:00.000Z`, -1) : null;
+  pedacos.push(de && ate ? `criadas entre ${de} e ${ate}, inclusive` : 'sem recorte de período — a base inteira');
+  for (const campo of ['segmento', 'categoria', 'fase', 'desfecho', 'moeda', 'lead_vinculo_regra']) {
+    const v = plano.filtros[campo];
+    if (v === undefined) continue;
+    const lista = Array.isArray(v) ? v : [v];
+    pedacos.push(`${ROTULO_CAMPO[campo]} = ${lista.map((x) => rotuloDeValor(campo, x)).join(' ou ')}`);
+  }
+  if (plano.filtros.so_sem_valor) pedacos.push('sem valor convertido para real');
+  if (plano.filtros.so_divergentes) pedacos.push('com divergência entre a declaração da origem e a nossa fase');
+  return pedacos.join(' · ');
+}
+
+/**
+ * O cabeçalho do painel: o recorte exato, o total, e a CONFERÊNCIA contra o
+ * número clicado. A conferência é a razão de este painel existir — sem ela,
+ * ele é só mais uma lista, e listas que não batem com o card acima delas foram
+ * o defeito que matou a aba antiga.
+ */
+export function renderPainelSub({ def, plano, total, esperado, mock = false, est = estado }) {
+  const t = int(total);
+  const e = (esperado === null || esperado === undefined) ? null : int(esperado);
+
+  let confere;
+  if (mock) {
+    confere = `<span style="color:var(--amber)">fixture de desenvolvimento: o mock não refiltra, então o total abaixo é o do fixture inteiro e a conferência contra o número clicado não se aplica aqui</span>`;
+  } else if (e === null) {
+    confere = '<span style="color:var(--amber)">⚠️ o número de origem não veio na última resposta — sem conferência possível, e isso já é um defeito</span>';
+  } else if (t === e) {
+    confere = `<span style="color:var(--green)"><i class="ti ti-check" style="margin-right:4px"></i>confere: <strong style="font-variant-numeric:tabular-nums">${br(t)}</strong> no painel = <strong style="font-variant-numeric:tabular-nums">${br(e)}</strong> no número clicado</span>`;
+  } else {
+    confere = `<span style="color:var(--red)">⚠️ o painel trouxe <strong style="font-variant-numeric:tabular-nums">${br(t)}</strong> e o número clicado marca <strong style="font-variant-numeric:tabular-nums">${br(e)}</strong>. A tela está se contradizendo: uma das duas contagens está errada, e nenhuma linha abaixo deve ser lida como “o conjunto do card” enquanto isto aparecer.</span>`;
+  }
+
+  const vazio = plano.vazio
+    ? `<div class="tl-idade" style="margin-top:8px;line-height:1.5">⚠️ ${escapeHtml(plano.motivoVazio ?? '')}. Nenhuma chamada foi feita à API: não existe recorte que devolva o conjunto vazio, e inventar um devolveria linhas que não pertencem a este número.</div>`
+    : '';
+
+  const ignorados = plano.ignorados.length
+    ? `<div class="tl-idade" style="margin-top:8px;line-height:1.5">⚠️ Este painel NÃO herdou ${plano.ignorados.map((x) => escapeHtml(x)).join('; ')}. Herdar faria a lista deixar de corresponder ao número que a abriu.</div>`
+    : '';
+
+  // Ressalva do próprio recorte: hoje só a linha de categoria nula tem uma, e
+  // ela existe porque a camada não sabe filtrar por ausência de categoria.
+  const ressalva = def.ressalva
+    ? `<div class="tl-idade" style="margin-top:8px;line-height:1.5">⚠️ ${escapeHtml(def.ressalva)}</div>`
+    : '';
+
+  return `<div class="mono-sm" style="color:var(--muted);line-height:1.6">
+      <strong style="color:var(--text)">Recorte:</strong> ${escapeHtml(recortePorExtenso(plano, est))}.
+      <br>${confere}
+    </div>${vazio}${ressalva}${ignorados}`;
+}
+
 function hidratarDaUrl() {
   const url = typeof window === 'undefined' ? {} : lerEstadoAtual();
   Object.assign(estado, PADROES);
@@ -707,13 +1427,45 @@ function hidratarDaUrl() {
   const presetConhecido = estado.preset === 'custom' || PRESETS.some((x) => x.id === estado.preset);
   if (!presetConhecido) estado.preset = PADROES.preset;
 
+  // `odet` — o painel aberto (FR-6: endereçável e retomável, como o resto da
+  // aba). Também entrada NÃO CONFIÁVEL: `definicaoDoPainel` devolve null para
+  // tipo desconhecido, e aí o painel simplesmente não abre em vez de a aba
+  // tentar montar um recorte que não existe. Só é ABERTO depois da primeira
+  // carga, porque o número esperado sai da resposta que pinta os cards.
+  const det = Array.isArray(url.odet) ? url.odet[0] : url.odet;
+  _painelPendenteDaUrl = definicaoDoPainel(det) ? det : null;
+
   // Preset e datas têm de ser coerentes: preset nomeado manda nas datas; só
   // `custom` preserva o que veio escrito na URL.
   if (estado.preset !== 'custom') aplicarPreset(estado.preset);
 }
 
+/**
+ * Esta aba está visível? A pergunta existe por um defeito real: o listener de
+ * Esc vive no `document` e continuava vivo depois de o usuário trocar de aba
+ * com o painel aberto. Abrir "Ganhas" → ir para Leads → Esc fazia
+ * `fecharPainel()` chamar `persistirNaUrl()`, que crava `view` — e a URL
+ * passava a dizer `view=oportunidades-crm` com `view-leads-crm` na tela. F5 ou
+ * link compartilhado abria a aba errada.
+ */
+function abaAtiva() {
+  if (typeof document === 'undefined') return false;
+  const raiz = document.getElementById('view-oportunidades-crm');
+  return Boolean(raiz && raiz.classList.contains('active'));
+}
+
 function persistirNaUrl(opcoes = {}) {
   if (typeof window === 'undefined') return;
+  // Só esta aba escreve a URL desta aba.
+  //
+  // ⚠️ GUARDA QUE A SUÍTE NÃO DISCRIMINA, e isto está escrito para não parecer
+  // coberta: com o observador de saída de aba (ver `ligarEventos`) fechando o
+  // painel antes, nenhum caminho chama esta função com a aba inativa — mutar
+  // esta linha não deixa teste nenhum vermelho. Ela fica porque escreve estado
+  // GLOBAL (a query string, compartilhada com todas as views) e porque foi
+  // assim que a URL de Leads foi sequestrada: um caller futuro que rode fora do
+  // ciclo da aba erraria de novo, calado.
+  if (!abaAtiva()) return;
   // Parte do que JÁ está na URL para não apagar `dados=mock` / `cenario=`, que
   // são chaves de sessão de teste e vivem no mesmo lugar. `atualizarEstado`
   // reescreve a query string INTEIRA — foi exatamente assim que `dados=mock`
@@ -733,8 +1485,21 @@ function persistirNaUrl(opcoes = {}) {
     if (estado.ate) novo.oate = estado.ate;
     novo.opreset = 'custom';
   }
+  // O painel aberto vive na URL junto com o recorte: sem isto, F5 sobre um
+  // painel aberto voltava para a aba sem ele, e o link compartilhado mostrava
+  // a aba em vez do conjunto que motivou o compartilhamento.
+  // `_painelPendenteDaUrl` entra no OR porque, na entrada da aba, a URL é
+  // reescrita ANTES de o painel de `?odet=` abrir (ele espera a primeira
+  // carga): sem ele, esta reescrita apagaria o próprio parâmetro que a
+  // hidratação acabou de ler.
+  const det = _painel.tipo || _painelPendenteDaUrl;
+  if (det) novo.odet = det; else delete novo.odet;
   atualizarEstado(novo, opcoes);
 }
+// Lido de `odet` na hidratação e consumido depois da primeira carga — o número
+// que o painel tem de bater sai da mesma resposta que pinta os cards, e ela só
+// existe depois de `carregar()`.
+let _painelPendenteDaUrl = null;
 let _acumulado = [];
 let _ultimaResposta = null;
 let _ligado = false;
@@ -874,6 +1639,20 @@ export function coberturaDaTabela(segmento) {
   return `${p.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% com origem classificada`;
 }
 
+/**
+ * Badge da seção de categoria. Conta as linhas e destaca quantas existem só do
+ * lado do lead — que é a informação que o badge tem para dar e que nenhum outro
+ * lugar da tela dá. Sai do dado da PRÓPRIA seção, nunca de `cards`: a tabela
+ * ignora o filtro de vínculo, e os dois falariam de recortes diferentes.
+ */
+export function badgeDeCategoria(categoria) {
+  const linhas = Array.isArray(categoria) ? categoria : [];
+  if (linhas.length === 0) return '—';
+  const soLead = linhas.filter((x) => x.categoria_presente_em === 'so_lead').length;
+  const base = `${br(linhas.length)} categoria${linhas.length === 1 ? '' : 's'}`;
+  return soLead > 0 ? `${base} · ${br(soLead)} só do lado do lead` : base;
+}
+
 function ignoradosFunil() {
   const x = [];
   if (estado.fase) x.push('o filtro de fase');
@@ -883,6 +1662,13 @@ function ignoradosFunil() {
 function ignoradosSegmento() {
   const x = [];
   if (estado.segmento) x.push('o filtro de segmento');
+  if (estado.lead_vinculo_regra) x.push('o filtro de vínculo');
+  return x;
+}
+// A tabela de categoria aplica `segmento` (a de segmento não) e ignora
+// `lead_vinculo_regra` — medido, não deduzido por simetria.
+function ignoradosCategoria() {
+  const x = [];
   if (estado.lead_vinculo_regra) x.push('o filtro de vínculo');
   return x;
 }
@@ -935,6 +1721,8 @@ async function carregar(acumular = false) {
       : '<div class="empty-state"><div class="es-title">Seção suprimida</div><div>A partição por desfecho não fecha — ver o alerta no topo.</div></div>');
     set('opc-segmento-tbl', particaoOk ? renderSegmento(resp.segmento, { ignorando: ignoradosSegmento() })
       : '<div class="empty-state"><div class="es-title">Seção suprimida</div><div>A partição por desfecho não fecha — ver o alerta no topo.</div></div>');
+    set('opc-categoria-tbl', particaoOk ? renderCategoria(resp.categoria, { ignorando: ignoradosCategoria() })
+      : '<div class="empty-state"><div class="es-title">Seção suprimida</div><div>A partição por desfecho não fecha — ver o alerta no topo.</div></div>');
     set('opc-fora-valor', particaoOk ? renderForaDoValor(cards)
       : '<div class="empty-state"><div class="es-title">Seção suprimida</div><div>A partição por desfecho não fecha — ver o alerta no topo.</div></div>');
     set('opc-ciclo', renderRessalvaCiclo(cards));
@@ -946,6 +1734,7 @@ async function carregar(acumular = false) {
     // `pct_com_segmento`, que ia a 100% sobre uma tabela inalterada.
     txt('opc-funil-badge', `${br(totalDaCoorte(resp.funil))} na coorte`);
     txt('opc-segmento-badge', coberturaDaTabela(resp.segmento));
+    txt('opc-categoria-badge', badgeDeCategoria(resp.categoria));
     txt('opc-lista-badge', `${br(resp.lista?.total)} no recorte`);
     txt('opc-fora-badge', `${br(cards.qtd_ganhas_fora_do_valor)} ganha(s)`);
 
@@ -966,14 +1755,189 @@ async function carregar(acumular = false) {
     set(alvoErro, `<div class="tl-idade" style="line-height:1.55">⚠️ Falha ao carregar a aba: ${escapeHtml(e.message)}.
       Nenhum número é exibido em cima de uma leitura que falhou — a tela prefere ficar vazia a mostrar o recorte anterior como se fosse o atual.</div>`);
     set('opc-kpis', ''); set('opc-integridade', ''); set('opc-funil', '');
-    set('opc-segmento-tbl', ''); set('opc-fora-valor', ''); set('opc-ciclo', '');
+    set('opc-segmento-tbl', ''); set('opc-categoria-tbl', '');
+    set('opc-fora-valor', ''); set('opc-ciclo', '');
     set('opc-lista-rows', ''); set('opc-lista-foot', '');
   }
+}
+
+// ---------------------------------------------------------------------------
+// o painel, em movimento
+// ---------------------------------------------------------------------------
+// Estado PRÓPRIO, separado do da lista de baixo. Os dois paginam, e misturar
+// os offsets faria "Carregar mais" do painel avançar a lista do rodapé.
+const _painel = {
+  tipo: null, def: null, plano: null, esperado: null,
+  acumulado: [], total: 0, temMais: false, seq: 0, origem: null,
+};
+
+function painelAberto() {
+  return _painel.tipo !== null;
+}
+
+// Os focáveis DENTRO do diálogo, na ordem do documento. Recalculado a cada Tab
+// de propósito: a lista de linhas é repintada a cada página carregada, e uma
+// lista memorizada apontaria para nós que saíram do DOM.
+function focaveisDoPainel() {
+  const modal = el('opc-detalhe');
+  if (!modal) return [];
+  return [...modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((x) => !x.hasAttribute('disabled') && x.offsetParent !== null);
+}
+
+/**
+ * Mantém o Tab dentro do diálogo enquanto ele estiver aberto — o
+ * comportamento que `aria-modal="true"` PROMETE e que o markup sozinho não
+ * entrega. A alternativa seria remover o atributo; ela foi descartada porque o
+ * painel é modal de verdade (overlay opaco, Esc fecha, fundo inerte aos olhos),
+ * e tirar a declaração só esconderia do leitor de tela o que os olhos já veem.
+ */
+function prenderFoco(ev) {
+  const focaveis = focaveisDoPainel();
+  if (focaveis.length === 0) return;
+  const primeiro = focaveis[0];
+  const ultimo = focaveis[focaveis.length - 1];
+  const atual = document.activeElement;
+  const modal = el('opc-detalhe');
+  // Foco fora do diálogo (aconteceu antes desta guarda, ou veio do fundo):
+  // devolve para dentro em vez de deixar seguir.
+  if (!modal || !modal.contains(atual)) {
+    ev.preventDefault();
+    primeiro.focus();
+    return;
+  }
+  if (ev.shiftKey && atual === primeiro) { ev.preventDefault(); ultimo.focus(); return; }
+  if (!ev.shiftKey && atual === ultimo) { ev.preventDefault(); primeiro.focus(); }
+}
+
+// Trava a rolagem do fundo enquanto o painel está aberto. Sem isto, rolar com o
+// painel na frente movia a página atrás dele — a mesma promessa quebrada do
+// `aria-modal`, na versão do mouse.
+function travarRolagem(travar) {
+  if (typeof document === 'undefined' || !document.body) return;
+  document.body.style.overflow = travar ? 'hidden' : '';
+}
+
+/**
+ * O número que o painel tem de bater. Vem, nesta ordem:
+ *   1. do `data-esperado` do elemento clicado — o número que o usuário viu;
+ *   2. de `def.esperado(_ultimaResposta)`, quando o painel é reaberto pela URL
+ *      (F5 ou link compartilhado) e não houve clique nenhum.
+ * Os dois saem da MESMA resposta; o teste unitário confere que concordam para
+ * todos os painéis, senão a fonte 2 poderia envelhecer sem ninguém notar.
+ */
+function esperadoDoPainel(def, doClique) {
+  if (doClique !== null && doClique !== undefined && doClique !== '') {
+    const x = Number(doClique);
+    if (Number.isFinite(x)) return x;
+  }
+  return def.esperado(_ultimaResposta);
+}
+
+async function carregarPainel(acumular = false) {
+  const def = _painel.def;
+  if (!def) return;
+  const meu = ++_painel.seq;
+  const plano = filtrosDoPainel(def);
+  _painel.plano = plano;
+
+  const pintar = (resp, linhas) => {
+    _painel.acumulado = linhas;
+    _painel.total = int(resp?.lista?.total);
+    _painel.temMais = resp?.lista?.tem_mais === true;
+    const t = el('opc-det-titulo');
+    if (t) t.textContent = `${def.rotulo} — ${br(_painel.total)} oportunidade${_painel.total === 1 ? '' : 's'}`;
+    set('opc-det-sub', renderPainelSub({
+      def, plano, total: _painel.total, esperado: _painel.esperado, mock: resp?.mock === true,
+    }));
+    set('opc-det-rows', renderLista({ oportunidades: linhas, total: _painel.total }));
+    set('opc-det-foot', renderRodapePainel(linhas.length, _painel.total));
+    const mais = el('opc-det-mais');
+    // `tem_mais` da camada, nunca `acumulado.length < total`: os dois falam de
+    // coisas diferentes assim que o total é o do recorte e o array é o da
+    // página (foi o bloqueador 2 do QA na lista de baixo).
+    if (mais) mais.style.display = _painel.temMais ? '' : 'none';
+  };
+
+  // INTERSEÇÃO VAZIA: nenhuma chamada. Não existe recorte que devolva "nada", e
+  // mandar o recorte sem a parte que o esvazia traria linhas que não pertencem
+  // ao número clicado.
+  if (plano.vazio) {
+    pintar({ lista: { total: 0, tem_mais: false } }, []);
+    return;
+  }
+
+  try {
+    const offset = acumular ? _painel.acumulado.length : 0;
+    const resp = await obterOportunidades({ ...plano.filtros, offset: offset || undefined });
+    if (meu !== _painel.seq || !painelAberto()) return;
+    const novas = resp.lista?.oportunidades ?? [];
+    pintar(resp, acumular ? _painel.acumulado.concat(novas) : novas);
+  } catch (e) {
+    if (meu !== _painel.seq || !painelAberto()) return;
+    set('opc-det-sub', `<div class="tl-idade" style="line-height:1.55">⚠️ Falha ao abrir o painel: ${escapeHtml(e.message)}.
+      Nenhuma linha é exibida sobre uma leitura que falhou.</div>`);
+    set('opc-det-rows', '');
+    set('opc-det-foot', '');
+    const mais = el('opc-det-mais');
+    if (mais) mais.style.display = 'none';
+  }
+}
+
+export function renderRodapePainel(mostrando, total) {
+  return `<div class="mono-sm" style="color:var(--dim);line-height:1.6">
+      Mostrando ${br(mostrando)} de ${br(total)} oportunidades deste recorte — o total vem do SQL, não de <code>length</code> do array recebido.
+      <br>O painel não exibe nome de lead: a unidade desta aba é o negócio, e este repositório é público. Quem precisa da pessoa abre a aba Leads.
+    </div>`;
+}
+
+function abrirPainel(tipo, esperadoDoClique, origem) {
+  const def = definicaoDoPainel(tipo);
+  if (!def) return;
+  _painel.tipo = tipo;
+  _painel.def = def;
+  _painel.esperado = esperadoDoPainel(def, esperadoDoClique);
+  _painel.acumulado = [];
+  _painel.total = 0;
+  _painel.temMais = false;
+  _painel.origem = origem ?? null;
+
+  const modal = el('opc-detalhe');
+  if (modal) modal.style.display = 'flex';
+  travarRolagem(true);
+  set('opc-det-rows', '');
+  set('opc-det-foot', '');
+  set('opc-det-sub', '<div class="mono-sm" style="color:var(--dim)">carregando o recorte…</div>');
+  const t = el('opc-det-titulo');
+  if (t) t.textContent = def.rotulo;
+  const fechar = el('opc-det-fechar');
+  if (fechar) fechar.focus();
+  persistirNaUrl({ substituir: true });
+  carregarPainel(false);
+}
+
+function fecharPainel({ persistir = true } = {}) {
+  if (!painelAberto()) return;
+  _painel.seq++; // descarta resposta em voo: ela não pode repintar um painel fechado
+  _painel.tipo = null;
+  _painel.def = null;
+  _painel.plano = null;
+  _painel.acumulado = [];
+  const modal = el('opc-detalhe');
+  if (modal) modal.style.display = 'none';
+  travarRolagem(false);
+  const origem = _painel.origem;
+  _painel.origem = null;
+  if (persistir) persistirNaUrl({ substituir: true });
+  if (origem && typeof origem.focus === 'function' && origem.isConnected) origem.focus();
 }
 
 function recarregarDoZero() {
   estado.offset = 0;
   _acumulado = [];
+  // Mexer num filtro muda o recorte que o painel herdou: mantê-lo aberto o
+  // deixaria descrevendo um número que não está mais na tela.
+  fecharPainel({ persistir: false });
   // `substituir: true`: mexer num filtro não é navegação, e empilhar uma
   // entrada de histórico por tecla digitada na busca tornaria o botão
   // "voltar" inutilizável.
@@ -988,7 +1952,45 @@ function ligarEventos() {
   const raiz = el('view-oportunidades-crm');
   if (!raiz) return;
 
+  // Fechar com Esc. Documento inteiro de propósito: o foco pode estar no botão
+  // de fechar, numa linha da tabela ou em lugar nenhum, e o Esc tem de valer
+  // nos três casos. Só age com o painel aberto, então não rouba o Esc de mais
+  // ninguém na página.
+  // SAIR DA ABA FECHA O PAINEL. Não é zelo: o painel trava a rolagem do corpo
+  // (`travarRolagem`), e sair da aba com ele aberto deixaria a página SEGUINTE
+  // sem rolagem, por um estado que não é mais dela. A guarda de `abaAtiva()`
+  // sozinha não resolveria isso — ela impede a URL de ser sequestrada, não o
+  // `overflow:hidden` de vazar.
+  //
+  // Observador em vez de hook no `showView`: a troca de view é de
+  // views-legacy.js, e este módulo não o edita por decisão. A classe `active`
+  // no próprio nó é o sinal público dessa troca.
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => {
+      if (painelAberto() && !abaAtiva()) fecharPainel({ persistir: false });
+    }).observe(raiz, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  document.addEventListener('keydown', (ev) => {
+    if (!painelAberto() || !abaAtiva()) return;
+    if (ev.key === 'Escape') { ev.stopPropagation(); fecharPainel(); return; }
+    // ARMADILHA DE FOCO. Declarar `aria-modal="true"` e deixar o Tab passear
+    // pelo fundo é pior do que não declarar: leitor de tela e teclado passam a
+    // operar numa página que o overlay esconde. Medido antes desta guarda: de
+    // 40 Tabs, 38 paradas caíam fora do diálogo, e a segunda já era o BODY.
+    if (ev.key === 'Tab') prenderFoco(ev);
+  });
+
   raiz.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-drill-fechar]')) { fecharPainel(); return; }
+    // ANTES dos filtros: o painel também vive dentro da raiz, e um clique nele
+    // não pode ser lido como clique num controle da aba.
+    const drill = ev.target.closest('[data-drill]');
+    if (drill) {
+      abrirPainel(drill.getAttribute('data-drill'), drill.getAttribute('data-esperado'), drill);
+      return;
+    }
+    if (ev.target.closest('#opc-det-btn-mais')) { carregarPainel(true); return; }
     const btn = ev.target.closest('[data-preset]');
     if (btn) { aplicarPreset(btn.getAttribute('data-preset')); recarregarDoZero(); return; }
     if (ev.target.closest('#opc-limpar')) {
@@ -1006,6 +2008,17 @@ function ligarEventos() {
       estado.offset = _acumulado.length;
       carregar(true);
     }
+  });
+
+  // Teclado: `role="button"` obriga a responder a Enter e Espaço. Sem isto os
+  // cards e as linhas seriam alcançáveis pelo Tab e não fariam nada — pior que
+  // não serem alcançáveis.
+  raiz.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const drill = ev.target.closest('[data-drill]');
+    if (!drill) return;
+    ev.preventDefault();
+    abrirPainel(drill.getAttribute('data-drill'), drill.getAttribute('data-esperado'), drill);
   });
 
   raiz.addEventListener('change', (ev) => {
@@ -1046,6 +2059,7 @@ function ligarEventos() {
  */
 export async function renderViewOportunidades() {
   ligarEventos();
+  fecharPainel({ persistir: false }); // entrar na aba de novo não reabre painel antigo
   hidratarDaUrl();
   sincronizarControles();
   renderBarra(_ultimaResposta);
@@ -1053,6 +2067,15 @@ export async function renderViewOportunidades() {
   _acumulado = [];
   persistirNaUrl({ substituir: true });
   await carregar(false);
+  // O painel de `?odet=` só abre AGORA, depois de `carregar()`: o número que
+  // ele tem de bater sai da resposta que acabou de pintar os cards. Abrir antes
+  // seria conferir contra `undefined` e mostrar o aviso de "sem conferência
+  // possível" em toda abertura por link.
+  if (_painelPendenteDaUrl) {
+    const pendente = _painelPendenteDaUrl;
+    _painelPendenteDaUrl = null;
+    abrirPainel(pendente, null, null);
+  }
 }
 
 /** Põe os controles do DOM no valor do `estado` (que veio da URL). */
