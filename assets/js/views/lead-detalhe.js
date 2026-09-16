@@ -6,6 +6,11 @@
 import { buscarLead } from '../data-api.js';
 import { renderBadge, renderRazao, renderVinculoIdentidade } from '../attribution.js';
 import { atualizarEstado, lerEstadoAtual } from '../url-state.js';
+// Dinheiro multi-moeda: as regras saíram daqui para ../formato-moeda.js em
+// 2026-09-16, quando a aba Oportunidades passou a precisar exatamente delas.
+// Os nomes locais foram preservados para manter o diff no tamanho do que
+// realmente mudou (a origem das funções), não no de uma renomeação.
+import { fmtValor as _fmtValor, fmtMrr as _fmtMrr } from '../formato-moeda.js';
 
 const FONTE_CLASSE = { salesforce: 'src-sf', rd_station: 'src-rd' };
 
@@ -25,6 +30,16 @@ function _formatarData(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+
+// ---------------------------------------------------------------------------
+// DINHEIRO NUMA ORG MULTI-MOEDA (BRL / USD / MXN — migration 090)
+//
+// As funções de dinheiro (emMoeda/numeroSimples/fmtValor/fmtMrr) vivem em
+// ../formato-moeda.js desde 2026-09-16, quando a aba Oportunidades passou a
+// precisar exatamente delas — importadas no topo deste arquivo. O comentário
+// longo com o defeito que elas evitam foi junto, para ficar ao lado do código
+// e não virar folclore.
+
 
 const ROTULO_VALOR = {
   c_level: 'C-level', diretoria: 'Diretoria', gerencia: 'Gerência',
@@ -237,9 +252,15 @@ function _renderDesfecho(detalhe) {
     // multiplicação por prazo. `MRR__c` continua visível porque é dado real da
     // origem, mas deixou de ser candidato a "valor de contrato" — por isso vem
     // depois, rotulado como MRR e nada além disso.
+    //
+    // Moeda: ver `fmtValor`/`fmtMrr` em ../formato-moeda.js. `amount` é o valor
+    // na moeda do registro e `amount_brl` é a grandeza comparável; os dois
+    // aparecem, nunca só um.
     const vals = [];
-    if (o.amount != null) vals.push(`<span style="color:var(--text)">Valor da oportunidade ${Number(o.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>`);
-    if (o.mrr != null) vals.push(`<span style="color:var(--dim)">MRR ${Number(o.mrr).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>`);
+    const valorOpp = _fmtValor(o.amount_brl, o.amount, o.moeda, o.conversao_indisponivel_motivo);
+    if (valorOpp) vals.push(`<span style="color:var(--text)">Valor da oportunidade ${escapeHtml(valorOpp)}</span>`);
+    const mrrOpp = _fmtMrr(o.mrr, o.moeda);
+    if (mrrOpp) vals.push(`<span style="color:var(--dim)">MRR ${escapeHtml(mrrOpp)}</span>`);
     return `<div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--border)">
       <span style="width:6px;height:6px;border-radius:50%;background:${c};flex:none"></span>
       <div style="flex:1;min-width:0">
@@ -281,10 +302,21 @@ function _renderRelated(detalhe, estado) {
 
   if (rel.oportunidade) {
     const o = rel.oportunidade;
+    // Este card era o que de fato mentia na tela: "R$" literal na frente de
+    // `mrr` e de `valor_contrato`, ambos na moeda do registro. E `Number(null)`
+    // virava 0, então uma oportunidade sem MRR anunciava "R$ 0" — ausência
+    // exibida como zero é outro número inventado.
+    const mrrTxt = _fmtMrr(o.mrr, o.moeda);
+    const contratoTxt = _fmtValor(o.valor_contrato_brl, o.valor_contrato, o.moeda, o.conversao_indisponivel_motivo);
     blocos.push(`
       <div class="rel-card" style="cursor:default">
         <div><div class="rel-title"><i class="ti ti-arrow-up-right"></i> ${escapeHtml(o.estagio)}</div><div class="rel-sub">Oportunidade · ${escapeHtml(o.id)}</div></div>
-        <div class="rel-val">R$ ${Number(o.mrr).toLocaleString('pt-BR')}${o.valor_contrato !== null ? ` <span class="mono-sm" style="font-weight:400;color:var(--muted)">(contrato: R$ ${Number(o.valor_contrato).toLocaleString('pt-BR')})</span>` : ''}</div>
+        <div class="rel-val">${mrrTxt
+          ? `MRR ${escapeHtml(mrrTxt)}`
+          : `<span class="mono-sm" style="font-weight:400;color:var(--muted)">${o.mrr === undefined
+            ? 'MRR não veio nesta resposta da API'
+            : 'MRR não informado na origem'}</span>`}${contratoTxt
+          ? ` <span class="mono-sm" style="font-weight:400;color:var(--muted)">· contrato ${escapeHtml(contratoTxt)}</span>` : ''}</div>
       </div>`);
   } else {
     blocos.push(`

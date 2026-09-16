@@ -54,4 +54,23 @@ test.describe('Ficha do lead e jornada', () => {
     await expect(jornada).toContainText('dias atrás');
     await expect(jornada).not.toContainText(/\b0 dias\b/);
   });
+
+  // A org do Salesforce é multi-moeda (BRL/USD/MXN — migration 090) e a ficha
+  // carimbava "R$" em cima de dólar e de peso. Medido em 2026-09-16: 22 dos 91
+  // leads com valor estavam com o símbolo errado, um deles 3,4× acima do valor
+  // real. Este teste existe para que isso não volte em silêncio — ele falha se
+  // alguém reintroduzir o `currency: 'BRL'` fixo.
+  test('Valor em moeda estrangeira: mostra o convertido E o cru, nunca R$ sobre dólar', async ({ page }) => {
+    await page.goto('/?view=leads-crm&lead=real-mkt-02&dados=mock');
+    const desfecho = page.locator('#crm-view-desfecho');
+    // O convertido (grandeza comparável) e o cru (dado da origem), juntos.
+    await expect(desfecho).toContainText('R$ 99.469,50');
+    await expect(desfecho).toContainText('US$ 19.500,00');
+    // O que NÃO pode existir: o número em dólar rotulado como real.
+    await expect(desfecho).not.toContainText('R$ 19.500,00');
+    // Sem conversão possível, o valor aparece na moeda dele com o motivo —
+    // não some (exclusão silenciosa, contrato §1.6) nem vira real no chute.
+    await expect(desfecho).toContainText('sem conversão para real');
+    await expect(desfecho).toContainText('Moeda ausente no registro');
+  });
 });

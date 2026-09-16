@@ -40,7 +40,10 @@
     ],
     "related": {
       "conta": { "id": "acc-real-mkt-01", "nome": "Estoque Ágil Comércio" },
-      "oportunidade": { "id": "opp-real-mkt-01", "mrr": 90, "estagio": "Avaliação", "valor_contrato": null },
+      "oportunidade": { "id": "opp-real-mkt-01", "mrr": 90, "estagio": "Avaliação", "valor_contrato": null, "moeda": "BRL", "valor_contrato_brl": null, "conversao_indisponivel_motivo": null },
+      "oportunidades": [
+        { "id": "opp-real-mkt-01", "stage_name": "Avaliação", "fase_comercial": "qualificacao", "record_type_name": "New Brasil", "moeda": "BRL", "amount": 1080, "amount_brl": 1080, "mrr": 90, "contrato_valor": null, "contrato_valor_brl": null, "conversao_indisponivel_motivo": null, "contrato_indisponivel_motivo": "Oportunidade ainda não está Ganha — valor de contrato não se aplica" }
+      ],
       "cadeia_campanha": null
     }
   },
@@ -86,7 +89,11 @@
     ],
     "related": {
       "conta": { "id": "acc-real-mkt-02", "nome": "Mundo Tech Consultoria" },
-      "oportunidade": { "id": "opp-real-mkt-02", "mrr": 19500, "estagio": "Discovery", "valor_contrato": null },
+      "oportunidade": { "id": "opp-real-mkt-02", "mrr": 19500, "estagio": "Ganho", "valor_contrato": 19500, "moeda": "USD", "valor_contrato_brl": 99469.49602122017, "conversao_indisponivel_motivo": null },
+      "oportunidades": [
+        { "id": "opp-real-mkt-02", "stage_name": "Ganho", "fase_comercial": "ganho", "record_type_name": "New Freshworks", "moeda": "USD", "amount": 19500, "amount_brl": 99469.49602122017, "mrr": 19500, "contrato_valor": 19500, "contrato_valor_brl": 99469.49602122017, "conversao_indisponivel_motivo": null, "contrato_indisponivel_motivo": null },
+        { "id": "opp-real-mkt-02b", "stage_name": "Negociação", "fase_comercial": "negociacao", "record_type_name": "Global", "moeda": null, "amount": 4200, "amount_brl": null, "mrr": null, "contrato_valor": null, "contrato_valor_brl": null, "conversao_indisponivel_motivo": "Moeda ausente no registro — ingerido antes da migration 090 e ainda não relido (a ingestão é incremental por SystemModstamp)", "contrato_indisponivel_motivo": "Oportunidade ainda não está Ganha — valor de contrato não se aplica" }
+      ],
       "cadeia_campanha": null
     }
   },
@@ -170,7 +177,10 @@
     ],
     "related": {
       "conta": { "id": "acc-real-mkt-04", "nome": "Pro Soluções Cloud" },
-      "oportunidade": { "id": "opp-real-mkt-04", "mrr": 923, "estagio": "Proposta Enviada", "valor_contrato": null },
+      "oportunidade": { "id": "opp-real-mkt-04", "mrr": 923, "estagio": "Proposta Enviada", "valor_contrato": null, "moeda": "COP", "valor_contrato_brl": null, "conversao_indisponivel_motivo": "Moeda \"COP\" não está em currency_rate — taxa desconhecida, e valor NUNCA é assumido como real" },
+      "oportunidades": [
+        { "id": "opp-real-mkt-04", "stage_name": "Proposta Enviada", "fase_comercial": "negociacao", "record_type_name": "Global", "moeda": "COP", "amount": 3299.99, "amount_brl": null, "mrr": 923, "contrato_valor": null, "contrato_valor_brl": null, "conversao_indisponivel_motivo": "Moeda \"COP\" não está em currency_rate — taxa desconhecida, e valor NUNCA é assumido como real", "contrato_indisponivel_motivo": "Oportunidade ainda não está Ganha — valor de contrato não se aplica" }
+      ],
       "cadeia_campanha": null
     }
   },
